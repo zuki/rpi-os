@@ -32,7 +32,7 @@ struct inode {
     uint16_t minor;
     uint16_t nlink;
     uint32_t size;
-    uint32_t addrs[NDIRECT+1];
+    uint32_t addrs[NDIRECT+2];
 };
 
 /*

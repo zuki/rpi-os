@@ -283,7 +283,7 @@ iget(uint32_t dev, uint32_t inum)
     return ip;
 }
 
-/* 
+/*
  * Increment reference count for ip.
  * Returns ip to enable ip = idup(ip1) idiom.
  */
@@ -296,7 +296,7 @@ idup(struct inode *ip)
     return ip;
 }
 
-/* 
+/*
  * Lock the given inode.
  * Reads the inode from disk if necessary.
  */
@@ -390,7 +390,7 @@ iunlockput(struct inode *ip)
 static uint32_t
 bmap(struct inode *ip, uint32_t bn)
 {
-    uint32_t addr, *a;
+    uint32_t idx1, idx2, addr, *a;
     struct buf *bp;
 
     if (bn < NDIRECT) {
@@ -414,6 +414,31 @@ bmap(struct inode *ip, uint32_t bn)
         return addr;
     }
 
+    bn -= NINDIRECT;
+
+    if (bn < NINDIRECT * NINDIRECT) {
+        // 二重間接ブロックをロードする。必要であれば割り当てる。
+        if ((addr = ip->addrs[NDIRECT+1]) == 0)
+            ip->addrs[NDIRECT+1] = addr = balloc(ip->dev);
+        idx1 = bn / NINDIRECT;  // ip->addrs[NDIRECT+1]内のインデックス
+        idx2 = bn % NINDIRECT;  // ip->addrs[NDIRECT+1][idex1]内のインデックス
+        bp = bread(ip->dev, addr);
+        a = (uint32_t *)bp->data;
+        if ((addr = a[idx1]) == 0) {  // 二重間接の1段階目
+            a[idx1] = addr = balloc(ip->dev);
+            log_write(bp);
+        }
+        brelse(bp);
+        bp = bread(ip->dev, addr);
+        a = (uint32_t *)bp->data;
+        if ((addr = a[idx2]) == 0) {  // 二重間接の2段階目
+            a[idx2] = addr = balloc(ip->dev);
+            log_write(bp);
+        }
+        brelse(bp);
+        return addr;
+    }
+
     panic("bmap: out of range");
     return 0;
 }
@@ -428,6 +453,9 @@ bmap(struct inode *ip, uint32_t bn)
 static void
 itrunc(struct inode *ip)
 {
+    struct buf *bp;
+    uint32_t *a, *b;
+
     for (int i = 0; i < NDIRECT; i++) {
         if (ip->addrs[i]) {
             bfree(ip->dev, ip->addrs[i]);
@@ -436,15 +464,40 @@ itrunc(struct inode *ip)
     }
 
     if (ip->addrs[NDIRECT]) {
-        struct buf *bp = bread(ip->dev, ip->addrs[NDIRECT]);
-        uint32_t *a = (uint32_t *) bp->data;
+        bp = bread(ip->dev, ip->addrs[NDIRECT]);
+        a = (uint32_t *) bp->data;
         for (int j = 0; j < NINDIRECT; j++) {
-            if (a[j])
+            if (a[j]) {
                 bfree(ip->dev, a[j]);
+                a[j] = 0;
+            }
         }
         brelse(bp);
         bfree(ip->dev, ip->addrs[NDIRECT]);
         ip->addrs[NDIRECT] = 0;
+    }
+
+    if (ip->addrs[NDIRECT+1]) {
+        bp = bread(ip->dev, ip->addrs[NDIRECT+1]);
+        a = (uint32_t *)bp->data;
+        for (int i = 0; i < NINDIRECT; i++) {
+            if (a[i]) {
+                brelse(bp);
+                bp = bread(ip->dev, a[i]);
+                b = (uint32_t *)bp->data;
+                for (int j = 0; j < NINDIRECT; j++) {
+                    if (b[j]) {
+                        bfree(ip->dev, b[j]);
+                        b[j] = 0;
+                    }
+                }
+                bfree(ip->dev, a[i]);
+                a[i] = 0;
+            }
+        }
+        brelse(bp);
+        bfree(ip->dev, ip->addrs[NDIRECT+1]);
+        ip->addrs[NDIRECT+1] = 0;
     }
 
     ip->size = 0;
@@ -655,7 +708,7 @@ skipelem(const char *path, char *name)
 }
 
 /* Look up and return the inode for a path name.
- * 
+ *
  * If parent != 0, return the inode for the parent and copy the final
  * path element into name, which must have room for DIRSIZ bytes.
  * Must be called inside a transaction since it calls iput().

@@ -14,7 +14,7 @@
 #define NBUF            (MAXOPBLOCKS*3)     // Size of disk block cache
 
 // mkfs only
-#define FSSIZE          1000                // Size of file system in blocks
+#define FSSIZE          20000               // Size of file system in blocks
 
 // Belows are used by both
 #define LOGSIZE         (MAXOPBLOCKS*3)     // Max data blocks in on-disk log
@@ -39,9 +39,9 @@ struct superblock {
   uint32_t bmapstart;    // Block number of first free map block
 };
 
-#define NDIRECT 12
-#define NINDIRECT (BSIZE / sizeof(uint32_t))
-#define MAXFILE (NDIRECT + NINDIRECT)
+#define NDIRECT 11
+#define NINDIRECT (BSIZE / sizeof(uint32_t))    // 128
+#define MAXFILE (NDIRECT + NINDIRECT + NINDIRECT * NINDIRECT)   // (11 + 128 + 128 * 128) * 512 = 8261 KB
 
 /* On-disk inode structure. */
 struct dinode {
@@ -50,7 +50,7 @@ struct dinode {
   uint16_t minor;               // Minor device number (T_DEV only)
   uint16_t nlink;               // Number of links to inode in file system
   uint32_t size;                // Size of file (bytes)
-  uint32_t addrs[NDIRECT+1];    // Data block addresses
+  uint32_t addrs[NDIRECT+2];    // Data block addresses
 };
 
 /* Inodes per block. */

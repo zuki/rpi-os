@@ -21,8 +21,11 @@ int main(void)
     if(cc <= 0)
       break;
     sectors++;
-	if (sectors % 100 == 0)
-		printf(".");
+	if (sectors % 100 == 0) {
+        printf(".");
+        fflush(stdout);
+    }
+
   }
 
   printf("\nwrote %d sectors\n", sectors);
