@@ -4,7 +4,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
-typedef uint64_t ssize_t;
+typedef int64_t ssize_t;
+typedef uint64_t size_t;
 
 /* Efficient min and max operations */
 #define MIN(_a, _b)                 \

@@ -252,14 +252,23 @@ isdirempty(struct inode *dp)
 }
 
 int
-sys_unlink()
+sys_unlinkat()
 {
     struct inode *ip, *dp;
     struct dirent de;
     char name[DIRSIZ], *path;
     ssize_t off;
+    int dirfd;
 
-    if (argstr(0, &path) < 0)
+#ifdef AT_FDCWD
+#undef AT_FDCWD
+#define AT_FDCWD -100
+#endif
+
+    if (argint(0, &dirfd) < 0 || argstr(1, &path) < 0)  // flagsは当面無視
+        return -1;
+
+    if (dirfd != AT_FDCWD)
         return -1;
 
     begin_op();

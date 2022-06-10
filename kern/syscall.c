@@ -28,6 +28,8 @@ extern int sys_mknodat();
 extern int sys_close();
 extern int sys_writev();
 extern int sys_read();
+extern int sys_write();
+extern int sys_unlinkat();
 
 /* Check if a block of memory lies within the process user space. */
 int
@@ -219,8 +221,14 @@ syscall1(struct trapframe *tf)
     case SYS_read:
         return sys_read();
 
+    case SYS_write:
+        return sys_write();
+
     case SYS_close:
         return sys_close();
+
+    case SYS_unlinkat:
+        return sys_unlinkat();
 
     default:
         // FIXME: don't panic.

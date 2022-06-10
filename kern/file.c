@@ -148,7 +148,7 @@ filewrite(struct file *f, char *addr, ssize_t n)
             if (r < 0)
                 break;
             if (r != n1)
-                panic("short filewrite");
+                panic("short filewrite: r=%lld, n1=%lld\n", r, n1);
             i += r;
         }
         return i == n ? n : -1;
