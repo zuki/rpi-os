@@ -9,7 +9,7 @@ $ brew tap messense/macos-cross-toolchains
 $ brew install aarch64-unknown-linux-gnu
 $ vi config.mk      // CROSS := aarch64-unknown-linux-gnu- に変更
 $ git submodule update --init --recursive
-$ (cd libc && export CROSS_COMPILE=arch64-unknown-linux-gnu- && ./configure --target=aarch64)
+$ (cd libc && export CROSS_COMPILE=aarch64-unknown-linux-gnu- && ./configure --target=aarch64)
 $ brew install mtools
 $ brew install util-linux
 $ echo 'export PATH="/usr/local/opt/util-linux/bin:$PATH"' >> /Users/dspace/.bash_profile
