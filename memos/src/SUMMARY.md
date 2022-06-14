@@ -1,6 +1,7 @@
 # メモ一覧
 
-- [01: インストールと実行](install_run.md)
-- [02: BigFile機能を実装](bigfile.md)
-- [03: Macで開発](mac.md)
-- [04: ダンプツール](dump.md)
+- [インストールと実行](install_run.md)
+- [BigFile機能を実装](bigfile.md)
+- [Macで開発](mac.md)
+- [ダンプツール](dump.md)
+- [muslをインストール](musl.md)
