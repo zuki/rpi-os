@@ -6,9 +6,9 @@
 ```
 $ mkdir -p $HOME/musl
 $ cd $XV6/libc
-$ export CROSS_COMPILE=aarch64-unknown-linux-gnu- && ./configure --target=aarch64 --path=$HOME/musl
+$ export CROSS_COMPILE=aarch64-unknown-linux-gnu- && ./configure --target=aarch64 --prefix=$HOME/musl
 $ make
-c$ make
+$ make
 sh tools/musl-gcc.specs.sh "$HOME/musl/include" "$HOME/musl/lib" "/lib/ld-musl-aarch64.so.1" > lib/musl-gcc.specs
 printf '#!/bin/sh\nexec "${REALGCC:-aarch64-unknown-linux-gnu-gcc}" "$@" -specs "%s/musl-gcc.specs"\n' "$HOME/musl/lib" > obj/musl-gcc
 chmod +x obj/musl-gcc
@@ -426,4 +426,159 @@ abc
 $ echo abc > test
 $ cat test
 abc
+```
+
+## DWarfエラーについて
+
+- gccとbinutilsのバージョンが合わないのが原因らしい
+- binutilsのバージョンが古いようだ
+
+```
+$ /usr/local/bin/aarch64-unknown-linux-gnu-gcc --version
+aarch64-unknown-linux-gnu-gcc (GCC) 11.2.0
+
+$ /usr/local/bin/aarch64-unknown-linux-gnu-ld --version
+GNU ld (GNU Binutils) 2.29.1
+
+$ /usr/local/bin/aarch64-unknown-linux-gnu-objdump --version
+GNU objdump (GNU Binutils) 2.29.1
+```
+
+- brewをaarch64で検索すると本家にaarch64版のgccとbinutilsがありバージョンも新しい
+
+```
+$ brew search aarch64
+==> Formulae
+aarch64-elf-binutils
+aarch64-elf-gcc
+messense/macos-cross-toolchains/aarch64-unknown-linux-gnu ✔
+messense/macos-cross-toolchains/aarch64-unknown-linux-musl
+sergiobenitez/osxct/aarch64-none-elf
+
+==> Casks
+gcc-aarch64-embedded
+
+$ brew info aarch64-elf-gcc
+aarch64-elf-gcc: stable 11.2.0 (bottled)
+GNU compiler collection for aarch64-elf
+
+$ brew info aarch64-elf-binutils
+aarch64-elf-binutils: stable 2.38 (bottled)
+GNU Binutils for aarch64-elf cross development
+```
+
+- messense/macos-cross-toolchains/aarch64-unknown-linux-gnuをアンインストールし、aarch64-elf-gccとaarch64-elf-binutilsをインストール
+
+```
+$ brew uninstall messense/macos-cross-toolchains/aarch64-unknown-linux-gnu
+Uninstalling /usr/local/Cellar/aarch64-unknown-linux-gnu/11.2.0... (3,958 files, 383.2MB)
+
+$ brew install aarch64-elf-binutils
+==> Downloading https://ghcr.io/v2/homebrew/core/aarch64-elf-binutils/manifests/2.38
+Already downloaded: /Users/dspace/Library/Caches/Homebrew/downloads/449db330764694949129ec8e2c5d9ae3d5ba204a81608e2ff5fc7fff0aaa4255--aarch64-elf-binutils-2.38.bottle_manifest.json
+==> Downloading https://ghcr.io/v2/homebrew/core/aarch64-elf-binutils/blobs/sha256:def04262f48a5bc1a5b3a9b1331c7e
+Already downloaded: /Users/dspace/Library/Caches/Homebrew/downloads/5e0f79d93c9a44bcdceb32ea8c9172c0a9da4cb8218b025271163cc36f3c15b3--aarch64-elf-binutils--2.38.big_sur.bottle.tar.gz
+==> Pouring aarch64-elf-binutils--2.38.big_sur.bottle.tar.gz
+🍺  /usr/local/Cellar/aarch64-elf-binutils/2.38: 189 files, 37.5MB
+==> Running `brew cleanup aarch64-elf-binutils`...
+Disable this behaviour by setting HOMEBREW_NO_INSTALL_CLEANUP.
+Hide these hints with HOMEBREW_NO_ENV_HINTS (see `man brew`).
+
+$ aarch64-elf-objdump --version
+GNU objdump (GNU Binutils) 2.38
+Copyright (C) 2022 Free Software Foundation, Inc.
+
+$ brew install aarch64-elf-gcc
+==> Downloading https://ghcr.io/v2/homebrew/core/aarch64-elf-gcc/manifests/11.2.0
+Already downloaded: /Users/dspace/Library/Caches/Homebrew/downloads/942e53f7676f7cb47bb370ded88c37eb8f87e98e39c87741ecc3548cb3ebbfd2--aarch64-elf-gcc-11.2.0.bottle_manifest.json
+==> Downloading https://ghcr.io/v2/homebrew/core/aarch64-elf-gcc/blobs/sha256:d7c2e86dddb3b3f8eeee5eb1c779d799f81
+Already downloaded: /Users/dspace/Library/Caches/Homebrew/downloads/a0716bb94bb11e696a04479ed8bb5be38ca236a3b812dcd3acb5b328c6be4532--aarch64-elf-gcc--11.2.0.big_sur.bottle.tar.gz
+==> Pouring aarch64-elf-gcc--11.2.0.big_sur.bottle.tar.gz
+🍺  /usr/local/Cellar/aarch64-elf-gcc/11.2.0: 536 files, 129.2MB
+==> Running `brew cleanup aarch64-elf-gcc`...
+Disable this behaviour by setting HOMEBREW_NO_INSTALL_CLEANUP.
+Hide these hints with HOMEBREW_NO_ENV_HINTS (see `man brew`).
+
+$ aarch64-elf-gcc --version
+aarch64-elf-gcc (GCC) 11.2.0
+Copyright (C) 2021 Free Software Foundation, Inc.
+```
+
+## 新しいgccでmuslを再インストール
+
+- makeで`lib/musl-gcc.specs`と`obj/musl-gcc`が作成されない
+- 作成後にmake installしてもインストールされない
+
+```
+$ cd libc
+$ make clean
+$ export CROSS_COMPILE=aarch64-elf- && ./configure --target=aarch64 --prefix=/Users/dspace/musl --syslibdir=/Users/dspace/musl/lib
+$ make
+$ make install
+$ make lib/lib/musl-gcc.specs
+$ make obj/musl-gcc
+$ ./tools/install.sh -D -m 644 lib/musl-gcc.specs $HOME/musl/lib/musl-gcc.specs
+$ ./tools/install.sh -D obj/musl-gcc $HOME/musl/bin/musl-gcc
+```
+
+## xv6を再コンパイル
+
+- エラー
+
+    ```
+    $ rm -rf obj
+    $ vi config.mk
+        CROSS := aarch64-elf-
+    $ make
+
+    /Users/dspace/musl/bin/musl-gcc -std=gnu99 -O3 -MMD -MP -static -z max-page-size=4096 -fno-omit-frame-pointer -c -o ../obj/usr/src/cat/main.c.o src/cat/main.c
+    mkdir -p ../obj/usr/bin/
+    /Users/dspace/musl/bin/musl-gcc -std=gnu99 -O3 -MMD -MP -static -z max-page-size=4096 -fno-omit-frame-pointer -o ../obj/usr/bin/cat ../obj/usr/src/cat/main.c.o
+    /usr/local/opt/aarch64-elf-binutils/bin/aarch64-elf-ld: cannot find crtbeginS.o: No such file or directory
+    /usr/local/opt/aarch64-elf-binutils/bin/aarch64-elf-ld: cannot find crtendS.o: No such file or directory
+    collect2: error: ld returned 1 exit status
+    ```
+
+- crtbeginS.oとcrtendS.oはgccのファイル
+- messense/macos-cross-toolchains版ではこのエラーはでなかったので何か考慮されているのかもしれない
+  - messense版のgccにはcrtbeginS.o, crtendS.oが含まれていた
+  - brew本家版にはこれらがない
+  - crtbeginS.oはdynamic link時に、crtbeginT.oはstatic link時にcrtbegin.oの代わりに使われるらしい ([Mini FAQ about the misc libc/gcc crt files](https://dev.gentoo.org/~vapier/crt.txt))
+  - objdumpすると本家版のcrtbegin.oはstatic link版に該当するようだった
+  - いずれにしてもc++のコンストラクタ、デコンストラクタ関係でありcには無関係か?
+
+    ```
+    $ tar tvf aarch64-unknown-linux-gnu-aarch64-darwin.tar.gz | grep crtbegin
+    -rw-r--r--  0 messense staff     3328  2 14 21:15 aarch64-unknown-linux-gnu/lib/gcc/aarch64-unknown-linux-gnu/11.2.0/crtbegin.o
+    -rw-r--r--  0 messense staff     3448  2 14 21:15 aarch64-unknown-linux-gnu/lib/gcc/aarch64-unknown-linux-gnu/11.2.0/crtbeginS.o
+    -rw-r--r--  0 messense staff     3936  2 14 21:15 aarch64-unknown-linux-gnu/lib/gcc/aarch64-unknown-linux-gnu/11.2.0/crtbeginT.o
+    $ tar tvf aarch64-unknown-linux-gnu-aarch64-darwin.tar.gz | grep crtend
+    -rw-r--r--  0 messense staff     1224  2 14 21:15 aarch64-unknown-linux-gnu/lib/gcc/aarch64-unknown-linux-gnu/11.2.0/crtend.o
+    -rw-r--r--  0 messense staff     1224  2 14 21:15 aarch64-unknown-linux-gnu/lib/gcc/aarch64-unknown-linux-gnu/11.2.0/crtendS.o
+    $ ls /usr/local/opt/aarch64-elf-gcc/lib/gcc/aarch64-elf/11.2.0/
+    crtbegin.o  crtfastmath.o  crtn.o  include        install-tools  libgcov.a
+    crtend.o    crti.o         ilp32   include-fixed  libgcc.a       plugin
+    ```
+
+- `$HOME/musl/lib/musl-gcc.specs`を編集して当該ファイル指定を削除したらエラーはなくなり、実行も問題なくできた
+- DWarfエラーもない
+- とりあえず、これで行くことにする
+
+```diff
+$ diff -uw musl-gcc.specs.org musl-gcc.specs
+--- musl-gcc.specs.org	2022-06-14 19:02:35.000000000 +0900
++++ musl-gcc.specs	2022-06-14 19:03:00.000000000 +0900
+@@ -13,10 +13,10 @@
+ libgcc.a%s %:if-exists(libgcc_eh.a%s)
+
+ *startfile:
+-%{!shared: /Users/dspace/musl/lib/Scrt1.o} /Users/dspace/musl/lib/crti.o crtbeginS.o%s
++%{!shared: /Users/dspace/musl/lib/Scrt1.o} /Users/dspace/musl/lib/crti.o
+
+ *endfile:
+-crtendS.o%s /Users/dspace/musl/lib/crtn.o
++/Users/dspace/musl/lib/crtn.o
+
+ *link:
+ -dynamic-linker /Users/dspace/musl/lib/ld-musl-aarch64.so.1 -nostdlib %{shared:-shared} %{static:-static} %{rdynamic:-export-dynamic}
 ```
