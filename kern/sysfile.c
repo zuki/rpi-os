@@ -261,11 +261,6 @@ sys_unlinkat()
     size_t off;
     int dirfd;
 
-#ifdef AT_FDCWD
-#undef AT_FDCWD
-#define AT_FDCWD -100
-#endif
-
     if (argint(0, &dirfd) < 0 || argstr(1, &path) < 0)  // flagsは当面無視
         return -1;
 
