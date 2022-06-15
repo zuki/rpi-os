@@ -138,6 +138,98 @@ argstr(int n, char **pp)
     return r;
 }
 
+__attribute__((unused)) static char *syscall_names[] = {
+    [SYS_getcwd] = "sys_getcwd",                  // 17
+    [SYS_dup] = "sys_dup",                        // 23
+    [SYS_dup3] = "sys_dup3",                      // 24
+    [SYS_fcntl] = "sys_fcntl",                    // 25
+    [SYS_ioctl] = "sys_ioctl",                    // 29
+    [SYS_mknodat] = "sys_mknodat",                // 33
+    [SYS_mkdirat] = "sys_mkdirat",                // 34
+    [SYS_unlinkat] = "sys_unlinkat",              // 35
+    [SYS_symlinkat] = "sys_symlinkat",            // 36
+    [SYS_linkat] = "sys_linkat",                  // 37
+    [SYS_umount2] = "sys_umount2",                // 39
+    [SYS_mount] = "sys_mount",                    // 40
+    [SYS_faccessat] = "sys_faccessat",            // 48
+    [SYS_chdir] = "sys_chdir",                    // 49
+    [SYS_fchmodat] = "sys_fchmodat",              // 53
+    [SYS_fchownat] = "sys_fchownat",              // 54
+    [SYS_fchown] = "sys_fchown",                  // 55
+    [SYS_openat] = "sys_openat",                  // 56
+    [SYS_close] = "sys_close",                    // 57
+    [SYS_pipe2] = "sys_pipe2",                    // 59
+    [SYS_getdents64] = "sys_getdents64",          // 61
+    [SYS_lseek] = "sys_lseek",                    // 62
+    [SYS_read] = "sys_read",                      // 63
+    [SYS_write] = "sys_write",                    // 64
+    [SYS_readv] = "sys_readv",                    // 65
+    [SYS_writev] = "sys_writev",                  // 66
+    [SYS_readlinkat] = "sys_readlinkat",          // 78
+    [SYS_newfstatat] = "sys_fstatat",             // 79
+    [SYS_fstat] = "sys_fstat",                    // 80
+    [SYS_fstat] = "sys_fstat",                    // 80
+    [SYS_fsync] = "sys_fsync",                    // 82
+    [SYS_fdatasync] = "sys_fdatasync",            // 83
+    [SYS_utimensat] = "sys_utimensat",            // 88
+    [SYS_exit] = "sys_exit",                      // 93
+    [SYS_exit_group] = "sys_exit",                // 94
+    [SYS_set_tid_address] = "sys_gettid",         // 96
+    [SYS_nanosleep] = "sys_nanosleep",            // 101
+    [SYS_getitimer] = "sys_getitimer",            // 102
+    [SYS_setitimer] = "sys_setitimer",            // 103
+    [SYS_clock_settime] = "sys_clock_settime",    // 112
+    [SYS_clock_gettime] = "sys_clock_gettime",    // 113
+    [SYS_sched_getaffinity] = "sys_sched_getaffinity", // 123
+    [SYS_sched_yield] = "sys_yield",              // 124
+    [SYS_kill] = "sys_kill",                      // 129
+    [SYS_rt_sigsuspend] = "sys_rt_sigsuspend",    // 133
+    [SYS_rt_sigaction] = "sys_rt_sigaction",      // 134
+    [SYS_rt_sigprocmask] = "sys_rt_sigprocmask",  // 135
+    [SYS_rt_sigpending] = "sys_rt_sigpending",    // 136
+    [SYS_rt_sigreturn] = "sys_rt_sigreturn",      // 139
+    [SYS_setregid] = "sys_setregid",              // 143
+    [SYS_setgid] = "sys_setgid",                  // 144
+    [SYS_setreuid] = "sys_setreuid",              // 145
+    [SYS_setuid] = "sys_setuid",                  // 146
+    [SYS_setresuid] = "sys_setresuid",            // 147
+    [SYS_getresuid] = "sys_getresuid",            // 148
+    [SYS_setresgid] = "sys_setresgid",            // 149
+    [SYS_getresgid] = "sys_getresgid",            // 150
+    [SYS_setfsuid] = "sys_setfsuid",              // 151
+    [SYS_setfsgid] = "sys_setfsgid",              // 152
+    [SYS_setpgid] = "sys_setpgid",                // 154
+    [SYS_getpgid] = "sys_getpgid",                // 155
+    [SYS_getgroups] = "sys_getgroups",            // 158
+    [SYS_setgroups] = "sys_setgroups",            // 159
+    [SYS_uname] = "sys_uname",                    // 160
+    [SYS_umask] = "sys_umask",                    // 166
+    [SYS_getpid] = "sys_getpid",                  // 172
+    [SYS_getppid] = "sys_getppid",                // 173
+    [SYS_getuid] = "sys_getuid",                  // 174
+    [SYS_geteuid] = "sys_geteuid",                // 175
+    [SYS_getgid] = "sys_getgid",                  // 176
+    [SYS_getegid] = "sys_getegid",                // 177
+    [SYS_gettid] = "sys_gettid",                  // 178
+    [SYS_sysinfo] = "sys_sysinfo",                // 179
+    [SYS_brk] = "sys_brk",                        // 214
+    [SYS_munmap] = "sys_munmap",                  // 215
+    [SYS_mremap] = "sys_mremap",                  // 216
+    [SYS_clone] = "sys_clone",                    // 220
+    [SYS_execve] = "sys_execve",                  // 221
+    [SYS_mmap] = "sys_mmap",                      // 222
+    [SYS_fadvise64] = "sys_fadvise64",            // 223
+    [SYS_mprotect] = "sys_mprotect",              // 226
+    [SYS_msync] = "sys_msync",                    // 227
+    [SYS_madvise] = "sys_madvise",                // 233
+    [SYS_wait4] = "sys_wait4",                    // 260
+    [SYS_prlimit64] = "sys_prlimit64",            // 261
+    [SYS_renameat2] = "sys_renameat2",            // 276
+    [SYS_getrandom] = "sys_getrandom",            // 278
+    [SYS_faccessat2] = "sys_faccessat2",          // 439
+};
+
+
 int
 syscall1(struct trapframe *tf)
 {
@@ -234,7 +326,7 @@ syscall1(struct trapframe *tf)
         // FIXME: don't panic.
 
         debug_reg();
-        panic("Unexpected syscall #%d\n", sysno);
+        panic("Unexpected syscall #%d (%s)\n", sysno, syscall_names[sysno]);
 
         return 0;
     }
