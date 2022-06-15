@@ -3,6 +3,7 @@
 
 #include <syscall.h>
 #include <stdint.h>
+#include <fcntl.h>
 #include "trap.h"
 #include "types.h"
 
@@ -16,16 +17,19 @@ long argint(int, int *);
 long argu64(int n, uint64_t * ip);
 long argptr(int, char **, size_t);
 long fetchstr(uint64_t, char **);
-//long sys_gettid();
-//long sys_getpid();
-//long sys_getppid();
-//long sys_clock_gettime();
-//long sys_faccessat2();
-//long sys_sched_getaffinity();
-//long sys_prlimit64();
-//long sys_sysinfo();
-//long sys_nanosleep();
-//long sys_getrandom();
+long sys_gettid();
+long sys_getpid();
+long sys_getppid();
+long sys_clock_gettime();
+long sys_faccessat2();
+long sys_sched_getaffinity();
+long sys_prlimit64();
+long sys_sysinfo();
+long sys_nanosleep();
+long sys_getrandom();
+long sys_uname();
+long sys_clock_settime();
+long sys_utimensat();
 long syscall1(struct trapframe *);
 
 // kern/sysproc.c
@@ -33,14 +37,14 @@ size_t sys_brk();
 long sys_yield();
 long sys_clone();
 long sys_wait4();
-//long sys_exit();
-//long sys_rt_sigprocmask();
-//long sys_rt_sigsuspend();
-//long sys_rt_sigaction();
-//long sys_rt_sigpending();
-//long sys_rt_sigreturn();
+long sys_exit();
+long sys_rt_sigprocmask();
+long sys_rt_sigsuspend();
+long sys_rt_sigaction();
+long sys_rt_sigpending();
+long sys_rt_sigreturn();
 long sys_kill();
-//mode_t sys_umask();
+mode_t sys_umask();
 long sys_getpgid();
 long sys_setpgid();
 long sys_setregid();
@@ -67,7 +71,7 @@ long sys_execve();
 long sys_dup();
 long sys_dup3();
 long sys_fcntl();
-//long sys_ioctl();
+long sys_ioctl();
 long sys_pipe2();
 long sys_fstat();
 long sys_fstatat();
