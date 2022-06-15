@@ -2,10 +2,11 @@
 #include "trap.h"
 #include "console.h"
 #include "vm.h"
+#include "syscall1.h"
 
 #include <sys/mman.h>
 
-int
+long
 sys_yield()
 {
     yield();
@@ -75,7 +76,7 @@ sys_mmap()
     }
 }
 
-int
+long
 sys_clone()
 {
     void *childstk;
@@ -91,7 +92,7 @@ sys_clone()
 }
 
 
-int
+long
 sys_wait4()
 {
     int pid, opt;

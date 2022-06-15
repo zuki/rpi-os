@@ -2,34 +2,12 @@
 // #include <unistd.h>
 
 #include <stdint.h>
+#include "syscall1.h"
 #include "memlayout.h"
 #include "trap.h"
 #include "console.h"
 #include "proc.h"
 #include "debug.h"
-
-extern int sys_brk();
-extern int sys_mmap();
-extern int sys_wait4();
-extern int sys_yield();
-
-extern int sys_execve();
-
-extern int sys_dup();
-extern int sys_chdir();
-extern int sys_pipe2();
-extern int sys_clone();
-extern int sys_fstat();
-extern int sys_fstatat();
-extern int sys_open();
-extern int sys_openat();
-extern int sys_mkdirat();
-extern int sys_mknodat();
-extern int sys_close();
-extern int sys_writev();
-extern int sys_read();
-extern int sys_write();
-extern int sys_unlinkat();
 
 /* Check if a block of memory lies within the process user space. */
 int
@@ -48,7 +26,7 @@ in_user(void *s, size_t n)
  * Doesn't actually copy the string - just sets *pp to point at it.
  * Returns length of string, not including nul.
  */
-int
+long
 fetchstr(uint64_t addr, char **pp)
 {
     struct proc *p = thisproc();
@@ -71,7 +49,7 @@ fetchstr(uint64_t addr, char **pp)
  * In our ABI, x8 contains system call index, x0-x5 contain parameters.
  * now we support system calls with at most 6 parameters.
  */
-int
+long
 argint(int n, int *ip)
 {
     struct proc *proc = thisproc();
@@ -89,7 +67,7 @@ argint(int n, int *ip)
  * In our ABI, x8 contains system call index, x0-x5 contain parameters.
  * now we support system calls with at most 6 parameters.
  */
-int
+long
 argu64(int n, uint64_t * ip)
 {
     struct proc *proc = thisproc();
@@ -107,7 +85,7 @@ argu64(int n, uint64_t * ip)
  * to a block of memory of size bytes. Check that the pointer
  * lies within the process address space.
  */
-int
+long
 argptr(int n, char **pp, size_t size)
 {
     uint64_t i = 0;
@@ -128,7 +106,7 @@ argptr(int n, char **pp, size_t size)
  * (There is no shared writable memory, so the string can't change
  * between this check and being used by the kernel.)
  */
-int
+long
 argstr(int n, char **pp)
 {
     uint64_t addr = 0;
@@ -230,7 +208,7 @@ __attribute__((unused)) static char *syscall_names[] = {
 };
 
 
-int
+long
 syscall1(struct trapframe *tf)
 {
     thisproc()->tf = tf;

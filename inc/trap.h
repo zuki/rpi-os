@@ -14,13 +14,4 @@ struct trapframe {
 void trap(struct trapframe *);
 void trap_init();
 
-/* In kern/syscall.c */
-extern int in_user(void *base, size_t size);
-extern int argint(int n, int *ip);
-extern int argu64(int n, uint64_t *ip);
-extern int argptr(int n, char **pp, size_t size);
-extern int argstr(int n, char **pp);
-extern int fetchstr(uint64_t addr, char **pp);
-extern int syscall1(struct trapframe *);
-
 #endif

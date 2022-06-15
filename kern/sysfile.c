@@ -6,6 +6,7 @@
 
 #include <fcntl.h>
 
+#include "syscall1.h"
 #include "types.h"
 #include "mmu.h"
 #include "proc.h"
@@ -63,7 +64,7 @@ fdalloc(struct file *f)
     return -1;
 }
 
-int
+long
 sys_dup()
 {
     struct file *f;
@@ -85,7 +86,7 @@ sys_read()
     ssize_t n;
     char *p;
 
-    if (argfd(0, 0, &f) < 0 || argu64(2, &n) < 0 || argptr(1, &p, n) < 0)
+    if (argfd(0, 0, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0)
         return -1;
     return fileread(f, p, n);
 }
@@ -97,7 +98,7 @@ sys_write()
     ssize_t n;
     char *p;
 
-    if (argfd(0, 0, &f) < 0 || argu64(2, &n) < 0 || argptr(1, &p, n) < 0)
+    if (argfd(0, 0, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0)
         return -1;
     return filewrite(f, p, n);
 }
@@ -125,7 +126,7 @@ sys_writev()
     return tot;
 }
 
-int
+long
 sys_close()
 {
     int fd;
@@ -138,7 +139,7 @@ sys_close()
     return 0;
 }
 
-int
+long
 sys_fstat()
 {
     int fd;
@@ -151,7 +152,7 @@ sys_fstat()
     return filestat(f, st);
 }
 
-int
+long
 sys_fstatat()
 {
     int dirfd, flags;
@@ -187,7 +188,7 @@ sys_fstatat()
 }
 
 /* Create the path new as a link to the same inode as old. */
-int
+long
 sys_link()
 {
     char name[DIRSIZ], *new, *old;
@@ -251,13 +252,13 @@ isdirempty(struct inode *dp)
     return 1;
 }
 
-int
+long
 sys_unlinkat()
 {
     struct inode *ip, *dp;
     struct dirent de;
     char name[DIRSIZ], *path;
-    ssize_t off;
+    size_t off;
     int dirfd;
 
 #ifdef AT_FDCWD
@@ -362,7 +363,7 @@ create(char *path, short type, short major, short minor)
     return ip;
 }
 
-int
+long
 sys_openat()
 {
     char *path;
@@ -423,7 +424,7 @@ sys_openat()
     return fd;
 }
 
-int
+long
 sys_mkdirat()
 {
     int dirfd, mode;
@@ -453,7 +454,7 @@ sys_mkdirat()
     return 0;
 }
 
-int
+long
 sys_mknodat()
 {
     struct inode *ip;
@@ -480,7 +481,7 @@ sys_mknodat()
     return 0;
 }
 
-int
+long
 sys_chdir()
 {
     char *path;
@@ -505,7 +506,7 @@ sys_chdir()
     return 0;
 }
 
-int
+long
 sys_execve()
 {
     char *p;
@@ -516,7 +517,7 @@ sys_execve()
     return execve(p, argv, envp);
 }
 
-int
+long
 sys_pipe2()
 {
     int *fd, flag;

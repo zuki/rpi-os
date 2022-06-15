@@ -11,6 +11,8 @@
 
 #include "debug.h"
 
+extern long syscall1(struct trapframe *);
+
 void
 trap_init()
 {
