@@ -7,6 +7,8 @@
 #include "trap.h"
 #include "spinlock.h"
 #include "list.h"
+#include "types.h"
+#include "signal.h"
 
 #define NPROC           100
 #define NCPU            4
@@ -22,15 +24,21 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+struct signal {
+    sigset_t mask;
+    sigset_t pending;
+    struct sigaction actions[NSIG];
+};
+
 /* Per-process state */
 struct proc {
-    /* 
+    /*
      * Memory layout
      *
      * +----------+
-     * |  Kernel  | 
+     * |  Kernel  |
      * +----------+  KERNBASE
-     * |  Stack   |  
+     * |  Stack   |
      * +----------+  KERNBASE - stksz
      * |   ....   |
      * |   ....   |
@@ -39,7 +47,7 @@ struct proc {
      * +----------+
      * |   Code   |
      * +----------+  base
-     * | Reserved | 
+     * | Reserved |
      * +----------+  0
      *
      */
@@ -49,7 +57,7 @@ struct proc {
     void *pgdir;                /* User space page table. */
     void *kstack;               /* Bottom of kernel stack for this process. */
     enum procstate state;       /* Process state. */
-    int pid;                    /* Process ID. */
+    pid_t pid;                  /* Process ID. */
     struct trapframe *tf;       /* Trap frame for current syscall. */
     struct context *context;    /* swtch() here to run process. */
     struct list_head link;      /* linked list of running process. */
@@ -59,10 +67,14 @@ struct proc {
     struct list_head child;     /* Child list of this process. */
     struct list_head clink;     /* Child list of this process. */
 
-    int killed;                  // If non-zero, have been killed
-    struct file *ofile[NOFILE];  // Open files
-    struct inode *cwd;           // Current directory
-    char name[16];               // Process name (debugging)
+    int killed;                 // If non-zero, have been killed
+    struct file *ofile[NOFILE]; // Open files
+    struct inode *cwd;          // Current directory
+    char name[16];              // Process name (debugging)
+
+    struct signal signal;       // Signal
+    struct trapframe *oldtf;    // To save the old trapframe
+    int paused;                 //
 };
 
 /* Per-CPU state */
@@ -95,8 +107,26 @@ void sleep(void *chan, struct spinlock *lk);
 void wakeup(void *chan);
 void yield();
 void exit(int);
-int  wait();
+int  wait(pid_t pid, int *status);
 int  fork();
 void procdump();
+
+long kill(pid_t pid, int sig);
+long sigsuspend(sigset_t *mask);
+long sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oldact);
+long sigpending(sigset_t *pending);
+long sigprocmask(int how, sigset_t *set, sigset_t *oldset, size_t size);
+long sigreturn(void);
+void check_pending_signal(void);
+void stop_handler(struct proc *p);
+void cont_handler(struct proc *p);
+void term_handler(struct proc *p);
+void handle_signal(struct proc *p , int sig);
+void user_handler(struct proc *p, int sig);
+void flush_signal_handlers(struct proc *p);
+
+// sigret_syscall.S
+void execute_sigret_syscall_start(void);
+void execute_sigret_syscall_end(void);
 
 #endif

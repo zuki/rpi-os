@@ -33,13 +33,14 @@ timer_reset()
 }
 
 /*
- * This is a per-cpu non-stable version of clock, frequency of 
+ * This is a per-cpu non-stable version of clock, frequency of
  * which is determined by cpu clock (may be tuned for power saving).
  */
 void
 timer_intr()
 {
-    trace("t: %d", ++cnt);
+    //trace("t: %d", ++cnt);
     timer_reset();
     yield();
+    //check_pending_signal();
 }

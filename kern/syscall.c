@@ -1,4 +1,5 @@
 #include <syscall.h>
+#include <errno.h>
 // #include <unistd.h>
 
 #include <stdint.h>
@@ -8,6 +9,8 @@
 #include "console.h"
 #include "proc.h"
 #include "debug.h"
+#include "string.h"
+#include "time.h"
 
 typedef long (*func)();
 
@@ -124,24 +127,20 @@ long sys_set_tid_address() {
     return thisproc()->pid;
 }
 
+long sys_getpid() {
+    return thisproc()->pid;
+}
+
 long sys_gettid() {
     trace("gettid: name '%s'", thisproc()->name);
     return thisproc()->pid;
 }
-
 
 // FIXME: Hack TIOCGWINSZ(get window size)
 long sys_ioctl() {
     trace("ioctl: name '%s'", thisproc()->name);
     if (thisproc()->tf->x[1] != 0x5413)
         panic("ioctl unimplemented. ");
-    return 0;
-}
-
-// FIXME: always return 0 since we don't have signals  :)
-long sys_rt_sigprocmask() {
-    trace("rt_sigprocmask: name '%s' how 0x%x", thisproc()->name,
-            (int)thisproc()->tf->x[0]);
     return 0;
 }
 
@@ -155,6 +154,29 @@ long sys_exit_group() {
 long sys_exit() {
     trace("sys_exit: '%s' exit with code %d", thisproc()->name, thisproc()->tf->x[0]);
     exit(thisproc()->tf->x[0]);
+    return 0;
+}
+
+long
+sys_nanosleep()
+{
+    struct timespec *req, *rem, t;
+    uint64_t expire;
+
+    if (argu64(0, (uint64_t *)&req) < 0 || argu64(1, (uint64_t *)&rem) < 0)
+        return -EINVAL;
+
+    if (!in_user(req, sizeof(struct timespec)) || !in_user(rem, sizeof(struct timespec)))
+        return -EFAULT;
+
+    memmove(&t, req, sizeof(struct timespec));
+
+    if (t.tv_nsec >= 1000000000L || t.tv_nsec < 0 || t.tv_sec < 0)
+        return -EINVAL;
+
+    expire = t.tv_sec * 1000000 + (t.tv_nsec + 999) / 1000;
+    trace("sec: %d, nsec: %d, expire: %d", t.tv_sec, t.tv_nsec, expire);
+    delayus(expire);
     return 0;
 }
 
@@ -185,6 +207,7 @@ static func syscalls[] = {
     [SYS_write] = (func)sys_write,              // 64
 //    [SYS_readv] = (func)sys_readv,              // 65
     [SYS_writev] = (func)sys_writev,            // 66
+    [SYS_ppoll] = sys_ppoll,                    // 73
 //    [SYS_readlinkat] = (func)sys_readlinkat,    // 78
     [SYS_newfstatat] = sys_fstatat,             // 79
     [SYS_fstat] = sys_fstat,                    // 80
@@ -195,19 +218,19 @@ static func syscalls[] = {
     // FIXME: exit_group should kill every thread in the current thread group.
     [SYS_exit_group] = sys_exit_group,          // 94
     [SYS_set_tid_address] = sys_set_tid_address,  // 96
-//    [SYS_nanosleep] = sys_nanosleep,            // 101
+    [SYS_nanosleep] = sys_nanosleep,            // 101
 //    [SYS_getitimer] = sys_getitimer,            // 102
 //    [SYS_setitimer] = sys_setitimer,            // 103
 //    [SYS_clock_settime] = sys_clock_settime,    // 112
 //    [SYS_clock_gettime] = sys_clock_gettime,    // 113
 //    [SYS_sched_getaffinity] = sys_sched_getaffinity, // 123
     [SYS_sched_yield] = sys_yield,              // 124
-//    [SYS_kill] = sys_kill,                      // 129
-//    [SYS_rt_sigsuspend] = sys_rt_sigsuspend,    // 133
-///   [SYS_rt_sigaction] = sys_rt_sigaction,      // 134
+    [SYS_kill] = sys_kill,                      // 129
+    [SYS_rt_sigsuspend] = sys_rt_sigsuspend,    // 133
+    [SYS_rt_sigaction] = sys_rt_sigaction,      // 134
     [SYS_rt_sigprocmask] = sys_rt_sigprocmask,  // 135
-//    [SYS_rt_sigpending] = sys_rt_sigpending,    // 136
-//    [SYS_rt_sigreturn] = sys_rt_sigreturn,      // 139
+    [SYS_rt_sigpending] = sys_rt_sigpending,    // 136
+    [SYS_rt_sigreturn] = sys_rt_sigreturn,      // 139
 //    [SYS_setregid] = sys_setregid,              // 143
 //    [SYS_setgid] = sys_setgid,                  // 144
 //    [SYS_setreuid] = sys_setreuid,              // 145
@@ -224,7 +247,7 @@ static func syscalls[] = {
 //    [SYS_setgroups] = sys_setgroups,            // 159
 //    [SYS_uname] = sys_uname,                    // 160
 //    [SYS_umask] = (func)sys_umask,              // 166
-//    [SYS_getpid] = sys_getpid,                  // 172
+    [SYS_getpid] = sys_getpid,                  // 172
 //    [SYS_getppid] = sys_getppid,                // 173
 //    [SYS_getuid] = sys_getuid,                  // 174
 //    [SYS_geteuid] = sys_geteuid,                // 175
@@ -276,6 +299,7 @@ __attribute__((unused)) static char *syscall_names[] = {
     [SYS_write] = "sys_write",                    // 64
     [SYS_readv] = "sys_readv",                    // 65
     [SYS_writev] = "sys_writev",                  // 66
+    [SYS_ppoll] = "sys_ppoll",                    // 73
     [SYS_readlinkat] = "sys_readlinkat",          // 78
     [SYS_newfstatat] = "sys_fstatat",             // 79
     [SYS_fstat] = "sys_fstat",                    // 80
@@ -348,12 +372,13 @@ syscall1(struct trapframe *tf)
     int sysno = tf->x[8];
 
     if (sysno > 0 && sysno < ARRAY_SIZE(syscalls) && syscalls[sysno]) {
+        if (sysno != SYS_sched_yield)
+            debug("%s called\n", syscall_names[sysno]);
         return syscalls[sysno]();
     } else {
         debug_reg();
-        if (syscall_names[sysno])
-            panic("Unexpected syscall #%d (%s)\n", sysno, syscall_names[sysno]);
-        else
-            panic("Unexpected syscall #%d (unknown)\n", sysno);
+        char *name = syscall_names[sysno] ? syscall_names[sysno] : "unknown";
+        panic("Unexpected syscall #%d (%s)\n", sysno, name);
+        return 0;
     }
 }

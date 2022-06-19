@@ -30,6 +30,7 @@ long sys_getrandom();
 long sys_uname();
 long sys_clock_settime();
 long sys_utimensat();
+long sys_ppoll();
 long syscall1(struct trapframe *);
 
 // kern/sysproc.c

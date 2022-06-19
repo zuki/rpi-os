@@ -34,11 +34,13 @@ trap(struct trapframe *tf)
             panic("unknown error");
         } else
             irq_handler();
+            check_pending_signal();
         break;
 
     case EC_SVC64:
         if (iss == 0) {
             tf->x[0] = syscall1(tf);
+            check_pending_signal();
         } else {
             warn("unexpected svc iss 0x%x", iss);
         }

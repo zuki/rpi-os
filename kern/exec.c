@@ -15,6 +15,28 @@
 
 static uint64_t auxv[][2] = { { AT_PAGESZ, PGSIZE } };
 
+// 親から受け継いだ不要な情報を破棄する
+static void flush_old_exec(void)
+{
+    struct proc *p = thisproc();
+
+    // (1) mmapのクリア
+    // TODO: mmapの実装をすること
+    //trace("call fml [%d]", p->pid);
+    //free_mmap_list(p);
+    // (2) signalのflush
+    flush_signal_handlers(p);
+    // (3) close_on_execのfileのclose
+    /* TODO: fdflagの実装をすること
+    for (int i = 0; i < NOFILE; i++) {
+        if (p->ofile[i] && bit_test(p->fdflag, i)) {
+            fileclose(p->ofile[i]);
+            p->ofile[i] = 0;
+        }
+    }
+    */
+}
+
 int
 execve(const char *path, char *const argv[], char *const envp[])
 {
@@ -66,6 +88,8 @@ execve(const char *path, char *const argv[], char *const envp[])
     Elf64_Phdr ph;
 
     curproc->pgdir = pgdir;     // Required since readi(sdrw) involves context switch(switch page table).
+
+    flush_old_exec();
 
     // Load program into memory.
     size_t sz = 0, base = 0, stksz = 0;

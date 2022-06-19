@@ -11,7 +11,7 @@ CFLAGS := -Wall -g -O2 \
           -Iinc -I$(MUSL_INC) -I$(MUSL_INC)/sys -I$(MUSL_INC)/bits
 #		  -Iinc -Ilibc/obj/include -Ilibc/arch/aarch64 -Ilibc/include -Ilibc/arch/generic
 
-CFLAGS += -DNOT_DEBUG -DLOG_DEBUG -DRASPI=$(RASPI)
+CFLAGS += -DNOT_DEBUG -DLOG_INFO -DRASPI=$(RASPI)
 
 CFLAGS += -mlittle-endian -mcmodel=small -mno-outline-atomics
 

@@ -1,4 +1,6 @@
 #include "proc.h"
+#include <errno.h>
+#include <poll.h>
 
 #include "string.h"
 #include "types.h"
@@ -13,6 +15,8 @@
 #include "debug.h"
 #include "file.h"
 #include "log.h"
+#include "string.h"
+#include "signal.h"
 
 extern void trapret();
 extern void swtch(struct context **old, struct context *new);
@@ -32,8 +36,13 @@ struct {
     struct spinlock lock;
 } ptable;
 
+struct {
+    struct spinlock lock;
+    struct spinlock siglock;
+} q;
+
 struct proc *initproc;
-static int pid = 0;
+static pid_t pid = 0;
 
 void
 proc_init()
@@ -88,6 +97,8 @@ proc_alloc()
     p->context = sp;
     p->context->lr0 = (uint64_t) forkret;
     p->context->lr = (uint64_t) trapret;
+
+    p->paused = 0;
 
     list_init(&p->child);
 
@@ -231,7 +242,6 @@ sleep(void *chan, struct spinlock *lk)
     list_push_back(&ptable.slpque[i], &p->link);
 
     p->state = SLEEPING;
-    trace("'%s'(%d) sleep lk=0x%p", p->name, p->pid, lk);
     swtch(&thisproc()->context, thiscpu()->scheduler);
     trace("'%s'(%d) wakeup lk=0x%p", p->name, p->pid, lk);
     p->state = RUNNING;
@@ -254,7 +264,6 @@ wakeup1(void *chan)
 
     LIST_FOREACH_ENTRY_SAFE(p, np, q, link) {
         if (p->chan == chan) {
-            trace("wake '%s'(%d)", p->name, p->pid);
             list_drop(&p->link);
             list_push_back(&ptable.sched_que, &p->link);
             p->state = RUNNABLE;
@@ -314,6 +323,8 @@ fork()
             np->ofile[i] = filedup(cp->ofile[i]);
     np->cwd = idup(cp->cwd);
 
+    memmove(&np->signal, &cp->signal, sizeof(struct signal));
+
     int pid = np->pid;
 
     acquire(&ptable.lock);
@@ -333,7 +344,7 @@ fork()
  * Return -1 if this process has no children.
  */
 int
-wait()
+wait(pid_t pid, int *status)
 {
     struct proc *cp = thisproc();
 
@@ -354,6 +365,7 @@ wait()
 
                 int pid = p->pid;
                 release(&ptable.lock);
+                if (status) *status = 0;
                 return pid;
             }
         }
@@ -376,7 +388,7 @@ exit(int err)
         panic("init exit");
 
     if (err) {
-        warn("exit: pid %d, err %d", cp->pid, err);
+        debug("exit: pid %d, err %d", cp->pid, err);
     }
 
     // Close all open files.
@@ -447,4 +459,409 @@ procdump()
             cprintf("%d %s %s\n", p->pid, states[p->state], p->name);
     }
     // release(&ptable.lock);
+}
+
+
+/*
+ * IDがpidのプロセスにシグナルsigを送信する
+ */
+static void
+send_signal(struct proc *p, int sig)
+{
+    trace("pid=%d, sig=%d, state=%d, paused=%d", p->pid, sig, p->state, p->paused);
+    if (sig == SIGKILL) {
+        p->killed = 1;
+    } else {
+        if (!sigismember(&p->signal.pending, sig))
+            sigaddset(&p->signal.pending, sig);
+        else
+            trace("sig already pending");
+    }
+
+    if (p->state == SLEEPING) {
+        if (p->paused == 1 && (sig == SIGTERM || sig == SIGINT || sig == SIGKILL)) {
+            // For process which are SLEEPING by pause()
+            p->paused = 0;
+            handle_signal(p, SIGCONT);
+        } else if (p->paused == 0 && p->killed != 1) {
+            // For stopped process
+            handle_signal(p, sig);
+        }
+    }
+}
+
+/*
+ * sys_killの実装
+ */
+long
+kill(pid_t pid, int sig)
+{
+    struct proc *current = thisproc();
+    struct proc *p;
+    long error = -ESRCH;
+
+
+    if (pid == 0 || pid < -1) {
+    /* TODO: pgidを設定
+        pid_t pgid = pid == 0 ? current->pgid : -pid;
+        if (pgid > 0) {
+            error = -ESRCH;
+            acquire(&ptable.lock);
+            for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+                if (p->pgid == pgid) {
+                    send_signal(p, sig);
+                    error = 0;
+                }
+            }
+            release(&ptable.lock);
+        }
+        return error;
+    */
+    } else if (pid == -1) {
+        acquire(&ptable.lock);
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+            if (p->pid > 1 && p != current) {
+                send_signal(p, sig);
+                error = 0;
+            }
+        }
+        release(&ptable.lock);
+        return error;
+    } else {
+        acquire(&ptable.lock);
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+            if (p->pid == pid) {
+                send_signal(p, sig);
+                error = 0;
+            }
+        }
+        release(&ptable.lock);
+        return error;
+    }
+    return -EINVAL;
+}
+
+/*
+ * sys_rt_sigsupnedの実装
+ */
+long
+sigsuspend(sigset_t *mask)
+{
+    struct proc *p = thisproc();
+    sigset_t oldmask;
+
+    acquire(&q.siglock);
+    p->paused = 1;
+    sigdelset(mask, SIGKILL);
+    sigdelset(mask, SIGSTOP);
+    oldmask = p->signal.mask;
+    siginitset(&p->signal.mask, mask);
+    release(&q.siglock);
+
+    acquire(&q.lock);
+    sleep(p, &q.lock);
+    release(&q.lock);
+
+    acquire(&q.siglock);
+    p->signal.mask = oldmask;
+    release(&q.siglock);
+    return -EINTR;
+}
+
+/*
+ * sys_rt_sigactionの実装
+ */
+long
+sigaction(int sig, struct k_sigaction *act,  struct k_sigaction *oldact)
+{
+    acquire(&q.siglock);
+    struct signal *signal = &thisproc()->signal;
+    if (oldact) {
+        struct sigaction *action = &signal->actions[sig];
+        oldact->handler = action->sa_handler;
+        oldact->flags = (unsigned long)action->sa_flags;
+        oldact->restorer = action->sa_restorer;
+        memmove((void *)&oldact->mask, &action->sa_mask, 8);
+        trace("oldact=0x%llx", oldact->handler);
+    }
+    if (act) {
+        struct sigaction *action = &signal->actions[sig];
+        action->sa_handler = act->handler;
+        action->sa_flags = (int)act->flags;
+        action->sa_restorer = act->restorer;
+        memmove((void *)&action->sa_mask, &act->mask, 8);
+        signal->mask = action->sa_mask;
+        sigdelset(&signal->mask, SIGKILL);
+        sigdelset(&signal->mask, SIGSTOP);
+        trace("sig=%d handler: act=0x%llx, p=0x%llx", sig, act->handler, action->sa_handler);
+    }
+    release(&q.siglock);
+
+    return 0;
+}
+
+/*
+ * sys_rt_sigpendingの実装
+ */
+long
+sigpending(sigset_t *pending)
+{
+    struct proc *p = thisproc();
+
+    acquire(&q.siglock);
+    *pending = p->signal.pending;
+    release(&q.siglock);
+    return 0;
+}
+
+/*
+ * sys_rt_sigprocmaskの実装
+ */
+long
+sigprocmask(int how, sigset_t *set, sigset_t *oldset, size_t size)
+{
+    int ret = 0;
+
+    acquire(&q.siglock);
+    struct signal *signal = &thisproc()->signal;
+    trace("how=%d oldmask=0x%llx set=0x%llx, size=%lld", how, oldmask, set, size);
+    if (oldset)
+        *oldset = signal->mask;
+    if (set) {
+        switch(how) {
+            case SIG_BLOCK:
+                sigorset(&signal->mask, &signal->mask, set);
+                break;
+            case SIG_UNBLOCK:
+                signotset(set, set);
+                sigandset(&signal->mask, &signal->mask, set);
+                break;
+            case SIG_SETMASK:
+                signal->mask = *set;
+                break;
+            default:
+                ret = -EINVAL;
+        }
+    }
+    trace(" newmask=0x%llx", signal->mask);
+    release(&q.siglock);
+    return ret;
+}
+
+
+/*
+ * sys_rt_sigreturnの実装
+ *   signal_handler処理後の後始末をする
+ */
+long
+sigreturn(void)
+{
+    struct proc *p = thisproc();
+
+    memmove((void *)p->tf, (void *)p->oldtf, sizeof(struct trapframe));
+    return 0;
+}
+
+/*
+ * シグナルを処理する
+ */
+void
+handle_signal(struct proc *p, int sig)
+{
+    trace("[%d]: sig=%d, handler=0x%llx", p->pid, sig, p->signal.actions[sig].sa_handler);
+    if (!sig) return;
+    if (p->signal.actions[sig].sa_handler == SIG_IGN) {
+        trace("sig %d handler is SIG_IGN", sig);
+    } else if (p->signal.actions[sig].sa_handler == SIG_DFL) {
+        switch(sig) {
+            case SIGSTOP:
+            case SIGTSTP:
+            case SIGTTIN:
+            case SIGTTOU:
+                stop_handler(p);
+                break;
+            case SIGCONT:
+                cont_handler(p);
+                break;
+            case SIGABRT:
+            case SIGBUS:
+            case SIGFPE:
+            case SIGILL:
+            case SIGQUIT:
+            case SIGSEGV:
+            case SIGSYS:
+            case SIGTRAP:
+            case SIGXCPU:
+            case SIGXFSZ:
+                // Core: through
+            case SIGALRM:
+            case SIGHUP:
+            case SIGINT:
+            case SIGIO:
+            case SIGKILL:
+            case SIGPIPE:
+            case SIGPROF:
+            case SIGPWR:
+            case SIGTERM:
+            case SIGSTKFLT:
+            case SIGUSR1:
+            case SIGUSR2:
+            case SIGVTALRM:
+                term_handler(p);
+                break;
+            case SIGCHLD:
+            case SIGURG:
+            case SIGWINCH:
+                // Doubt - ignore handler()
+                break;
+            default:
+                break;
+        }
+    } else {
+        trace("call user_handler: sig = %d", sig);
+        user_handler(p, sig);
+    }
+
+    // clear the pending signal flag
+    acquire(&q.siglock);
+    sigdelset(&p->signal.pending, sig);
+    release(&q.siglock);
+}
+
+/*
+ * trap処理終了後、ユーザモードに戻る前に実行される
+ */
+void
+check_pending_signal(void)
+{
+    struct proc *p = thisproc();
+
+    for (int sig = 0; sig < NSIG; sig++) {
+        if (sigismember(&p->signal.pending, sig) == 1) {
+            trace("pid=%d, sig=%d", p->pid, sig);
+            handle_signal(p, sig);
+            break;
+        }
+    }
+}
+
+/*
+ * 親から引き継いだsignalを調整する
+ */
+void
+flush_signal_handlers(struct proc *p)
+{
+    struct sigaction *ka;
+
+    for (int i = 0; i < NSIG; i++) {
+        ka = &p->signal.actions[i];
+        if (ka->sa_handler != SIG_IGN)
+            ka->sa_handler = SIG_DFL;
+        ka->sa_flags = 0;
+        sigemptyset(&ka->sa_mask);
+    }
+    p->paused = 0;
+}
+
+// シグナルハンドラ
+
+/*
+ * プロセスを停止する
+ */
+void
+term_handler(struct proc *p)
+{
+    acquire(&ptable.lock);
+    p->killed = 1;
+    if (p->state == SLEEPING)
+        p->state = RUNNABLE;
+    release(&ptable.lock);
+}
+
+/*
+ * プロセスを継続する
+ */
+void
+cont_handler(struct proc *p)
+{
+    trace("pid=%d", p->pid);
+    wakeup1(p);
+}
+
+/*
+ * プロセスを停止する
+ */
+void
+stop_handler(struct proc *p)
+{
+    trace("pid=%d", p->pid);
+    acquire(&q.lock);
+    sleep(p, &q.lock);
+    release(&q.lock);
+}
+
+/*
+ * ユーザハンドラを処理する
+ */
+void
+user_handler(struct proc *p, int sig)
+{
+    trace("sig=%d", sig);
+    uint64_t sp = p->tf->sp;
+
+    // save the current trapframe from kernel stack to user stack
+    sp -= sizeof(struct trapframe);
+    memmove((void *)sp, (void *)p->tf, sizeof(struct trapframe));
+    p->oldtf = (struct trapframe *)sp;
+
+    // Push the sigret_syscall.S code onto the user stack
+    void *sig_ret_code_addr = (void *)execute_sigret_syscall_start;
+    uint64_t sig_ret_code_size = (uint64_t)&execute_sigret_syscall_end - (uint64_t)&execute_sigret_syscall_start;
+
+    // return addr for handler
+    sp -= sig_ret_code_size;
+    uint64_t handler_ret_addr = sp;
+    memmove((void *)sp, sig_ret_code_addr, sig_ret_code_size);
+
+    // Push the signal number (これはx86の仕様)
+    //sp -= sizeof(uint64_t);
+    //*((uint64_t *)sp) = sig;
+
+    // aarc64はレジスタ渡し
+    p->tf->x[0] = sig;
+
+    // Push the return address of sigret function
+    sp -= sizeof(uint64_t);
+    memmove((void *)sp, (void *)&handler_ret_addr, sizeof(uint64_t));
+
+    // change the sp stored in tf
+    p->tf->sp = sp;
+
+    // now change the eip to point to the user handler
+    p->tf->elr = (uint64_t)p->signal.actions[sig].sa_handler;
+}
+
+//FIXME: ちゃんと実装する
+long sys_ppoll() {
+    struct proc *p = thisproc();
+    struct pollfd *fds;
+    nfds_t nfds;
+    //struct timespec *timeout_ts;
+    //sigset_t *sigmask;
+
+    if (argu64(0, (uint64_t *)&fds) < 0 || argu64(1, (uint64_t *)&nfds) < 0)
+        return -EINVAL;
+
+    if (fds == NULL) {
+        p->paused = 1;
+        acquire(&q.lock);
+        sleep(p, &q.lock);
+        release(&q.lock);
+        return -EINTR;
+    }
+
+    for (int i = 0; i < nfds; i++) {
+        fds[i].revents = fds[i].fd == 0 ? POLLIN : POLLOUT;
+    }
+    return 0;
 }
