@@ -5,4 +5,5 @@
 - [Macで開発](mac.md)
 - [ダンプツール](dump.md)
 - [muslをインストール](musl.md)
-- [signal機能を追加](signal.md)
+- [シグナル機能を追加](signal.md)
+- [時計機能を追加](time.md)

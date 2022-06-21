@@ -9,6 +9,8 @@ typedef uint64_t        size_t;
 typedef int             pid_t;
 typedef int64_t         time_t;
 typedef int64_t         suseconds_t;
+typedef int32_t         clockid_t;
+
 
 /* Efficient min and max operations */
 #define MIN(_a, _b)                 \

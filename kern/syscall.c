@@ -11,6 +11,7 @@
 #include "debug.h"
 #include "string.h"
 #include "time.h"
+#include "clock.h"
 
 typedef long (*func)();
 
@@ -180,6 +181,47 @@ sys_nanosleep()
     return 0;
 }
 
+long
+sys_clock_gettime()
+{
+    clockid_t clk_id;
+    struct timespec *tp;
+
+    if (argint(0, (clockid_t *)&clk_id) < 0 || argu64(1, (uint64_t *)&tp) < 0)
+        return -EINVAL;
+
+    if (!in_user(tp, sizeof(struct timespec)))
+        return -EFAULT;
+
+    if (clk_id != CLOCK_REALTIME)
+        return -EINVAL;
+
+    trace("clk_id: %d, tp: 0x%p\n", clk_id, tp);
+
+    return clock_gettime(clk_id, tp);
+}
+
+long
+sys_clock_settime()
+{
+    clockid_t clk_id;
+    struct timespec *tp;
+
+    if (argint(0, (clockid_t *)&clk_id) < 0 || argu64(1, (uint64_t *)&tp) < 0)
+        return -EINVAL;
+
+    if (!in_user(tp, sizeof(struct timespec)))
+        return -EFAULT;
+
+    if (clk_id != CLOCK_REALTIME)
+        return -EINVAL;
+
+    trace("clk_id: %d, tp: 0x%p\n", clk_id, tp);
+
+    return clock_settime(clk_id, tp);
+}
+
+
 static func syscalls[] = {
 //    [SYS_getcwd] = (func)sys_getcwd,            // 17
     [SYS_dup] = sys_dup,                        // 23
@@ -221,8 +263,8 @@ static func syscalls[] = {
     [SYS_nanosleep] = sys_nanosleep,            // 101
 //    [SYS_getitimer] = sys_getitimer,            // 102
 //    [SYS_setitimer] = sys_setitimer,            // 103
-//    [SYS_clock_settime] = sys_clock_settime,    // 112
-//    [SYS_clock_gettime] = sys_clock_gettime,    // 113
+    [SYS_clock_settime] = sys_clock_settime,    // 112
+    [SYS_clock_gettime] = sys_clock_gettime,    // 113
 //    [SYS_sched_getaffinity] = sys_sched_getaffinity, // 123
     [SYS_sched_yield] = sys_yield,              // 124
     [SYS_kill] = sys_kill,                      // 129

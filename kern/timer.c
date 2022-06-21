@@ -5,6 +5,7 @@
 #include "irq.h"
 #include "console.h"
 #include "proc.h"
+#include "time.h"
 
 /* Core Timer */
 #define CORE_TIMER_CTRL(i)      (LOCAL_BASE + 0x40 + 4*(i))
@@ -16,10 +17,10 @@ static uint64_t cnt;
 void
 timer_init()
 {
-    dt = timerfreq();
-    asm volatile ("msr cntp_ctl_el0, %[x]"::[x] "r"(1));
-    asm volatile ("msr cntp_tval_el0, %[x]"::[x] "r"(dt));
-    put32(CORE_TIMER_CTRL(cpuid()), CORE_TIMER_ENABLE);
+    dt = timerfreq() / HZ;       // 10 ms
+    asm volatile ("msr cntp_ctl_el0, %[x]"::[x] "r"(1));    // Timer enable
+    asm volatile ("msr cntp_tval_el0, %[x]"::[x] "r"(dt));  // Set counter
+    put32(CORE_TIMER_CTRL(cpuid()), CORE_TIMER_ENABLE);     // core timer enable
 #ifdef USE_GIC
     irq_enable(IRQ_LOCAL_CNTPNS);
     irq_register(IRQ_LOCAL_CNTPNS, timer_intr);
@@ -39,8 +40,7 @@ timer_reset()
 void
 timer_intr()
 {
-    //trace("t: %d", ++cnt);
+    trace("t: %d", ++cnt);
     timer_reset();
     yield();
-    //check_pending_signal();
 }

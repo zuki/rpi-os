@@ -14,6 +14,8 @@
 #include "buf.h"
 #include "mbox.h"
 #include "irq.h"
+#include "ds3231.h"
+#include "i2c.h"
 
 /*
  * Keep it in data segment by explicitly initializing by zero,
@@ -31,7 +33,7 @@ main()
     acquire(&mp.lock);
     if (mp.cnt++ == 0) {
         memset(edata, 0, end - edata);
-
+        i2c_init(DS3231_I2C_DIV);
         irq_init();
         console_init();
         mm_init();

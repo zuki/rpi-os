@@ -4,7 +4,8 @@
 #include "types.h"
 #include "list.h"
 
-//extern uint64_t jiffies;
+#define HZ  100
+#define INITIAL_JIFFIES ((uint64_t)-300 * HZ)
 
 struct timeval {
     time_t      tv_sec;
@@ -28,6 +29,11 @@ struct timer_list {
     void (*function)(uint64_t);
 };
 
+extern uint64_t jiffies;
+extern struct timespec xtime;
+
+#define CURRENT_TIME (xtime.tv_sec)
+
 #define CLOCK_REALTIME           0
 #define CLOCK_MONOTONIC          1
 #define CLOCK_PROCESS_CPUTIME_ID 2
@@ -47,7 +53,7 @@ struct timer_list {
 
 #define TIME_UTC                1
 
-/*
+
 extern void add_timer(struct timer_list *timer);
 extern int del_timer(struct timer_list *timer);
 
@@ -77,6 +83,6 @@ void run_timer_list(void);
 long getitimer(int, struct itimerval *);
 void it_real_fn(uint64_t);
 long setitimer(int, struct itimerval *, struct itimerval *);
-*/
+
 
 #endif

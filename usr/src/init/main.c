@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 
 char *argv[] = { "sh", 0 };
-char *envp[] = { "TEST_ENV=FROM_INIT", 0 };
+char *envp[] = { "TZ=JST-9", 0 };
 
 int
 main()
