@@ -3,18 +3,26 @@
 
 #include "types.h"
 
+#define offsetof(st, m) __builtin_offsetof(st, m)
+
+#define container_of(ptr, type, member)                 \
+({                                                      \
+    const typeof(((type *)0)->member) *__mptr = (ptr);  \
+    (type *)((char *)__mptr - offsetof(type,member));   \
+})
+
 struct list_head {
-    struct list_head *next, *prev; 
+    struct list_head *next, *prev;
 };
 
 static inline void
-list_init(struct list_head *head) 
+list_init(struct list_head *head)
 {
     head->next = head->prev = head;
 }
 
-static inline int 
-list_empty(struct list_head *head) 
+static inline int
+list_empty(struct list_head *head)
 {
     return head->next == head;
 }
@@ -24,12 +32,12 @@ list_front(struct list_head *head)
     return head->next;
 }
 static inline struct list_head *
-list_back(struct list_head *head) 
+list_back(struct list_head *head)
 {
     return head->prev;
 }
 
-static inline void 
+static inline void
 list_insert(struct list_head *cur, struct list_head *prev, struct list_head *next)
 {
     next->prev = cur;
@@ -38,27 +46,27 @@ list_insert(struct list_head *cur, struct list_head *prev, struct list_head *nex
     prev->next = cur;
 }
 
-static inline void 
-list_push_front(struct list_head *head, struct list_head *cur) 
+static inline void
+list_push_front(struct list_head *head, struct list_head *cur)
 {
     list_insert(cur, head, head->next);
 }
 
-static inline void 
+static inline void
 list_push_back(struct list_head *head, struct list_head *cur)
 {
     list_insert(cur, head->prev, head);
 }
 
 static inline void
-list_del(struct list_head *prev, struct list_head *next) 
+list_del(struct list_head *prev, struct list_head *next)
 {
     next->prev = prev;
     prev->next = next;
 }
 
 static inline void
-list_drop(struct list_head *item) 
+list_drop(struct list_head *item)
 {
     list_del(item->prev, item->next);
 }
@@ -79,7 +87,7 @@ static inline struct list_head *
 list_find(struct list_head *head, struct list_head *item)
 {
     for (struct list_head *p = head->next; p != head; p = p->next) {
-        if (p == item) 
+        if (p == item)
             return item;
     }
     return 0;

@@ -1,8 +1,7 @@
 #ifndef INC_VM_H
 #define INC_VM_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include "types.h"
 #include "proc.h"
 
 uint64_t *  vm_init();

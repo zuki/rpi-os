@@ -1,5 +1,5 @@
-#ifndef INC_SIGNAL_H
-#define INC_SIGNAL_H
+#ifndef INC_LINUX_SIGNAL_H
+#define INC_LINUX_SIGNAL_H
 
 #define NSIG   32
 

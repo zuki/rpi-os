@@ -1,7 +1,7 @@
 #ifndef INC_BUF_H
 #define INC_BUF_H
 
-#include <stdint.h>
+#include "types.h"
 #include "list.h"
 #include "sleeplock.h"
 #include "fs.h"

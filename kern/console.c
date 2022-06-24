@@ -1,8 +1,5 @@
 #include "console.h"
-
-#include <stdarg.h>
-#include <stdint.h>
-
+#include "types.h"
 #include "arm.h"
 #include "uart.h"
 #include "irq.h"

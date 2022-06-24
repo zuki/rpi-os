@@ -5,16 +5,24 @@
 #ifndef INC_FS_H
 #define INC_FS_H
 
-#include <stdint.h>
+#include "types.h"
+#include "linux/fcntl.h"
+#include "linux/time.h"
 
 // Kernel only
 #define NDEV            10                  // Maximum major device number
-#define NINODE          50                  // Maximum number of active i-nodes
-#define MAXOPBLOCKS     10                  // Max # of blocks any FS op writes
+#define MAXBDEV         4                   // maximum numbers of block devices
+#define NINODE          1024                // Maximum number of active i-nodes
+#define MAXOPBLOCKS     30                  // Max # of blocks any FS op writes
 #define NBUF            (MAXOPBLOCKS*3)     // Size of disk block cache
+#define MAXVFSSIZE      4                   // maximum number of vfs fils systems
+#define SDMAJOR         0                   // SD card major block device
+#define CONMAJOR        1                   // Console device
+#define ROOTFSTYPE      "v6"                //
+#define MAXBSIZE        4096                // maximum BSIZE
 
 // mkfs only
-#define FSSIZE          20000               // Size of file system in blocks
+#define FSSIZE          800000              // Size of file system in blocks
 
 // Belows are used by both
 #define LOGSIZE         (MAXOPBLOCKS*3)     // Max data blocks in on-disk log
@@ -50,27 +58,42 @@ struct dinode {
   uint16_t minor;               // Minor device number (T_DEV only)
   uint16_t nlink;               // Number of links to inode in file system
   uint32_t size;                // Size of file (bytes)
+  mode_t mode;                  // file mode
+  //uid_t    uid;                 // owner's user id
+  //gid_t    gid;                 // owner's gropu id
+  struct timespec atime;        // last accessed time
+  struct timespec mtime;        // last modified time
+  struct timespec ctime;        // created time
   uint32_t addrs[NDIRECT+2];    // Data block addresses
+  char    _dummy[12];
 };
 
 /* Inodes per block. */
-#define IPB           (BSIZE / sizeof(struct dinode))
+#define IPB           (BSIZE / sizeof(struct dinode))   // 4
 
 /* Block containing inode i. */
 #define IBLOCK(i, sb)     ((i) / IPB + sb.inodestart)
 
 /* Bitmap bits per block. */
-#define BPB           (BSIZE*8)
+#define BPB           (BSIZE*8)                         // 4096
 
 /* Block of free map containing bit for block b. */
 #define BBLOCK(b, sb) (b/BPB + sb.bmapstart)
 
 /* Directory is a file containing a sequence of dirent structures. */
-#define DIRSIZ 14
+#define DIRSIZ 60
 
 struct dirent {
-  uint16_t inum;
+  uint32_t inum;
   char name[DIRSIZ];
+};
+
+struct dirent64 {
+  ino64_t d_ino;
+  off64_t d_off;
+  unsigned short d_reclen;
+  unsigned char d_type;
+  char d_name[];
 };
 
 #define T_DIR  1   // Directory

@@ -1,12 +1,13 @@
+#include "linux/errno.h"
 #include "proc.h"
 #include "trap.h"
 #include "console.h"
 #include "vm.h"
 #include "syscall1.h"
-
-#include <sys/mman.h>
-#include <errno.h>
-#include "signal.h"
+#include "linux/mman.h"
+#include "mmap.h"
+#include "linux/signal.h"
+#include "linux/ppoll.h"
 
 long
 sys_yield()
@@ -162,7 +163,7 @@ sys_rt_sigsuspend()
 {
     sigset_t *mask;
 
-    if (argptr(0, &mask, sizeof(sigset_t)) < 0)
+    if (argptr(0, (char **)&mask, sizeof(sigset_t)) < 0)
         return -EINVAL;
 
     trace("mask=%lld", *mask);
@@ -229,4 +230,19 @@ long
 sys_rt_sigreturn()
 {
     return sigreturn();
+}
+
+//FIXME: ちゃんと実装する
+long sys_ppoll() {
+    struct pollfd *fds;
+    nfds_t nfds;
+    // TODO: 以下2変数の実装
+    //struct timespec *timeout_ts;
+    //sigset_t *sigmask;
+
+    if (argu64(1, &nfds) < 0
+     || argptr(0, (char **)&fds, nfds * sizeof(struct pollfd)) < 0)
+        return -EINVAL;
+
+    return ppoll(fds, nfds);
 }

@@ -1,11 +1,9 @@
 #include "clock.h"
-
+#include "linux/time.h"
 #include "arm.h"
 #include "base.h"
 #include "irq.h"
-
 #include "console.h"
-#include "time.h"
 #include "rtc.h"
 
 /* Local timer */

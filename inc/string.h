@@ -1,9 +1,7 @@
 #ifndef INC_STRING_H
 #define INC_STRING_H
 
-#include <stdint.h>
-#include <stddef.h>
-
+#include "types.h"
 #include "arm.h"
 
 static inline void *

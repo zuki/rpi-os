@@ -1,5 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <time.h>
 
 #define NDIRECT         11
 
@@ -19,7 +22,12 @@ struct dinode {
   uint16_t minor;               // Minor device number (T_DEV only)
   uint16_t nlink;               // Number of links to inode in file system
   uint32_t size;                // Size of file (bytes)
+  mode_t mode;                  // file mode
+  struct timespec atime;        // last accessed time
+  struct timespec mtime;        // last modified time
+  struct timespec ctime;        // created time
   uint32_t addrs[NDIRECT+2];    // Data block addresses
+  char    _dummy[12];
 };
 
 // FROM mksd.mk
@@ -34,9 +42,9 @@ struct dinode {
 
 #define BUFSIZE         4096
 
-#define MAXOPBLOCKS     10
-#define NINODE          50
-#define FSSIZE          20000
+#define MAXOPBLOCKS     30
+#define NINODE          1024
+#define FSSIZE          800000
 #define BSIZE           512
 #define LOGSIZE         (MAXOPBLOCKS*3)
 #define IPB             (BSIZE / sizeof(struct dinode))
@@ -83,7 +91,7 @@ void dump_hex(int start, char *buf, int len) {
         }
         for (j = 0; j < 16; j++) {
             unsigned char c = buf[i*16+j];
-            if (c >= 0x20 && c <= 0x74)
+            if (c >= 0x20 && c <= 0x7e)
                 printf("%c", c);
             else
                 printf(".");
@@ -138,6 +146,10 @@ void dump(FILE *f, char type, int arg1, int arg2) {
             printf(" minor: 0x%04x\n", inode->minor);
             printf(" nlink: 0x%04x\n", inode->nlink);
             printf(" size : %d (0x%08x)\n", inode->size, inode->size);
+            printf(" mode : 0x%04x\n", inode->mode);
+            printf(" atime: 0x%08lx\n", inode->atime.tv_sec);
+            printf(" mtime: 0x%08lx\n", inode->mtime.tv_sec);
+            printf(" ctime: 0x%08lx\n", inode->ctime.tv_sec);
             for (j = 0; j < NDIRECT+2; j++) {
                 if (inode->addrs[j] == 0) break;
                 printf(" addrs[%02d]: %d\n", j, inode->addrs[j]);

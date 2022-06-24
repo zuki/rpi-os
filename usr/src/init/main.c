@@ -5,18 +5,19 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/sysmacros.h>
 
 char *argv[] = { "sh", 0 };
-char *envp[] = { "TZ=JST-9", 0 };
+char *envp[] = { "TEST_ENV=FROM_INIT", "TZ=JST-9", 0 };
 
 int
 main()
 {
     int pid, wpid;
 
-    if (open("console", O_RDWR) < 0) {
-        mknod("console", 1, 1);
-        open("console", O_RDWR);
+    if (open("/dev/tty", O_RDWR) < 0) {
+        mknod("/dev/tty", (S_IFCHR | 0777), makedev(1, 0));
+        open("/dev/tty", O_RDWR);
     }
     dup(0);                     // stdout
     dup(0);                     // stderr
@@ -29,7 +30,7 @@ main()
             exit(1);
         }
         if (pid == 0) {
-            execve("sh", argv, envp);
+            execve("/bin/sh", argv, envp);
             printf("init: exec sh failed\n");
             exit(1);
         }

@@ -10,19 +10,21 @@
  * routines.  The (higher-level) system call implementations
  * are in sysfile.c.
  */
-
+#include "linux/errno.h"
+#include "fs.h"
 #include "types.h"
 #include "mmu.h"
 #include "proc.h"
 #include "string.h"
 #include "console.h"
-
 #include "spinlock.h"
 #include "sleeplock.h"
-
 #include "buf.h"
 #include "log.h"
 #include "file.h"
+#include "linux/time.h"
+#include "clock.h"
+#include "time.h"
 
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -213,7 +215,11 @@ ialloc(uint32_t dev, short type)
             dip->type = type;
             log_write(bp);      // mark it allocated on the disk
             brelse(bp);
-            return iget(dev, inum);
+            struct inode *ip = iget(dev, inum);
+            struct timespec tp;
+            clock_gettime(CLOCK_REALTIME, &tp);
+            ip->atime = ip->ctime = ip->mtime = tp;
+            return ip;
         }
         brelse(bp);
     }
@@ -319,6 +325,10 @@ ilock(struct inode *ip)
         ip->minor = dip->minor;
         ip->nlink = dip->nlink;
         ip->size = dip->size;
+        ip->mode  = dip->mode;
+        ip->atime = dip->atime;
+        ip->mtime = dip->mtime;
+        ip->ctime = dip->ctime;
         memmove(ip->addrs, dip->addrs, sizeof(ip->addrs));
         brelse(bp);
         ip->valid = 1;
@@ -516,16 +526,21 @@ stati(struct inode *ip, struct stat *st)
     st->st_ino = ip->inum;
     st->st_nlink = ip->nlink;
     st->st_size = ip->size;
+    st->st_blksize = BSIZE;
+    st->st_blocks  = (ip->size / BSIZE) + 1;
+    st->st_atime = ip->atime;
+    st->st_mtime = ip->mtime;
+    st->st_ctime = ip->ctime;
+    if (ip->type == T_DEV)
+        st->st_rdev = makedev(ip->major, ip->minor);
 
     switch (ip->type) {
     case T_FILE:
-        st->st_mode = S_IFREG;
-        break;
     case T_DIR:
-        st->st_mode = S_IFDIR;
-        break;
     case T_DEV:
-        st->st_mode = 0;
+    case T_MOUNT:
+    case T_SYMLINK:
+        st->st_mode = ip->mode;
         break;
     default:
         panic("unexpected stat type %d. ", ip->type);
@@ -759,4 +774,124 @@ struct inode *
 nameiparent(const char *path, char *name)
 {
     return namex(path, 1, name);
+}
+
+
+struct inode *
+create(char *path, short type, short major, short minor, mode_t mode)
+{
+    struct inode *ip, *dp;
+    char name[255];
+    size_t off;
+    struct timespec ts;
+
+    // 親ディレクトリなし
+    if ((dp = nameiparent(path, name)) == 0)
+        return (void *)-ENOENT;
+    ilock(dp);
+
+    // ファイルはすでにあり
+    if ((ip = dirlookup(dp, name, &off)) != 0) {
+        iunlockput(dp);
+        ilock(ip);
+        if (type == T_FILE && ip->type == T_FILE)
+            return ip;
+        iunlockput(ip);
+        return (void *)-EEXIST;
+    }
+
+    // ファイルなし、作成
+    if ((ip = ialloc(dp->dev, type)) == 0)
+        panic("create: ialloc");
+
+    ilock(ip);
+    ip->major = major;
+    ip->minor = minor;
+    ip->nlink = 1;
+    //ip->mode  = mode & ~thisproc()->umask;
+    ip->mode  = mode;
+    ip->type  = type;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ip->atime = ip->mtime = ip->ctime = ts;
+/*
+    ip->uid = thisproc()->uid;
+    ip->gid = thisproc()->gid;
+*/
+    iupdate(ip);
+
+    if (type == T_DIR) {        // Create . and .. entries.
+        dp->nlink++;            // for ".."
+        iupdate(dp);
+        // No ip->nlink++ for ".": avoid cyclic ref count.
+        if (dirlink(ip, ".", ip->inum) < 0
+            || dirlink(ip, "..", dp->inum) < 0)
+            panic("create dots");
+    }
+
+    if (dirlink(dp, name, ip->inum) < 0)
+        panic("create: dirlink");
+
+    iunlockput(dp);
+
+    return ip;
+}
+
+int
+unlink(struct inode *dp, uint32_t off)
+{
+    struct dirent de;
+
+    memset(&de, 0, sizeof(de));
+    if (writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
+        return -1;
+    return 0;
+}
+
+long
+getdents(struct file *f, char *data, size_t size)
+{
+    ssize_t r, n;
+    int namelen, reclen, off = 0;
+    char *buf;
+    struct dirent de;
+    struct dirent64 *de64;
+
+    buf = data;
+
+    while (1) {
+        n = fileread(f, (char *)&de, sizeof(de));
+        r = (buf - data);
+        if (n == 0) {
+            trace("read 0");
+            return r ? r : 0;
+        }
+        if (n < 0 || n != sizeof(de)) {
+            trace("readi failed");
+            return r ? r : -1;
+        }
+
+        if (de.inum == 0) continue;
+
+        namelen = MIN(strlen(de.name), DIRSIZ) + 1;
+        reclen = (size_t)(&((struct dirent64*)0)->d_name);
+        reclen = reclen + namelen;
+        reclen = ALIGN(reclen, 3);
+        if ((r + reclen) > size) {
+            trace("break; r: %d, reclen: %d, size: %d", r, reclen, size);
+            break;
+        }
+
+        de64 = (struct dirent64 *)buf;
+        memset(de64, 0, sizeof(struct dirent64));
+        de64->d_ino = de.inum;
+        de64->d_off = off;
+        de64->d_reclen = reclen;
+        de64->d_type = IFTODT(f->ip->mode);
+        strncpy(de64->d_name, de.name, namelen);
+        buf += reclen;
+        off = f->off;
+    }
+
+    return (buf - data);
+
 }

@@ -1,7 +1,5 @@
-#include <stdint.h>
-
+#include "types.h"
 #include "string.h"
-
 #include "arm.h"
 #include "console.h"
 #include "vm.h"

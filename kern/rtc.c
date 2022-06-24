@@ -1,8 +1,8 @@
-#include <errno.h>
+#include "linux/errno.h"
+#include "linux/time.h"
 #include "rtc.h"
 #include "ds3231.h"
 #include "console.h"
-#include "time.h"
 #include "types.h"
 
 

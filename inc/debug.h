@@ -1,7 +1,7 @@
 #ifndef INC_DEBUG_H
 #define INC_DEBUG_H
 
-#include <stddef.h>
+#include "types.h"
 #include "arm.h"
 #include "console.h"
 

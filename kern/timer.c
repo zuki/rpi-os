@@ -1,11 +1,11 @@
 #include "timer.h"
-
+#include "linux/time.h"
 #include "arm.h"
 #include "base.h"
 #include "irq.h"
 #include "console.h"
 #include "proc.h"
-#include "time.h"
+
 
 /* Core Timer */
 #define CORE_TIMER_CTRL(i)      (LOCAL_BASE + 0x40 + 4*(i))

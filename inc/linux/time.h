@@ -1,5 +1,5 @@
-#ifndef INC_TIME_H
-#define INC_TIME_H
+#ifndef INC_LINUX_TIME_H
+#define INC_LINUX_TIME_H
 
 #include "types.h"
 #include "list.h"

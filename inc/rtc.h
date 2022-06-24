@@ -1,8 +1,7 @@
 #ifndef INC_RTC_H
 #define INC_RTC_H
 
-#include "time.h"
-#include "types.h"
+#include "linux/time.h"
 
 //#define USING_RASPI 1
 #undef    USING_RASPI

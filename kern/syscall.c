@@ -1,8 +1,6 @@
-#include <syscall.h>
-#include <errno.h>
-// #include <unistd.h>
-
-#include <stdint.h>
+#include "linux/syscall.h"
+#include "linux/errno.h"
+#include "types.h"
 #include "syscall1.h"
 #include "memlayout.h"
 #include "trap.h"
@@ -10,8 +8,8 @@
 #include "proc.h"
 #include "debug.h"
 #include "string.h"
-#include "time.h"
 #include "clock.h"
+#include "linux/time.h"
 
 typedef long (*func)();
 
@@ -137,14 +135,6 @@ long sys_gettid() {
     return thisproc()->pid;
 }
 
-// FIXME: Hack TIOCGWINSZ(get window size)
-long sys_ioctl() {
-    trace("ioctl: name '%s'", thisproc()->name);
-    if (thisproc()->tf->x[1] != 0x5413)
-        panic("ioctl unimplemented. ");
-    return 0;
-}
-
 // FIXME: exit_group should kill every thread in the current thread group.
 long sys_exit_group() {
     trace("sys_exit_group: '%s' exit with code %d", thisproc()->name, thisproc()->tf->x[0]);
@@ -221,18 +211,17 @@ sys_clock_settime()
     return clock_settime(clk_id, tp);
 }
 
-
 static func syscalls[] = {
 //    [SYS_getcwd] = (func)sys_getcwd,            // 17
     [SYS_dup] = sys_dup,                        // 23
-//    [SYS_dup3] = sys_dup3,                      // 24
-//    [SYS_fcntl] = sys_fcntl,                    // 25
+    [SYS_dup3] = sys_dup3,                      // 24
+    [SYS_fcntl] = sys_fcntl,                    // 25
     [SYS_ioctl] = sys_ioctl,                    // 29
     [SYS_mknodat] = sys_mknodat,                // 33
     [SYS_mkdirat] = sys_mkdirat,                // 34
     [SYS_unlinkat] = sys_unlinkat,              // 35
-//    [SYS_symlinkat] = sys_symlinkat,            // 36
-//    [SYS_linkat] = sys_linkat,                  // 37
+    [SYS_symlinkat] = sys_symlinkat,            // 36
+    [SYS_linkat] = sys_linkat,                  // 37
 //    [SYS_umount2] = sys_umount2,                // 39
 //    [SYS_mount] = sys_mount,                    // 40
 //    [SYS_faccessat] = sys_faccessat,            // 48
@@ -243,19 +232,19 @@ static func syscalls[] = {
     [SYS_openat] = sys_openat,                  // 56
     [SYS_close] = sys_close,                    // 57
     [SYS_pipe2] = sys_pipe2,                    // 59
-//    [SYS_getdents64] = sys_getdents,            // 61
-//    [SYS_lseek] = (func)sys_lseek,              // 62
+    [SYS_getdents64] = sys_getdents64,            // 61
+    [SYS_lseek] = (func)sys_lseek,              // 62
     [SYS_read] = (func)sys_read,                // 63
     [SYS_write] = (func)sys_write,              // 64
-//    [SYS_readv] = (func)sys_readv,              // 65
+    [SYS_readv] = (func)sys_readv,              // 65
     [SYS_writev] = (func)sys_writev,            // 66
     [SYS_ppoll] = sys_ppoll,                    // 73
-//    [SYS_readlinkat] = (func)sys_readlinkat,    // 78
+    [SYS_readlinkat] = (func)sys_readlinkat,    // 78
     [SYS_newfstatat] = sys_fstatat,             // 79
     [SYS_fstat] = sys_fstat,                    // 80
-//    [SYS_fsync] = sys_fsync,                    // 82
+    [SYS_fsync] = sys_fsync,                    // 82
 //    [SYS_fdatasync] = sys_fdatasync,            // 83
-//    [SYS_utimensat] = sys_utimensat,            // 88
+    [SYS_utimensat] = sys_utimensat,            // 88
     [SYS_exit] = sys_exit,                      // 93
     // FIXME: exit_group should kill every thread in the current thread group.
     [SYS_exit_group] = sys_exit_group,          // 94
@@ -303,7 +292,7 @@ static func syscalls[] = {
     [SYS_clone] = sys_clone,                    // 220
     [SYS_execve] = sys_execve,                  // 221
     [SYS_mmap] = (func)sys_mmap,                // 222
-//    [SYS_fadvise64] = sys_fadvise64,            // 223
+    [SYS_fadvise64] = sys_fadvise64,            // 223
 //    [SYS_mprotect] = sys_mprotect,              // 226
 //    [SYS_msync] = sys_msync,                    // 227
 //    [SYS_madvise] = sys_madvise,                // 233

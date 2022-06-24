@@ -1,11 +1,10 @@
 #ifndef INC_SYSCALL1_H
 #define INC_SYSCALL1_H
 
-#include <syscall.h>
-#include <stdint.h>
-#include <fcntl.h>
-#include "trap.h"
 #include "types.h"
+#include "trap.h"
+#include "linux/syscall.h"
+#include "linux/fcntl.h"
 
 #define MAXARG      32
 #define MAXENV      64
@@ -29,7 +28,6 @@ long sys_nanosleep();
 long sys_getrandom();
 long sys_uname();
 long sys_clock_settime();
-long sys_utimensat();
 long sys_ppoll();
 long syscall1(struct trapframe *);
 
@@ -85,7 +83,7 @@ long sys_fsync();
 long sys_fdatasync();
 long sys_close();
 long sys_openat();
-long sys_getdents();
+long sys_getdents64();
 long sys_mkdirat();
 long sys_mknodat();
 long sys_unlinkat();
@@ -108,6 +106,7 @@ long sys_msync();
 void *sys_mremap();
 long sys_mprotect();
 long sys_madvise();
+long sys_utimensat();
 //int dirunlink(struct inode *, char *, uint32_t);
 //int direntlookup(struct inode *, int, struct dirent *);
 

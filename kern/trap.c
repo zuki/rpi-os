@@ -32,9 +32,10 @@ trap(struct trapframe *tf)
     case EC_UNKNOWN:
         if (il) {
             panic("unknown error");
-        } else
+        } else {
             irq_handler();
             check_pending_signal();
+        }
         break;
 
     case EC_SVC64:

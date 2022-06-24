@@ -1,16 +1,16 @@
 #ifndef INC_PROC_H
 #define INC_PROC_H
 
-#include <stdint.h>
+#include "types.h"
 #include "arm.h"
 #include "mmu.h"
 #include "trap.h"
 #include "spinlock.h"
 #include "list.h"
-#include "types.h"
-#include "signal.h"
+#include "linux/signal.h"
+#include "linux/ppoll.h"
 
-#define NPROC           100
+#define NPROC           128
 #define NCPU            4
 #define NOFILE          16      // Open files per process
 
@@ -68,6 +68,7 @@ struct proc {
     struct list_head clink;     /* Child list of this process. */
 
     int killed;                 // If non-zero, have been killed
+    int fdflag;                 // file descriptor flags: 1 bit/file
     struct file *ofile[NOFILE]; // Open files
     struct inode *cwd;          // Current directory
     char name[16];              // Process name (debugging)
@@ -124,6 +125,7 @@ void term_handler(struct proc *p);
 void handle_signal(struct proc *p , int sig);
 void user_handler(struct proc *p, int sig);
 void flush_signal_handlers(struct proc *p);
+long ppoll(struct pollfd *fds, nfds_t nfds);
 
 // sigret_syscall.S
 void execute_sigret_syscall_start(void);

@@ -15,7 +15,7 @@ USR_CC := $(MUSL)/bin/musl-gcc
 
 # -z max-page-size: https://stackoverflow.com/questions/33005638/how-to-change-alignment-of-code-segment-in-elf
 CFLAGS = -std=gnu99 -O3 -MMD -MP -static -z max-page-size=4096 \
-  -fno-omit-frame-pointer
+  -fno-omit-frame-pointer -Iinc/
 #  -I../libc/obj/include/ \
 #  -I../libc/arch/aarch64/ \
 #  -I../libc/arch/generic/

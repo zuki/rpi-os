@@ -1,4 +1,4 @@
-#include <syscall.h>
+#include "linux/syscall.h"
 
 .global execute_sigret_syscall_start
 .global execute_sigret_syscall_end

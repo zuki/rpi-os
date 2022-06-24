@@ -1,11 +1,9 @@
-#include <elf.h>
-
+#include "types.h"
+#include "linux/elf.h"
 #include "trap.h"
-
 #include "file.h"
 #include "log.h"
 #include "string.h"
-
 #include "console.h"
 #include "vm.h"
 #include "proc.h"

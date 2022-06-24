@@ -1,4 +1,4 @@
-#include "signal.h"
+#include "linux/signal.h"
 
 int sigemptyset(sigset_t *set) {
     *set = 0UL;

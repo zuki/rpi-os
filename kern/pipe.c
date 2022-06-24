@@ -1,3 +1,4 @@
+#include "pipe.h"
 #include "types.h"
 // #include "mmu.h"
 #include "proc.h"
@@ -7,19 +8,8 @@
 #include "file.h"
 #include "mm.h"
 
-#define PIPESIZE 512
-
-struct pipe {
-    struct spinlock lock;
-    char data[PIPESIZE];
-    size_t nread;               // number of bytes read
-    size_t nwrite;              // number of bytes written
-    int readopen;               // read fd is still open
-    int writeopen;              // write fd is still open
-};
-
 int
-pipealloc(struct file **f0, struct file **f1)
+pipealloc(struct file **f0, struct file **f1, int flags)
 {
     struct pipe *p;
 
@@ -38,10 +28,12 @@ pipealloc(struct file **f0, struct file **f1)
     (*f0)->readable = 1;
     (*f0)->writable = 0;
     (*f0)->pipe = p;
+    (*f0)->flags = O_RDONLY | O_APPEND | (flags & PIPE2_FLAGS);
     (*f1)->type = FD_PIPE;
     (*f1)->readable = 0;
     (*f1)->writable = 1;
     (*f1)->pipe = p;
+    (*f1)->flags = O_WRONLY | O_APPEND | (flags & PIPE2_FLAGS);
     return 0;
 
   bad:

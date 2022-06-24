@@ -5,8 +5,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <time.h>
 
-#include "../../../inc/fs.h"
+#include "fs.h"
 
 char *
 fmtname(char *path)
@@ -21,8 +22,19 @@ fmtname(char *path)
     if (strlen(p) >= DIRSIZ)
         return p;
     memmove(buf, p, strlen(p));
-    memset(buf + strlen(p), ' ', DIRSIZ - strlen(p));
+    //memset(buf + strlen(p), ' ', DIRSIZ - strlen(p));
     return buf;
+}
+
+char *
+fmttime(time_t time)
+{
+    static char mtime_s[12];
+
+    struct tm *tm = localtime(&time);
+    sprintf(mtime_s, "%2d %2d %02d:%02d",
+        tm->tm_mon + 1, tm->tm_mday,  tm->tm_hour, tm->tm_min);
+    return mtime_s;
 }
 
 void
@@ -45,8 +57,8 @@ ls(char *path)
     }
 
     if (S_ISREG(st.st_mode)) {
-        printf("%s %x %ld %ld\n", fmtname(path), st.st_mode, st.st_ino,
-               st.st_size);
+        printf("%04o %4ld %5ld %s %s\n", st.st_mode, st.st_ino,
+               st.st_size, fmttime(st.st_mtime), fmtname(path));
     } else if (S_ISDIR(st.st_mode)) {
         if (strlen(path) + 1 + DIRSIZ + 1 > sizeof(buf)) {
             fprintf(stderr, "ls: path too long\n");
@@ -63,8 +75,8 @@ ls(char *path)
                     fprintf(stderr, "ls: cannot stat %s\n", buf);
                     continue;
                 }
-                printf("%s %x %ld %ld\n", fmtname(buf), st.st_mode,
-                       st.st_ino, st.st_size);
+                printf("%04o %4ld %5ld %s %s\n", st.st_mode,
+                       st.st_ino, st.st_size, fmttime(st.st_mtime), fmtname(buf));
             }
         }
     }

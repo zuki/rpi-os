@@ -1,7 +1,7 @@
 #ifndef INC_ARM_H
 #define INC_ARM_H
 
-#include <stdint.h>
+#include "types.h"
 
 /* Prevent compiler from reordering. */
 static inline void

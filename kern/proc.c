@@ -1,6 +1,5 @@
 #include "proc.h"
-#include <errno.h>
-#include <poll.h>
+#include "linux/errno.h"
 
 #include "string.h"
 #include "types.h"
@@ -16,7 +15,8 @@
 #include "file.h"
 #include "log.h"
 #include "string.h"
-#include "signal.h"
+#include "linux/signal.h"
+#include "linux/ppoll.h"
 
 extern void trapret();
 extern void swtch(struct context **old, struct context *new);
@@ -36,7 +36,7 @@ struct {
     struct spinlock lock;
 } ptable;
 
-struct {
+struct _q {
     struct spinlock lock;
     struct spinlock siglock;
 } q;
@@ -127,6 +127,8 @@ proc_initx(char *name, char *code, size_t len)
     p->stksz = 0;
     p->sz = PGSIZE;
     p->base = 0;
+
+    p->fdflag = 0;
 
     p->tf->elr = 0;
 
@@ -322,6 +324,7 @@ fork()
         if (cp->ofile[i])
             np->ofile[i] = filedup(cp->ofile[i]);
     np->cwd = idup(cp->cwd);
+    np->fdflag = cp->fdflag;
 
     memmove(&np->signal, &cp->signal, sizeof(struct signal));
 
@@ -841,16 +844,9 @@ user_handler(struct proc *p, int sig)
     p->tf->elr = (uint64_t)p->signal.actions[sig].sa_handler;
 }
 
-//FIXME: ちゃんと実装する
-long sys_ppoll() {
+long
+ppoll(struct pollfd *fds, nfds_t nfds) {
     struct proc *p = thisproc();
-    struct pollfd *fds;
-    nfds_t nfds;
-    //struct timespec *timeout_ts;
-    //sigset_t *sigmask;
-
-    if (argu64(0, (uint64_t *)&fds) < 0 || argu64(1, (uint64_t *)&nfds) < 0)
-        return -EINVAL;
 
     if (fds == NULL) {
         p->paused = 1;
@@ -863,5 +859,6 @@ long sys_ppoll() {
     for (int i = 0; i < nfds; i++) {
         fds[i].revents = fds[i].fd == 0 ? POLLIN : POLLOUT;
     }
+
     return 0;
 }

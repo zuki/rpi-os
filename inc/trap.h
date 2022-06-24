@@ -1,8 +1,7 @@
 #ifndef INC_TRAP_H
 #define INC_TRAP_H
 
-#include <stdint.h>
-#include <stddef.h>
+#include "types.h"
 
 struct trapframe {
     uint64_t spsr, elr, sp, tpidr;
