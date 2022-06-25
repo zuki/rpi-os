@@ -5,7 +5,7 @@
 #ifndef USR_INC_FS_H
 #define USR_INC_FS_H
 
-#include "types.h"
+#include <stdint.h>
 #include "param.h"
 
 /* Disk layout:
@@ -32,13 +32,13 @@ struct dinode {
     uint16_t nlink;               // Number of links to inode in file system
     uint32_t size;                // Size of file (bytes)
     mode_t mode;                  // file mode
-    //uid_t    uid;                 // owner's user id
-    //gid_t    gid;                 // owner's gropu id
+    uid_t    uid;                 // owner's user id
+    gid_t    gid;                 // owner's gropu id
     struct timespec atime;        // last accessed time
     struct timespec mtime;        // last modified time
     struct timespec ctime;        // created time
     uint32_t addrs[NDIRECT+2];    // Data block addresses
-    char    _dummy[12];
+    char    _dummy[4];
 };
 
 /* Inodes per block: 4 */

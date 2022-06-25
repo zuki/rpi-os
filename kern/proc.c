@@ -129,6 +129,11 @@ proc_initx(char *name, char *code, size_t len)
     p->base = 0;
 
     p->fdflag = 0;
+    p->umask = 0002;
+    p->uid = p->euid = p->suid = p->fsuid = 0;
+    p->gid = p->egid = p->sgid = p->fsgid = 0;
+    p->ngroups = 0;
+    memset(p->groups, 0, sizeof(gid_t)*NGROUPS);
 
     p->tf->elr = 0;
 
@@ -325,6 +330,16 @@ fork()
             np->ofile[i] = filedup(cp->ofile[i]);
     np->cwd = idup(cp->cwd);
     np->fdflag = cp->fdflag;
+    np->uid = cp->uid;
+    np->euid = cp->euid;
+    np->suid = cp->suid;
+    np->fsuid = cp->fsuid;
+    np->gid = cp->gid;
+    np->egid = cp->egid;
+    np->sgid = cp->sgid;
+    np->fsgid = cp->fsgid;
+    np->ngroups = cp->ngroups;
+    memmove(np->groups, cp->groups, sizeof(gid_t) * cp->ngroups);
 
     memmove(&np->signal, &cp->signal, sizeof(struct signal));
 

@@ -9,10 +9,12 @@
 #include "list.h"
 #include "linux/signal.h"
 #include "linux/ppoll.h"
+#include "linux/capability.h"
 
-#define NPROC           128
-#define NCPU            4
-#define NOFILE          16      // Open files per process
+#define NPROC           128     // 最大プロセス数
+#define NCPU            4       // コア数
+#define NOFILE          16      // プロセスがオープンできるファイル数
+#define NGROUPS         32      // ユーザが所属できる最大グループ数
 
 /* Stack must always be 16 bytes aligned. */
 struct context {
@@ -58,6 +60,14 @@ struct proc {
     void *kstack;               /* Bottom of kernel stack for this process. */
     enum procstate state;       /* Process state. */
     pid_t pid;                  /* Process ID. */
+
+    uid_t uid, euid, suid, fsuid;      /* User, Effective-User, Set-User ID       */
+    gid_t gid, egid, sgid, fsgid;      /* Group ID                                */
+    gid_t groups[NGROUPS];      // 所属グループ
+    int   ngroups;              // 実際に所属しているグループ数
+    kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;   // capabilities
+    mode_t umask;               // umask
+
     struct trapframe *tf;       /* Trap frame for current syscall. */
     struct context *context;    /* swtch() here to run process. */
     struct list_head link;      /* linked list of running process. */
@@ -130,5 +140,12 @@ long ppoll(struct pollfd *fds, nfds_t nfds);
 // sigret_syscall.S
 void execute_sigret_syscall_start(void);
 void execute_sigret_syscall_end(void);
+
+static inline int capable(int cap)
+{
+   if (cap_raised(thisproc()->cap_effective, cap))
+      return 1;
+   return 0;
+}
 
 #endif

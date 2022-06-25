@@ -701,3 +701,57 @@ sys_utimensat()
 
     return utimensat(path, times);
 }
+
+long
+sys_fchmodat()
+{
+    int dirfd, flags;
+    char *path;
+    mode_t mode;
+
+    if (argint(0, &dirfd) < 0 || argstr(1, &path) < 0
+     || argint(2, (int *)&mode) < 0 || argint(3, &flags) < 0)
+        return -EINVAL;
+
+    // TODO: AT_FDCWD以外の実装
+    if (dirfd != AT_FDCWD) return -EINVAL;
+
+    return filechmod(path, mode);
+}
+
+long
+sys_fchown()
+{
+    int fd;
+    uid_t owner;
+    gid_t group;
+    struct file *f;
+
+    if (argfd(0, &fd, &f) < 0 || argint(1, (int *)&owner) < 0
+     || argint(2, (int *)&group) < 0)
+        return -EINVAL;
+
+    return filechown(f, 0, owner, group);
+}
+
+long
+sys_fchownat()
+{
+    int dirfd, flags;
+    char *path;
+    uid_t owner;
+    gid_t group;
+
+    if (argint(0, &dirfd) < 0 || argstr(1, &path) < 0
+     || argint(2, (int *)&owner) < 0 || argint(3, (int *)&group) < 0
+     || argint(4, &flags) < 0)
+        return -EINVAL;
+
+    // TODO: AT_FDCWD以外の実装
+    if (dirfd != AT_FDCWD) return -EINVAL;
+    // TODO: flagsの実装
+
+    trace("dirfd=%d, path=%s, uid=%d, gid=%d, flags=%d\n", dirfd, path, owner, group, flags);
+
+    return filechown(0, path, owner, group);
+}

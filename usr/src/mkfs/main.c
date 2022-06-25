@@ -46,13 +46,13 @@ void wsect(uint, void *);
 void winode(uint, struct dinode *);
 void rinode(uint inum, struct dinode *ip);
 void rsect(uint sec, void *buf);
-uint ialloc(ushort type, mode_t mode);
+uint ialloc(ushort type, uid_t uid, gid_t gid, mode_t mode);
 void iappend(uint inum, void *p, int n);
-uint make_dir(uint parent, char *name, /* uid_t uid, gid_t gid, */ mode_t mode);
-uint make_dev(uint parent, char *name, int major, int minor, /* uid_t uid, gid_t gid, */ mode_t mode);
-uint make_file(uint parent, char *name, /* uid_t uid, gid_t gid, */ mode_t mode);
+uint make_dir(uint parent, char *name, uid_t uid, gid_t gid, mode_t mode);
+uint make_dev(uint parent, char *name, int major, int minor, uid_t uid, gid_t gid, mode_t mode);
+uint make_file(uint parent, char *name, uid_t uid, gid_t gid, mode_t mode);
 void make_dirent(uint inum, uint parent, char *name);
-void copy_file(int start, int argc, char *files[], uint parent, /* uid_t uid, gid_t gid, */ mode_t mode);
+void copy_file(int start, int argc, char *files[], uint parent, uid_t uid, gid_t gid, mode_t mode);
 
 // convert to little-endian byte order
 ushort
@@ -146,45 +146,45 @@ main(int argc, char *argv[])
     memmove(buf, &sb, sizeof(sb));
     wsect(1, buf);
 
-    rootino = ialloc(T_DIR, S_IFDIR|0775);
+    rootino = ialloc(T_DIR, 0, 0, S_IFDIR|0775);
     assert(rootino == ROOTINO);
     make_dirent(rootino, rootino, ".");
     make_dirent(rootino, rootino, "..");
 
     // Create /bin
-    binino = make_dir(rootino, "bin", S_IFDIR|0775);
+    binino = make_dir(rootino, "bin", 0, 0, S_IFDIR|0775);
 
     // Create /dev
-    devino = make_dir(rootino, "dev", S_IFDIR|0775);
+    devino = make_dir(rootino, "dev", 0, 0, S_IFDIR|0775);
     // Create /dev/sdc1
-    make_dev(devino, "sdc1", SDMAJOR, 0, S_IFBLK|0666);
+    make_dev(devino, "sdc1", SDMAJOR, 0, 0, 0, S_IFBLK|0666);
     // Create /dev/sdc2
-    make_dev(devino, "sdc2", SDMAJOR, 1, S_IFBLK|0666);
+    make_dev(devino, "sdc2", SDMAJOR, 1, 0, 0, S_IFBLK|0666);
     // Create /dev/sdc3
-    make_dev(devino, "sdc3", SDMAJOR, 2, S_IFBLK|0666);
+    make_dev(devino, "sdc3", SDMAJOR, 2, 0, 0, S_IFBLK|0666);
 
     // Create /dev/tty
-    make_dev(devino, "tty", CONMAJOR, 0, S_IFCHR|0666);
+    make_dev(devino, "tty", CONMAJOR, 0, 0, 0, S_IFCHR|0666);
 
     // Create /etc
-    etcino = make_dir(rootino, "etc", S_IFDIR|0775);
+    etcino = make_dir(rootino, "etc", 0, 0, S_IFDIR|0775);
 
     // create /lib
-    libino = make_dir(rootino, "lib", S_IFDIR|0777);
+    libino = make_dir(rootino, "lib", 0, 0, S_IFDIR|0777);
 
     // Create /home
-    homeino = make_dir(rootino, "home", S_IFDIR|0775);
-    // Create /home/vagrant
-    make_dir(homeino, "vagrant", S_IFDIR|0775);
+    homeino = make_dir(rootino, "home", 0, 0, S_IFDIR|0775);
+    // Create /home/zuki
+    make_dir(homeino, "zuki", 1000, 1000, S_IFDIR|0775);
 
     // create /usr
-    usrino = make_dir(rootino, "usr", S_IFDIR|0775);
+    usrino = make_dir(rootino, "usr", 0, 0, S_IFDIR|0775);
     // create /usr/local
-    localino = make_dir(usrino, "local", S_IFDIR|0775);
+    localino = make_dir(usrino, "local", 0, 0, S_IFDIR|0775);
     // create /usr/local/bin
-    localbinino = make_dir(localino, "bin", S_IFDIR|0775);
+    localbinino = make_dir(localino, "bin", 0, 0, S_IFDIR|0775);
 
-    copy_file(2, argc, argv, binino, S_IFREG|0755);
+    copy_file(2, argc, argv, binino, 0, 0, S_IFREG|0755);
 
     // fix size of root inode dir
     rinode(rootino, &din);
@@ -211,10 +211,10 @@ make_dirent(uint inum, uint parent, char *name)
 }
 
 uint
-make_dir(uint parent, char *name, /* uid_t uid, gid_t gid, */ mode_t mode)
+make_dir(uint parent, char *name, uid_t uid, gid_t gid, mode_t mode)
 {
     // Create parent/name
-    uint inum = ialloc(T_DIR, /* uid, gid, */ mode);
+    uint inum = ialloc(T_DIR, uid, gid, mode);
     make_dirent(inum, parent, name);
 
     // Create parent/name/.
@@ -227,11 +227,11 @@ make_dir(uint parent, char *name, /* uid_t uid, gid_t gid, */ mode_t mode)
 }
 
 uint
-make_dev(uint parent, char *name, int major, int minor, /* uid_t uid, gid_t gid, */ mode_t mode)
+make_dev(uint parent, char *name, int major, int minor, uid_t uid, gid_t gid, mode_t mode)
 {
     struct dinode din;
 
-    uint inum = ialloc(T_DEV, /* uid, gid, */ mode);
+    uint inum = ialloc(T_DEV, uid, gid, mode);
     make_dirent(inum, parent, name);
     rinode(inum, &din);
     din.major = xshort(major);
@@ -241,15 +241,15 @@ make_dev(uint parent, char *name, int major, int minor, /* uid_t uid, gid_t gid,
 }
 
 uint
-make_file(uint parent, char *name, /* uid_t uid, gid_t gid, */ mode_t mode)
+make_file(uint parent, char *name, uid_t uid, gid_t gid, mode_t mode)
 {
-    uint inum = ialloc(T_FILE, /* uid, gid, */ mode);
+    uint inum = ialloc(T_FILE, uid, gid, mode);
     make_dirent(inum, parent, name);
     return inum;
 }
 
 void
-copy_file(int start, int argc, char *files[], uint parent, /* uid_t uid, gid_t gid, */ mode_t mode)
+copy_file(int start, int argc, char *files[], uint parent, uid_t uid, gid_t gid, mode_t mode)
 {
     int fd, cc;
     uint inum;
@@ -272,7 +272,7 @@ copy_file(int start, int argc, char *files[], uint parent, /* uid_t uid, gid_t g
             exit(1);
         }
 
-        inum = make_file(parent, files[i], /* uid, gid, */ mode);
+        inum = make_file(parent, files[i], uid, gid, mode);
         while ((cc = read(fd, buf, sizeof(buf))) > 0)
             iappend(inum, buf, cc);
         close(fd);
@@ -333,7 +333,7 @@ rsect(uint sec, void *buf)
 }
 
 uint
-ialloc(ushort type, mode_t mode)
+ialloc(ushort type, uid_t uid, gid_t gid, mode_t mode)
 {
     uint inum = freeinode++;
     struct dinode din;
@@ -344,10 +344,12 @@ ialloc(ushort type, mode_t mode)
     ts2.tv_nsec = xlong(ts1.tv_nsec);
     //printf("inum[%d] ts: sec %ld, nsec %ld\n", inum, ts2.tv_sec, ts2.tv_nsec);
     bzero(&din, sizeof(din));
-    din.type = xshort(type);
+    din.type  = xshort(type);
     din.nlink = xshort(1);
-    din.size = xint(0);
-    din.mode = xint(mode);
+    din.size  = xint(0);
+    din.mode  = xint(mode);
+    din.uid   = xint(uid);
+    din.gid   = xint(gid);
     din.atime = din.mtime = din.ctime = ts2;
     winode(inum, &din);
     return inum;

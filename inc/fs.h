@@ -47,6 +47,16 @@ struct superblock {
   uint32_t bmapstart;    // Block number of first free map block
 };
 
+#define SB_NOT_LOADED   0
+#define SB_INITIALIZED  1
+
+#define SB_FREE         0
+#define SB_USED         1
+
+#define MAY_EXEC    1
+#define MAY_WRITE   2
+#define MAY_READ    4
+
 #define NDIRECT 11
 #define NINDIRECT (BSIZE / sizeof(uint32_t))    // 128
 #define MAXFILE (NDIRECT + NINDIRECT + NINDIRECT * NINDIRECT)   // (11 + 128 + 128 * 128) * 512 = 8261 KB
@@ -59,13 +69,13 @@ struct dinode {
   uint16_t nlink;               // Number of links to inode in file system
   uint32_t size;                // Size of file (bytes)
   mode_t mode;                  // file mode
-  //uid_t    uid;                 // owner's user id
-  //gid_t    gid;                 // owner's gropu id
+  uid_t    uid;                 // owner's user id
+  gid_t    gid;                 // owner's gropu id
   struct timespec atime;        // last accessed time
   struct timespec mtime;        // last modified time
   struct timespec ctime;        // created time
   uint32_t addrs[NDIRECT+2];    // Data block addresses
-  char    _dummy[12];
+  char    _dummy[4];
 };
 
 /* Inodes per block. */

@@ -42,6 +42,8 @@ struct inode {
     uint32_t size;              // Size of file (bytes)
 
     mode_t mode;                // file mode
+    uid_t  uid;                 // Owner's user id
+    gid_t  gid;                 // Owner's group id
     struct timespec atime;      // last accessed time
     struct timespec mtime;      // last modified time
     struct timespec ctime;      // created time
@@ -81,6 +83,7 @@ ssize_t         readi(struct inode *, char *, size_t, size_t);
 ssize_t         writei(struct inode *, char *, size_t, size_t);
 struct inode *  create(char *path, short type, short major, short minor, mode_t mode);
 long            getdents(struct file *f, char *data, size_t size);
+int             permission(struct inode *ip, int mask);
 
 struct file *   filealloc();
 struct file *   filedup(struct file *f);
@@ -95,6 +98,8 @@ long            fileunlink(char *path);
 long            filesymlink(char *old, char *new);
 ssize_t         filereadlink(char *path, char *buf, size_t bufsize);
 long            filerename(char *path1, char *path2);
+long            filechmod(char *path, mode_t mode);
+long            filechown(struct file *f, char *path, uid_t owner, gid_t group);
 
 long            fsync(struct file *f, int type);
 long            fdalloc(struct file *f, int from);

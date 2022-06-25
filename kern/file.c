@@ -13,6 +13,7 @@
 #include "clock.h"
 #include "string.h"
 #include "linux/stat.h"
+#include "linux/capability.h"
 
 struct devsw devsw[NDEV];
 struct {
@@ -79,6 +80,7 @@ fileopen(char *path, int flags, mode_t mode)
     struct file *f;
     char buf[512];
     int fd, n;
+    long error;
 
     begin_op();
     if (flags & O_CREAT) {
@@ -126,12 +128,10 @@ loop:
     }
     int readable = FILE_READABLE((int)flags);
     int writable = FILE_WRITABLE((int)flags);
-/*  TODO: 権限チェック
-    if (readable && ((error = ip->iops->permission(ip, MAY_READ)) < 0))
+    if (readable && ((error = permission(ip, MAY_READ)) < 0))
         goto bad;
-    if (writable && ((error = ip->iops->permission(ip, MAY_WRITE)) < 0))
+    if (writable && ((error = permission(ip, MAY_WRITE)) < 0))
         goto bad;
-*/
     if ((f = filealloc()) == 0 || (fd = fdalloc(f, 0)) < 0) {
         iunlock(ip);
         end_op();
@@ -569,4 +569,81 @@ utimensat(char *path, struct timespec times[2])
     iunlockput(ip);
     end_op();
     return 0;
+}
+
+long
+filechmod(char *path, mode_t mode)
+{
+    struct inode *ip;
+
+    begin_op();
+    if ((ip = namei(path)) == 0) {
+        end_op();
+        return -ENOENT;
+    }
+
+    ilock(ip);
+    ip->mode = (ip->mode & S_IFMT) | mode;
+    iupdate(ip);
+    iunlockput(ip);
+    end_op();
+
+    return 0;
+}
+
+long
+filechown(struct file *f, char *path, uid_t owner, gid_t group)
+{
+    struct inode *ip;
+    struct proc *p = thisproc();
+    long error = -EPERM;
+    int i;
+
+    begin_op();
+    if (f != NULL) {
+        ip = f->ip;
+    } else {
+        if ((ip = namei(path)) == 0) {
+            end_op();
+            return -ENOENT;
+        }
+    }
+
+    ilock(ip);
+
+    if (owner != (uid_t)-1) {
+        if (!capable(CAP_CHOWN)) {
+            goto bad;
+        }
+        ip->uid = owner;
+    }
+
+    if (group != (gid_t)-1) {
+        if (capable(CAP_CHOWN)) {
+            ip->gid = group;
+        } else if (ip->uid == p->euid) {
+            for (i = 0; i < p->ngroups; i++) {
+                if (p->groups[i] == group) {
+                    ip->gid = group;
+                    break;
+                }
+            }
+            if (i == p->ngroups) {
+                goto bad;
+            }
+        } else {
+            goto bad;
+        }
+    }
+
+    if (ip->mode & S_IXUGO && !capable(CAP_CHOWN)) {
+        ip->mode &= ~(S_ISUID|S_ISGID);
+    }
+    iupdate(f->ip);
+    error = 0;
+
+bad:
+    iunlockput(ip);
+    end_op();
+    return error;
 }

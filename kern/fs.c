@@ -241,11 +241,16 @@ iupdate(struct inode *ip)
 
     bp = bread(ip->dev, IBLOCK(ip->inum, sb));
     dip = (struct dinode *)bp->data + ip->inum % IPB;
-    dip->type = ip->type;
+    dip->type  = ip->type;
     dip->major = ip->major;
     dip->minor = ip->minor;
     dip->nlink = ip->nlink;
-    dip->size = ip->size;
+    dip->size  = ip->size;
+    dip->uid   = ip->uid;
+    dip->gid   = ip->gid;
+    dip->atime = ip->atime;
+    dip->mtime = ip->mtime;
+    dip->ctime = ip->ctime;
     memmove(dip->addrs, ip->addrs, sizeof(ip->addrs));
     log_write(bp);
     brelse(bp);
@@ -326,6 +331,8 @@ ilock(struct inode *ip)
         ip->nlink = dip->nlink;
         ip->size = dip->size;
         ip->mode  = dip->mode;
+        ip->uid   = dip->uid;
+        ip->gid   = dip->gid;
         ip->atime = dip->atime;
         ip->mtime = dip->mtime;
         ip->ctime = dip->ctime;
@@ -522,15 +529,17 @@ void
 stati(struct inode *ip, struct stat *st)
 {
     // FIXME: support other field in stat
-    st->st_dev = ip->dev;
-    st->st_ino = ip->inum;
-    st->st_nlink = ip->nlink;
-    st->st_size = ip->size;
+    st->st_dev     = ip->dev;
+    st->st_ino     = ip->inum;
+    st->st_nlink   = ip->nlink;
+    st->st_uid     = ip->uid;
+    st->st_gid     = ip->gid;
+    st->st_size    = ip->size;
     st->st_blksize = BSIZE;
     st->st_blocks  = (ip->size / BSIZE) + 1;
-    st->st_atime = ip->atime;
-    st->st_mtime = ip->mtime;
-    st->st_ctime = ip->ctime;
+    st->st_atime   = ip->atime;
+    st->st_mtime   = ip->mtime;
+    st->st_ctime   = ip->ctime;
     if (ip->type == T_DEV)
         st->st_rdev = makedev(ip->major, ip->minor);
 
@@ -813,10 +822,9 @@ create(char *path, short type, short major, short minor, mode_t mode)
     ip->type  = type;
     clock_gettime(CLOCK_REALTIME, &ts);
     ip->atime = ip->mtime = ip->ctime = ts;
-/*
     ip->uid = thisproc()->uid;
     ip->gid = thisproc()->gid;
-*/
+
     iupdate(ip);
 
     if (type == T_DIR) {        // Create . and .. entries.
@@ -893,5 +901,25 @@ getdents(struct file *f, char *data, size_t size)
     }
 
     return (buf - data);
+}
 
+int
+permission(struct inode *ip, int mask)
+{
+    struct proc *p = thisproc();
+    mode_t mode = ip->mode;
+
+    if (p->fsuid == ip->uid)
+        mode >>= 6;
+    else if (p->fsgid == ip->gid)
+        mode >>= 3;
+
+    if (((mode & mask & (MAY_READ|MAY_WRITE|MAY_EXEC)) == mask))
+        return 0;
+
+    if ((mask & (MAY_READ|MAY_WRITE)) || (ip->mode & S_IXUGO))
+        if (capable(CAP_DAC_OVERRIDE))
+            return 0;
+
+    return -EACCES;
 }
