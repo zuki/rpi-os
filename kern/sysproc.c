@@ -10,6 +10,7 @@
 #include "linux/signal.h"
 #include "linux/ppoll.h"
 #include "linux/capability.h"
+#include "linux/resources.h"
 
 long
 sys_yield()
@@ -126,22 +127,15 @@ sys_clone()
 long
 sys_wait4()
 {
-    int pid, opt;
+    int pid, options;
     int *wstatus;
-    void *rusage;
-    if (argint(0, &pid) < 0 ||
-        argu64(1, (uint64_t *) & wstatus) < 0 ||
-        argint(2, &opt) < 0 || argu64(3, (uint64_t *) & rusage) < 0)
-        return -1;
+    struct rusage *rusage;
+    if (argint(0, &pid) < 0 || argptr(1, (char **)&wstatus, sizeof(int)) < 0
+     || argint(2, &options) < 0
+     || argptr(3, (char **)&rusage, sizeof(struct rusage)) < 0)
+        return -EINVAL;
 
-    // FIXME:
-    if (pid != -1 || opt != 0 || rusage != 0) {
-        warn("unimplemented. pid %d, wstatus 0x%p, opt 0x%x, rusage 0x%p",
-             pid, wstatus, opt, rusage);
-        return -1;
-    }
-
-    return wait(pid, wstatus);
+    return wait4(pid, wstatus, options, rusage);
 }
 
 long
@@ -646,4 +640,60 @@ sys_setgroups()
     }
 
     return 0;
+}
+
+// FIXME: use pid instead of tid since we don't have threads :)
+long sys_set_tid_address() {
+    trace("set_tid_address: name '%s'", thisproc()->name);
+    return thisproc()->pid;
+}
+
+long sys_getpid() {
+    return thisproc()->pid;
+}
+
+long sys_gettid() {
+    trace("gettid: name '%s'", thisproc()->name);
+    return thisproc()->pid;
+}
+
+long
+sys_getppid()
+{
+    return thisproc()->parent->pid;
+}
+
+// FIXME: exit_group should kill every thread in the current thread group.
+long sys_exit_group() {
+    trace("sys_exit_group: '%s' exit with code %d", thisproc()->name, thisproc()->tf->x[0]);
+    exit(thisproc()->tf->x[0]);
+    return 0;
+}
+
+long sys_exit() {
+    trace("sys_exit: '%s' exit with code %d", thisproc()->name, thisproc()->tf->x[0]);
+    exit(thisproc()->tf->x[0]);
+    return 0;
+}
+
+long
+sys_getpgid()
+{
+    pid_t pid;
+
+    if (argint(0, &pid) < 0)
+        return -EINVAL;
+
+    return getpgid(pid);
+}
+
+long
+sys_setpgid()
+{
+    pid_t pid, pgid;
+
+    if (argint(0, &pid) < 0 || argint(1, &pgid) < 0)
+        return -EINVAL;
+
+    return setpgid(pid, pgid);
 }

@@ -16,9 +16,6 @@ long argint(int, int *);
 long argu64(int n, uint64_t * ip);
 long argptr(int, char **, size_t);
 long fetchstr(uint64_t, char **);
-long sys_gettid();
-long sys_getpid();
-long sys_getppid();
 long sys_clock_gettime();
 long sys_faccessat2();
 long sys_sched_getaffinity();
@@ -37,6 +34,7 @@ long sys_yield();
 long sys_clone();
 long sys_wait4();
 long sys_exit();
+long sys_exit_group();
 long sys_rt_sigprocmask();
 long sys_rt_sigsuspend();
 long sys_rt_sigaction();
@@ -64,6 +62,10 @@ long sys_getgroups();
 long sys_setgroups();
 long sys_getitimer();
 long sys_setitimer();
+long sys_gettid();
+long sys_getpid();
+long sys_getppid();
+long sys_set_tid_address();
 
 // kern/sysfile.c
 long sys_execve();

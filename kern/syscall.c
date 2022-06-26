@@ -120,34 +120,6 @@ argstr(int n, char **pp)
     return r;
 }
 
-// FIXME: use pid instead of tid since we don't have threads :)
-long sys_set_tid_address() {
-    trace("set_tid_address: name '%s'", thisproc()->name);
-    return thisproc()->pid;
-}
-
-long sys_getpid() {
-    return thisproc()->pid;
-}
-
-long sys_gettid() {
-    trace("gettid: name '%s'", thisproc()->name);
-    return thisproc()->pid;
-}
-
-// FIXME: exit_group should kill every thread in the current thread group.
-long sys_exit_group() {
-    trace("sys_exit_group: '%s' exit with code %d", thisproc()->name, thisproc()->tf->x[0]);
-    exit(thisproc()->tf->x[0]);
-    return 0;
-}
-
-long sys_exit() {
-    trace("sys_exit: '%s' exit with code %d", thisproc()->name, thisproc()->tf->x[0]);
-    exit(thisproc()->tf->x[0]);
-    return 0;
-}
-
 long
 sys_nanosleep()
 {
@@ -272,14 +244,14 @@ static func syscalls[] = {
     [SYS_getresgid] = sys_getresgid,            // 150
     [SYS_setfsuid] = sys_setfsuid,              // 151
     [SYS_setfsgid] = sys_setfsgid,              // 152
-//    [SYS_setpgid] = sys_setpgid,                // 154
-//    [SYS_getpgid] = sys_getpgid,                // 155
+    [SYS_setpgid] = sys_setpgid,                // 154
+    [SYS_getpgid] = sys_getpgid,                // 155
     [SYS_getgroups] = sys_getgroups,            // 158
     [SYS_setgroups] = sys_setgroups,            // 159
 //    [SYS_uname] = sys_uname,                    // 160
     [SYS_umask] = (func)sys_umask,              // 166
     [SYS_getpid] = sys_getpid,                  // 172
-//    [SYS_getppid] = sys_getppid,                // 173
+    [SYS_getppid] = sys_getppid,                // 173
     [SYS_getuid] = sys_getuid,                  // 174
     [SYS_geteuid] = sys_geteuid,                // 175
     [SYS_getgid] = sys_getgid,                  // 176

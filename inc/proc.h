@@ -10,6 +10,7 @@
 #include "linux/signal.h"
 #include "linux/ppoll.h"
 #include "linux/capability.h"
+#include "linux/resources.h"
 
 #define NPROC           128     // 最大プロセス数
 #define NCPU            4       // コア数
@@ -59,7 +60,13 @@ struct proc {
     void *pgdir;                /* User space page table. */
     void *kstack;               /* Bottom of kernel stack for this process. */
     enum procstate state;       /* Process state. */
+
     pid_t pid;                  /* Process ID. */
+    pid_t pgid;                 // プロセスグループID
+    pid_t sid;                  // セッションID
+    struct proc *parent;        /* Parent process */
+    struct list_head child;     /* Child list of this process. */
+    struct list_head clink;     /* Child list of this process. */
 
     uid_t uid, euid, suid, fsuid;      /* User, Effective-User, Set-User ID       */
     gid_t gid, egid, sgid, fsgid;      /* Group ID                                */
@@ -72,12 +79,8 @@ struct proc {
     struct context *context;    /* swtch() here to run process. */
     struct list_head link;      /* linked list of running process. */
     void *chan;                 /* If non-zero, sleeping on chan */
-
-    struct proc *parent;        /* Parent process */
-    struct list_head child;     /* Child list of this process. */
-    struct list_head clink;     /* Child list of this process. */
-
     int killed;                 // If non-zero, have been killed
+    int xstate;                 // waitで待っていてる親に返すexit status
     int fdflag;                 // file descriptor flags: 1 bit/file
     struct file *ofile[NOFILE]; // Open files
     struct inode *cwd;          // Current directory
@@ -118,7 +121,7 @@ void sleep(void *chan, struct spinlock *lk);
 void wakeup(void *chan);
 void yield();
 void exit(int);
-int  wait(pid_t pid, int *status);
+int  wait4(pid_t pid, int *status, int options, struct rusage *ru);
 int  fork();
 void procdump();
 
@@ -136,6 +139,8 @@ void handle_signal(struct proc *p , int sig);
 void user_handler(struct proc *p, int sig);
 void flush_signal_handlers(struct proc *p);
 long ppoll(struct pollfd *fds, nfds_t nfds);
+long setpgid(pid_t, pid_t);
+pid_t getpgid(pid_t);
 
 // sigret_syscall.S
 void execute_sigret_syscall_start(void);

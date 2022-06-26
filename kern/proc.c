@@ -17,6 +17,8 @@
 #include "string.h"
 #include "linux/signal.h"
 #include "linux/ppoll.h"
+#include "linux/resources.h"
+#include "linux/wait.h"
 
 extern void trapret();
 extern void swtch(struct context **old, struct context *new);
@@ -128,6 +130,7 @@ proc_initx(char *name, char *code, size_t len)
     p->sz = PGSIZE;
     p->base = 0;
 
+    p->pgid = p->sid = p->pid;
     p->fdflag = 0;
     p->umask = 0002;
     p->uid = p->euid = p->suid = p->fsuid = 0;
@@ -329,6 +332,8 @@ fork()
         if (cp->ofile[i])
             np->ofile[i] = filedup(cp->ofile[i]);
     np->cwd = idup(cp->cwd);
+    np->pgid = cp->pgid;
+    np->sid = cp->sid;
     np->fdflag = cp->fdflag;
     np->uid = cp->uid;
     np->euid = cp->euid;
@@ -362,18 +367,33 @@ fork()
  * Return -1 if this process has no children.
  */
 int
-wait(pid_t pid, int *status)
+wait4(pid_t pid, int *status, int options, struct rusage *ru)
 {
     struct proc *cp = thisproc();
-
-    struct list_head *q = &cp->child;
+    struct list_head *que = &cp->child;
     struct proc *p, *np;
 
     acquire(&ptable.lock);
-    while (!list_empty(q)) {
-        LIST_FOREACH_ENTRY_SAFE(p, np, q, clink) {
-            if (p->state == ZOMBIE) {
-                assert(p->parent == cp);
+    while (!list_empty(que)) {
+        LIST_FOREACH_ENTRY_SAFE(p, np, que, clink) {
+            if (p->parent != cp) continue;
+            if (pid > 0) {
+                if (p->pid != pid)
+                    continue;
+            } else if (pid == 0) {
+                if (p->pgid != cp->pgid)
+                    continue;
+            } else if (pid != -1) {
+                if (p->pgid != -pid)
+                    continue;
+            }
+            if (p->state == ZOMBIE
+             || (options & WUNTRACED && p->state == SLEEPING)
+             || (options & WNOHANG)) {
+                //assert(p->parent == cp);
+
+                if (status) *status = p->xstate;
+                if (ru) memset(ru, 0, sizeof(struct rusage));
 
                 list_drop(&p->clink);
 
@@ -383,14 +403,13 @@ wait(pid_t pid, int *status)
 
                 int pid = p->pid;
                 release(&ptable.lock);
-                if (status) *status = 0;
                 return pid;
             }
         }
         sleep(cp, &ptable.lock);
     }
     release(&ptable.lock);
-    return -1;
+    return -ECHILD;
 }
 
 /*
@@ -442,6 +461,7 @@ exit(int err)
     assert(list_empty(q));
 
     // Jump into the scheduler, never to return.
+    cp->xstate = err & 0xff;
     cp->state = ZOMBIE;
 
     swtch(&cp->context, thiscpu()->scheduler);
@@ -876,4 +896,79 @@ ppoll(struct pollfd *fds, nfds_t nfds) {
     }
 
     return 0;
+}
+
+long
+setpgid(pid_t pid, pid_t pgid)
+{
+    struct proc *current = thisproc(), *p, *pp;
+    long error = -EINVAL;
+
+    if (!pid) pid = current->pid;
+    if (!pgid) pgid = pid;
+    if (pgid < 0) return -EINVAL;
+
+    if (pid != current->pid) {
+        acquire(&ptable.lock);
+        for (pp = ptable.proc; pp < &ptable.proc[NPROC]; pp++) {
+            if (pp->pid == pid) {
+                p = pp;
+                break;
+            }
+        }
+        release(&ptable.lock);
+        error = -ESRCH;
+        if (!p) goto out;
+    } else {
+        p = current;
+    }
+
+    error = -EINVAL;
+    if (p->parent == current) {
+        error = -EPERM;
+        if (p->sid != current->sid) goto out;
+    } else {
+        error = -ESRCH;
+        if (p != current) goto out;
+    }
+
+    if (pgid != pid) {
+        acquire(&ptable.lock);
+        for (pp = ptable.proc; pp < &ptable.proc[NPROC]; pp++) {
+            if (pp->sid == current->sid) {
+                release(&ptable.lock);
+                goto ok_pgid;
+            }
+        }
+        release(&ptable.lock);
+        goto out;
+    }
+
+ok_pgid:
+    if (current->pgid != pgid) {
+        current->pgid = pgid;
+    }
+    error = 0;
+out:
+    return error;
+}
+
+pid_t
+getpgid(pid_t pid)
+{
+    struct proc *p;
+
+    if (!pid) {
+        return thisproc()->pgid;
+    } else {
+        acquire(&ptable.lock);
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+            if (p->pid == pid) {
+                release(&ptable.lock);
+                return p->pgid;
+            }
+        }
+        release(&ptable.lock);
+        return -ESRCH;
+    }
 }
