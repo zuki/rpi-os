@@ -3,7 +3,10 @@ bin/
 .lvimrc
 .gdb_history
 .vscode/
+*.o
 
 boot/*
 memos/book/*
 tools/dump
+/coreutils-8.32/*
+!coreutils-8.32/src
