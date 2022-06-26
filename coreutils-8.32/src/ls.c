@@ -3023,7 +3023,7 @@ print_dir (char const *name, char const *realname, bool command_line_arg)
         {
           /* If readdir finds no directory entries at all, not even "." or
              "..", then double check that the directory exists.  */
-          if (syscall (SYS_getdents, dirfd (dirp), NULL, 0) == -1
+          if (syscall (SYS_getdents64, dirfd (dirp), NULL, 0) == -1
               && errno != EINVAL)
             {
               /* We exclude EINVAL as that pertains to buffer handling,
