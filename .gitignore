@@ -8,5 +8,9 @@ bin/
 boot/*
 memos/book/*
 tools/dump
-/coreutils-8.32/*
+coreutils-8.32/*
 !coreutils-8.32/src
+coreutils-8.32/src/*
+!coreutils-8.32/src/*.[ch]
+coreutils-8.32/src/coreutils.h
+coreutils-8.32/src/version.[ch]
