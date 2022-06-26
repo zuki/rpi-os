@@ -10,4 +10,6 @@ void clock_intr();
 long clock_gettime(clockid_t clk_id, struct timespec *tp);
 long clock_settime(clockid_t clk_id, const struct timespec *tp);
 
+long get_uptime(void);
+
 #endif

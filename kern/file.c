@@ -647,3 +647,175 @@ bad:
     end_op();
     return error;
 }
+
+long
+faccess(char *path, int mode, int flags)
+{
+    struct inode *ip;
+    struct proc *p = thisproc();
+    uid_t uid, fuid;
+    gid_t gid, fgid;
+    mode_t fmode;
+
+    begin_op();
+    if ((ip = namei(path)) == 0) {
+        end_op();
+        return -ENOENT;
+    }
+    fmode = ip->mode;
+    fuid = ip->uid;
+    fgid = ip->gid;
+    iput(ip);
+    end_op();
+
+    // mode == F_OKの場合はファイルが存在するのでOK
+    if (mode == 0) return 0;
+
+    // 呼び出し元がrootならR_OK, W_OKは常にOK
+    // X_OKはファイルにUGOのいずれかに実行許可があればOK
+    if (p->uid == 0) {
+        if ((mode & X_OK) && !(fmode & S_IXUGO))
+            return -EACCES;
+        else
+            return 0;
+    }
+
+    // root以外は個別に判断
+    if (flags & AT_EACCESS) {       // 実効IDで判断
+        uid = p->euid;
+        gid = p->egid;
+    } else {                        // 実IDで判断
+        uid = p->uid;
+        gid = p->gid;
+    }
+
+    if (mode & R_OK) {
+        if ((fuid == uid && !(fmode & S_IRUSR))
+         && (fgid == gid && !(fmode & S_IRGRP))
+                         && !(fmode & S_IROTH))
+        return -EACCES;
+    }
+
+    if (mode & W_OK) {
+        if ((fuid == uid && !(fmode & S_IWUSR))
+         && (fgid == gid && !(fmode & S_IWGRP))
+                         && !(fmode & S_IWOTH))
+        return -EACCES;
+    }
+
+     if (mode & X_OK) {
+        if ((fuid == uid && !(fmode & S_IXUSR))
+         && (fgid == gid && !(fmode & S_IXOTH))
+                         && !(fmode & S_IXOTH))
+        return -EACCES;
+    }
+
+    return 0;
+}
+
+static long
+rename(struct inode *dp, char *name1, char *name2)
+{
+    struct inode *ip;
+    struct dirent de;
+    size_t off;
+
+    ilock(dp);
+    if ((ip = dirlookup(dp, name1, &off)) == 0)
+        return -ENOENT;
+    ilock(ip);
+    de.inum = ip->inum;
+    memmove(de.name, name2, DIRSIZ);
+
+    if (writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
+        panic("writei");
+    clock_gettime(CLOCK_REALTIME, &ip->ctime);
+    iupdate(ip);
+    iunlockput(ip);
+    iunlockput(dp);
+
+    return 0;
+}
+
+static void
+get_filename(char *path, char *name)
+{
+    char *pos;
+    int len;
+
+    if ((pos = strrchr(path, '/')) != 0) {
+        pos += 1;
+    } else {
+        pos = path;
+    }
+    len = strlen(pos);
+    if (len >= DIRSIZ) {
+        memmove(name, pos, DIRSIZ);
+    } else {
+        memmove(name, pos, len + 1);
+    }
+}
+
+long
+filerename(char *path1, char *path2)
+{
+    struct inode *ip1, *ip2, *dp1;
+    char name1[DIRSIZ], name2[DIRSIZ];
+    long error;
+
+    begin_op();
+    if ((ip1 = namei(path1)) == 0) {
+        end_op();
+        warn("path1 %s not exits", path1);
+        return -ENOENT;
+    }
+    dp1 = nameiparent(path1, name1);
+    ip2 = namei(path2);
+
+    // TODO: path2にディレクトリが含まれている場合の処理を追加
+    get_filename(path2, name2);
+
+    error = -EINVAL;
+    if (ip1->type == T_DIR) {
+        if (ip2 == 0) {
+            if ((error = rename(dp1, name1, name2)) < 0) {
+                warn("rename failed");
+                goto bad;
+            }
+        } else if ((ip2->type == T_DIR && isdirempty(ip2))
+                 || ip2->type != T_DIR) {
+            if ((error = rename(dp1, name1, name2)) < 0) {
+                warn("ename2 failed");
+                goto bad;
+            }
+            if ((error = fileunlink(path2)) < 0) {
+                warn("fileunlink failed");
+                goto bad;
+            }
+        }
+    } else {
+        if (ip2 != 0 && ip2->type == T_DIR) {
+            ilock(ip2);
+            if ((error = dirlink(ip2, name1, 0)) < 0) {
+                warn("dirlink failed");
+                goto bad;
+            }
+            idup(ip2);
+            iunlockput(ip2);
+        } else if (ip2 == 0) {
+            if ((error = rename(dp1, name1, name2)) < 0) {
+                warn("rename3 failed");
+                goto bad;
+            }
+        } else {
+            if ((error = rename(dp1, name1, name2)) < 0) {
+                warn("rename4 failed");
+                goto bad;
+            }
+        }
+    }
+    error = 0;
+bad:
+    end_op();
+    return error;
+}

@@ -175,4 +175,10 @@ cpuid()
     return id & 0xFF;
 }
 
+static inline void
+nop()
+{
+    asm volatile ("nop");
+}
+
 #endif

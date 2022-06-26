@@ -9,7 +9,11 @@
 #include "debug.h"
 #include "string.h"
 #include "clock.h"
+#include "mm.h"
+#include "linux/resources.h"
+#include "linux/sysinfo.h"
 #include "linux/time.h"
+#include "linux/utsname.h"
 
 typedef long (*func)();
 
@@ -183,8 +187,96 @@ sys_clock_settime()
     return clock_settime(clk_id, tp);
 }
 
+long
+sys_sched_getaffinity()
+{
+    // TODO
+    return 0;
+}
+
+long
+sys_sysinfo()
+{
+    struct sysinfo *info;
+
+    if (argptr(0, (char **)&info, sizeof(struct sysinfo)) < 0)
+        return -EINVAL;
+
+    info->uptime = (uint64_t)get_uptime();
+    info->loads[0] = 0;
+    info->loads[1] = 0;
+    info->loads[2] = 0;
+    info->procs = get_procs();
+    info->totalram = get_totalram();
+    info->freeram = get_freeram();
+    info->sharedram = 0;
+    info->bufferram = 0;
+    info->totalswap = 0;
+    info->freeswap = 0;
+    info->totalhigh = 0;
+    info->freehigh = 0;
+    info->mem_unit = PGSIZE;
+
+    return 0;
+}
+
+long
+sys_uname()
+{
+    struct utsname *uts;
+
+    if (argptr(0, (char **)&uts, sizeof(struct utsname)) < 0)
+        return -EINVAL;
+
+    strncpy(uts->sysname, UNAME_SYSNAME, sizeof(UNAME_SYSNAME));
+    strncpy(uts->nodename, UNAME_NODENAME, sizeof(UNAME_NODENAME));
+    strncpy(uts->release, UNAME_RELEASE, sizeof(UNAME_RELEASE));
+    strncpy(uts->version, UNAME_VERSION, sizeof(UNAME_VERSION));
+    strncpy(uts->machine, UNAME_MACHINE, sizeof(UNAME_MACHINE));
+
+    return 0;
+}
+
+long
+sys_prlimit64()
+{
+    pid_t pid;
+    int resource;
+    struct rlimit *new_limit, *old_limit;
+
+    if (argint(0, &pid) < 0 || argint(1, &resource) < 0
+     || argptr(2, (char **)&new_limit, sizeof(struct rlimit)) < 0
+     || argptr(3, (char **)&old_limit, sizeof(struct rlimit)) < 0)
+        return -EINVAL;
+
+    trace("pid=%d, resource=%d, new_limit=0x%llx, old_limit=0x%llx",
+        pid, resource, new_limit, old_limit);
+
+    if (old_limit != 0) {
+        old_limit->rlim_cur = RLIM_SAVED_CUR;
+        old_limit->rlim_max = RLIM_SAVED_MAX;
+    }
+    return 0;
+}
+
+long
+sys_getrandom()
+{
+    void *buf;
+    size_t buflen;
+    uint32_t flags;
+
+    if (argu64(1, &buflen) < 0 || argptr(0, (char **)&buf, buflen) < 0
+     || argint(2, (int *)&flags) < 0)
+        return -EINVAL;
+
+    // TODO: flagsの実装
+
+    return getrandom(buf, buflen);
+}
+
 static func syscalls[] = {
-//    [SYS_getcwd] = (func)sys_getcwd,            // 17
+    [SYS_getcwd] = (func)sys_getcwd,            // 17
     [SYS_dup] = sys_dup,                        // 23
     [SYS_dup3] = sys_dup3,                      // 24
     [SYS_fcntl] = sys_fcntl,                    // 25
@@ -196,7 +288,7 @@ static func syscalls[] = {
     [SYS_linkat] = sys_linkat,                  // 37
 //    [SYS_umount2] = sys_umount2,                // 39
 //    [SYS_mount] = sys_mount,                    // 40
-//    [SYS_faccessat] = sys_faccessat,            // 48
+    [SYS_faccessat] = sys_faccessat,            // 48
     [SYS_chdir] = sys_chdir,                    // 49
     [SYS_fchmodat] = sys_fchmodat,              // 53
     [SYS_fchownat] = sys_fchownat,              // 54
@@ -215,7 +307,7 @@ static func syscalls[] = {
     [SYS_newfstatat] = sys_fstatat,             // 79
     [SYS_fstat] = sys_fstat,                    // 80
     [SYS_fsync] = sys_fsync,                    // 82
-//    [SYS_fdatasync] = sys_fdatasync,            // 83
+    [SYS_fdatasync] = sys_fdatasync,            // 83
     [SYS_utimensat] = sys_utimensat,            // 88
     [SYS_exit] = sys_exit,                      // 93
     // FIXME: exit_group should kill every thread in the current thread group.
@@ -226,7 +318,7 @@ static func syscalls[] = {
 //    [SYS_setitimer] = sys_setitimer,            // 103
     [SYS_clock_settime] = sys_clock_settime,    // 112
     [SYS_clock_gettime] = sys_clock_gettime,    // 113
-//    [SYS_sched_getaffinity] = sys_sched_getaffinity, // 123
+    [SYS_sched_getaffinity] = sys_sched_getaffinity, // 123
     [SYS_sched_yield] = sys_yield,              // 124
     [SYS_kill] = sys_kill,                      // 129
     [SYS_rt_sigsuspend] = sys_rt_sigsuspend,    // 133
@@ -248,7 +340,7 @@ static func syscalls[] = {
     [SYS_getpgid] = sys_getpgid,                // 155
     [SYS_getgroups] = sys_getgroups,            // 158
     [SYS_setgroups] = sys_setgroups,            // 159
-//    [SYS_uname] = sys_uname,                    // 160
+    [SYS_uname] = sys_uname,                    // 160
     [SYS_umask] = (func)sys_umask,              // 166
     [SYS_getpid] = sys_getpid,                  // 172
     [SYS_getppid] = sys_getppid,                // 173
@@ -257,7 +349,7 @@ static func syscalls[] = {
     [SYS_getgid] = sys_getgid,                  // 176
     [SYS_getegid] = sys_getegid,                // 177
     [SYS_gettid] = sys_gettid,                  // 178
-//    [SYS_sysinfo] = sys_sysinfo,                // 179
+    [SYS_sysinfo] = sys_sysinfo,                // 179
     [SYS_brk] = (func)sys_brk,                  // 214
 //    [SYS_munmap] = sys_munmap,                  // 215
 //    [SYS_mremap] = (func)sys_mremap,            // 216
@@ -269,10 +361,10 @@ static func syscalls[] = {
 //    [SYS_msync] = sys_msync,                    // 227
 //    [SYS_madvise] = sys_madvise,                // 233
     [SYS_wait4] = sys_wait4,                    // 260
-//    [SYS_prlimit64] = sys_prlimit64,            // 261
-//    [SYS_renameat2] = sys_renameat2,            // 276
-//    [SYS_getrandom] = sys_getrandom,            // 278
-//    [SYS_faccessat2] = sys_faccessat2,          // 439
+    [SYS_prlimit64] = sys_prlimit64,            // 261
+    [SYS_renameat2] = sys_renameat2,            // 276
+    [SYS_getrandom] = sys_getrandom,            // 278
+    [SYS_faccessat2] = sys_faccessat2,          // 439
 };
 
 __attribute__((unused)) static char *syscall_names[] = {

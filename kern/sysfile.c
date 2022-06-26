@@ -683,6 +683,18 @@ sys_fsync()
     return 0;
 }
 
+long
+sys_fdatasync()
+{
+    int fd;
+
+    if (argfd(0, &fd, 0) < 0)
+        return -EINVAL;
+
+    // xv6 file systemは常にflushされているので何もしない
+    return 0;
+}
+
 
 long
 sys_utimensat()
@@ -754,4 +766,113 @@ sys_fchownat()
     trace("dirfd=%d, path=%s, uid=%d, gid=%d, flags=%d\n", dirfd, path, owner, group, flags);
 
     return filechown(0, path, owner, group);
+}
+
+/* カレントワーキングディレクトリ名の取得 */
+void *
+sys_getcwd()
+{
+    char *buf;
+    size_t size;
+    struct proc *p = thisproc();
+    struct inode *cwd, *dp;
+    struct dirent de;
+    int i, n, pos = 0;
+
+    if (argu64(1, &size) < 0 || argptr(0, &buf, size) < 0)
+        return (void *)-EINVAL;
+
+    cwd = idup(p->cwd);
+    while (1) {
+        dp = dirlookup(cwd, "..", 0);
+        ilock(dp);
+        if (direntlookup(dp, cwd->inum, &de) < 0)
+            goto bad;
+        n = strlen(de.name);
+        if ((n + pos + 2) > size)
+            goto bad;
+
+        iput(cwd);
+        iunlock(dp);
+        for (i = 0; i < n; i++) {
+            buf[pos + i] = de.name[n - i - 1];  // bufに逆順に詰める
+        }
+        pos += i;
+        if (dp->inum == ROOTINO) break;
+        buf[pos++] = '/';
+        cwd = idup(dp);
+        iput(dp);
+    }
+    iput(dp);
+    buf[pos++] = '/'; buf[pos] = 0;             // NULL終端
+
+   // bufを反転する
+    for (i = 0; i > (pos + 1) / 2; i++) {
+        char c = buf[i];
+        buf[i] = buf[pos - i];
+        buf[pos - i] = c;
+    }
+    trace("buf: %s", buf);
+    return buf;
+
+bad:
+    iput(cwd);
+    iunlockput(dp);
+    return NULL;
+}
+
+long
+sys_faccessat()
+{
+    int dirfd, mode;
+    char *path;
+
+    if (argint(0, &dirfd) < 0 || argstr(1, &path) < 0
+     || argint(2, &mode) < 0)
+        return -EINVAL;
+
+    // TODO: dirfdは未実装
+    if (dirfd != AT_FDCWD) return -EINVAL;
+
+    return faccess(path, mode, 0);
+}
+
+long
+sys_faccessat2()
+{
+    int dirfd, mode, flags;
+    char *path;
+
+    if (argint(0, &dirfd) < 0 || argstr(1, &path) < 0
+     || argint(2, &mode) < 0 || argint(3, &flags) < 0)
+        return -EINVAL;
+
+    // TODO: dirfdは未実装
+    if (dirfd != AT_FDCWD) return -EINVAL;
+    // TODO: AT_SYMLINK_NOFOLLOWの実装
+    if (flags & AT_SYMLINK_NOFOLLOW) return -EINVAL;
+
+    return faccess(path, mode, flags);
+}
+
+long
+sys_renameat2()
+{
+    int olddirfd, newdirfd;
+    char *oldpath, *newpath;
+    uint32_t flags;
+
+    if (argint(0, &olddirfd) < 0 || argstr(1, &oldpath) < 0
+     || argint(2, &newdirfd) < 0 || argstr(3, &newpath) < 0
+     || argint(4, (int *)&flags) < 0)
+        return -EINVAL;
+
+    // TODO: olddirfd, newdirfd, flagsは未実装
+    if (olddirfd != AT_FDCWD || newdirfd != AT_FDCWD) return -EINVAL;
+    // TODO: flagsの実装
+
+    if (strcmp(oldpath, newpath) == 0) return 0;
+
+    return filerename(oldpath, newpath);
+
 }

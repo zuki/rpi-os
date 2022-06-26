@@ -690,6 +690,25 @@ dirlink(struct inode *dp, char *name, uint32_t inum)
     return 0;
 }
 
+/* 指定のディレクトリから指定のinumを持つディレクトリエントリを検索する */
+int
+direntlookup(struct inode *dp, int inum, struct dirent *dep)
+{
+    struct dirent de;
+
+    if (dp->type != T_DIR) panic("dp is not DIR");
+
+    for (uint32_t off = 0; off < dp->size; off += sizeof(de)) {
+        if (readi(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
+            panic("readi");
+        if (de.inum == inum) {
+            memmove(dep, &de, sizeof(de));
+            return 0;
+        }
+    }
+    return -1;
+}
+
 
 /* Paths. */
 

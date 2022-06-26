@@ -24,6 +24,9 @@ struct freelist {
 
 static struct spinlock memlock;
 
+static uint64_t totalram;
+static uint64_t freeram = 0;
+
 void mm_test();
 
 /*
@@ -54,8 +57,10 @@ void
 free_range(void *start, void *end)
 {
     int cnt = 0;
-    for (void *p = start; p + PGSIZE <= end; p += PGSIZE, cnt++)
+    for (void *p = start; p + PGSIZE <= end; p += PGSIZE, cnt++) {
         freelist_free(&freelist, p);
+        freeram += PGSIZE;
+    }
     info("0x%p ~ 0x%p, %d pages", start, end, cnt);
 }
 
@@ -65,6 +70,7 @@ mm_init()
     // HACK Raspberry pi 4b.
     size_t phystop = MIN(0x3F000000, mbox_get_arm_memory());
     free_range(ROUNDUP((void *)end, PGSIZE), P2V(phystop));
+    totalram = freeram;
 #ifdef DEBUG
     for (int i = 0; i < MAX_PAGES; i++) {
         void *p = freelist_alloc(&freelist);
@@ -88,6 +94,7 @@ kalloc()
 {
     acquire(&memlock);
     void *p = freelist_alloc(&freelist);
+    if (!p) freeram -= PGSIZE;
 #ifdef DEBUG
     if (p) {
         for (int i = 8; i < PGSIZE; i++) {
@@ -130,6 +137,7 @@ kfree(void *va)
     }
 #endif
     freelist_free(&freelist, va);
+    freeram += PGSIZE;
     release(&memlock);
 }
 
@@ -161,4 +169,16 @@ mm_test()
     while (i--)
         kfree(p[i]);
 #endif
+}
+
+uint64_t
+get_totalram(void)
+{
+    return totalram;
+}
+
+uint64_t
+get_freeram(void)
+{
+    return freeram;
 }

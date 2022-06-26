@@ -114,3 +114,8 @@ long clock_settime(clockid_t clk_id, const struct timespec *tp)
 
     return 0;
 }
+
+long get_uptime(void)
+{
+    return xtime.tv_sec;
+}

@@ -8,5 +8,7 @@ void *kalloc();
 void kfree(void *v);
 void mm_test();
 void mm_dump();
+uint64_t  get_totalram();
+uint64_t  get_freeram();
 
 #endif

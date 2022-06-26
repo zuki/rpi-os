@@ -972,3 +972,18 @@ getpgid(pid_t pid)
         return -ESRCH;
     }
 }
+
+uint16_t
+get_procs(void)
+{
+    struct proc *p;
+    uint16_t nump = 0;
+
+    acquire(&ptable.lock);
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+        if (p->state != UNUSED)
+            nump++;
+    }
+    release(&ptable.lock);
+    return nump;
+}

@@ -66,6 +66,7 @@ extern struct devsw devsw[];
 void            readsb(int, struct superblock *);
 int             dirlink(struct inode *, char *, uint32_t);
 struct inode *  dirlookup(struct inode *, char *, size_t *);
+int             direntlookup(struct inode *dp, int inum, struct dirent *dep);
 struct inode *  ialloc(uint32_t, short);
 struct inode *  idup(struct inode *);
 void            iinit(int dev);
@@ -103,6 +104,7 @@ long            filechown(struct file *f, char *path, uid_t owner, gid_t group);
 
 long            fsync(struct file *f, int type);
 long            fdalloc(struct file *f, int from);
+long            faccess(char *paht, int mode, int flags);
 long            utimensat(char *path, struct timespec times[2]);
 
 #endif

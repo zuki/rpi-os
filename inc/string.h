@@ -81,4 +81,23 @@ strlen(const char *s)
     return n;
 }
 
+static inline char *
+strrchr(const char *s, char c)
+{
+    char *p = (char *)((uint64_t)s + strlen(s) - 1);
+    for (; *p && p >= s; p--) {
+        if (*p == c)
+            return (char *)p;
+    }
+    return 0;
+}
+
+static inline int
+strcmp(const char *p, const char *q)
+{
+    while (*p && *p == *q)
+        p++, q++;
+    return (int) ((uint8_t)*p - (uint8_t)*q);
+}
+
 #endif

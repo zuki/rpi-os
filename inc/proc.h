@@ -141,6 +141,7 @@ void flush_signal_handlers(struct proc *p);
 long ppoll(struct pollfd *fds, nfds_t nfds);
 long setpgid(pid_t, pid_t);
 pid_t getpgid(pid_t);
+uint16_t get_procs();
 
 // sigret_syscall.S
 void execute_sigret_syscall_start(void);
