@@ -22,12 +22,14 @@ struct dinode {
   uint16_t minor;               // Minor device number (T_DEV only)
   uint16_t nlink;               // Number of links to inode in file system
   uint32_t size;                // Size of file (bytes)
-  mode_t mode;                  // file mode
+  uint32_t mode;                  // file mode
+  uint32_t uid;                 // owner's user id
+  uint32_t gid;                 // owner's gropu id
   struct timespec atime;        // last accessed time
   struct timespec mtime;        // last modified time
   struct timespec ctime;        // created time
   uint32_t addrs[NDIRECT+2];    // Data block addresses
-  char    _dummy[12];
+  char    _dummy[4];
 };
 
 // FROM mksd.mk
