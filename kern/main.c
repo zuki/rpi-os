@@ -14,6 +14,7 @@
 #include "irq.h"
 #include "ds3231.h"
 #include "i2c.h"
+#include "random.h"
 
 /*
  * Keep it in data segment by explicitly initializing by zero,
@@ -36,6 +37,7 @@ main()
         console_init();
         mm_init();
         clock_init();
+        rand_init();
         proc_init();
         user_init();
         binit();
