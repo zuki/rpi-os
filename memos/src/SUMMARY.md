@@ -12,3 +12,4 @@
 - [各種プロロセスIDを導入](process.md)
 - [システムコール実装の追加](syscall.md)
 - [coreutilsを導入](coreutils.md)
+- [dashを導入](dash.md)

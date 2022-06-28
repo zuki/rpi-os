@@ -19,6 +19,7 @@ typedef uint64_t ulong;
 #define sleep xv6_sleep
 #include "param.h"
 #include "fs.h"
+#include "usrbins.h"
 
 #ifndef static_assert
 #define static_assert(a, b) do { switch (0) case 0: case (a): ; } while (0)
@@ -99,7 +100,7 @@ main(int argc, char *argv[])
 {
     int i;
     uint off;
-    uint rootino, devino, sdino, binino, etcino, libino, homeino, usrino, localino, localbinino;
+    uint rootino, devino, sdino, binino, etcino, libino, homeino, usrino, usrbinino, localino, localbinino;
     struct dirent de;
     char buf[BSIZE];
     struct dinode din;
@@ -179,12 +180,17 @@ main(int argc, char *argv[])
 
     // create /usr
     usrino = make_dir(rootino, "usr", 0, 0, S_IFDIR|0775);
+    // create /usr/bin
+    usrbinino = make_dir(usrino, "bin", 0, 0, S_IFDIR|0775);
     // create /usr/local
     localino = make_dir(usrino, "local", 0, 0, S_IFDIR|0775);
     // create /usr/local/bin
     localbinino = make_dir(localino, "bin", 0, 0, S_IFDIR|0775);
 
     copy_file(2, argc, argv, binino, 0, 0, S_IFREG|0755);
+
+    // /usr/bin  (coreutils)
+    copy_file(0, nbins(), usrbins, usrbinino, 0, 0, S_IFREG|0755);
 
     // fix size of root inode dir
     rinode(rootino, &din);

@@ -19,9 +19,12 @@ fmtname(char *path)
     p++;
 
     // Return blank-padded name.
+    /*
     if (strlen(p) >= DIRSIZ)
         return p;
-    memmove(buf, p, strlen(p));
+    */
+    memmove(buf, p, DIRSIZ);
+    buf[DIRSIZ] = 0;
     //memset(buf + strlen(p), ' ', DIRSIZ - strlen(p));
     return buf;
 }

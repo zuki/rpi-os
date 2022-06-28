@@ -150,7 +150,7 @@ runcmd(struct cmd *cmd)
 int
 getcmd(char *buf, int nbuf)
 {
-    fprintf(stderr, "$ ");
+    fprintf(stderr, "# ");
     memset(buf, 0, nbuf);
     fgets(buf, nbuf, stdin);
     if (buf[0] == 0)            // EOF

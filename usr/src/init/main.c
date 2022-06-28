@@ -14,6 +14,7 @@ int
 main()
 {
     int pid, wpid;
+    int status;
 
     if (open("/dev/tty", O_RDWR) < 0) {
         mknod("/dev/tty", (S_IFCHR | 0777), makedev(1, 0));
@@ -31,11 +32,13 @@ main()
         }
         if (pid == 0) {
             execve("/bin/sh", argv, envp);
+            //execve("/usr/bin/dash", argv, envp);
             printf("init: exec sh failed\n");
             exit(1);
         }
-        while ((wpid = wait(NULL)) >= 0 && wpid != pid)
+        while ((wpid = wait(&status)) >= 0 && wpid != pid)
             printf("zombie!\n");
+        printf("pid=%d, wpid=%d, status=%d\n", pid, wpid, status);
     }
 
     return 0;
