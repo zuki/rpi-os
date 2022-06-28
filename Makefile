@@ -65,7 +65,7 @@ qemu: all
 qemu-gdb: all
 	$(QEMU_CMD) -kernel $(KERN_IMG) -S -gdb tcp::1234
 gdb:
-	gdb-multiarch -n -x .gdbinit
+	gdb -n -x .gdbinit
 
 init:
 	sudo apt install -y gcc-aarch64-linux-gnu gdb-multiarch
