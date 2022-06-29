@@ -56,7 +56,7 @@ sys_brk()
     if (argu64(0, &newsz) < 0)
         return oldsz;
 
-    info("name %s: 0x%llx to 0x%llx", p->name, oldsz, newsz);
+    debug("name %s: 0x%llx to 0x%llx", p->name, oldsz, newsz);
 
     if (newsz == 0)
         return oldsz;
@@ -66,7 +66,7 @@ sys_brk()
     } else {
         sz = uvm_alloc(p->pgdir, p->base, p->stksz, oldsz, newsz);
         if (sz == 0) {
-            info("uvm_alloc failed");
+            warn("uvm_alloc failed");
             return oldsz;
         }
         p->sz = sz;
@@ -88,7 +88,7 @@ sys_mmap()
         argint(3, &flags) < 0 || argint(4, &fd) < 0 || argu64(5, &offset) < 0)
         return -EINVAL;
 
-    info("addr=0x%llx, length=0x%lld, prot=0x%x, flags=0x%x, offset=0x%lld", addr, length, prot, flags, offset);
+    debug("addr=0x%llx, length=0x%lld, prot=0x%x, flags=0x%x, offset=0x%lld", addr, length, prot, flags, offset);
 
     if (flags & MAP_ANONYMOUS) {
         if (fd != -1) return -EINVAL;
@@ -131,10 +131,7 @@ sys_mmap()
     if (flags & MAP_ANONYMOUS)
         length = ROUNDUP(length, PGSIZE);
 
-    long ret = mmap(addr, length, prot, flags, f, offset);
-    info("return 0x%llx", ret)
-    return ret;
-   // return mmap(addr, length, prot, flags, f, offset);
+    return mmap(addr, length, prot, flags, f, offset);
 }
 
 long
@@ -146,7 +143,7 @@ sys_munmap()
     if (argu64(0, (uint64_t *)&addr) < 0 || argu64(1, &length) < 0)
         return -EINVAL;
 
-    info("addr: 0x%llx, length: 0x%llx", addr, length);
+    debug("addr: 0x%llx, length: 0x%llx", addr, length);
 
     return munmap(addr, length);
 }
@@ -194,7 +191,7 @@ sys_kill()
     if (sig < 1 || sig >= NSIG)
         return -EINVAL;
 
-    info("pid=%d, sig=%d", pid, sig);
+    debug("pid=%d, sig=%d", pid, sig);
 
     return kill(pid, sig);
 }
@@ -729,10 +726,7 @@ sys_getpgid()
     if (argint(0, &pid) < 0)
         return -EINVAL;
 
-    long ret = getpgid(pid);
-    info("pid %d, return %lld", pid, ret);
-    return ret;
-    //return getpgid(pid);
+    return getpgid(pid);
 }
 
 long

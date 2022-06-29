@@ -192,7 +192,7 @@ sys_ioctl()
     if (argfd(0, &fd, &f) < 0 || argu64(1, &req) < 0)
         return -EINVAL;
 
-    info("fd: %d, req: 0x%llx, f->type: %d", fd, req, f->ip->type);
+    debug("fd: %d, req: 0x%llx, f->type: %d", fd, req, f->ip->type);
 
     if (f->ip->type != T_DEV) return -ENOTTY;
 
@@ -229,16 +229,13 @@ sys_ioctl()
         case TIOCSPGRP:  // TODO: 本来、dev(tty)用なのでp->sgid? ¥
             if (argptr(2, (char **)&pgid_p, sizeof(pid_t)) < 0)
                 return -EINVAL;
-            pid_t opgid = thisproc()->pgid;
             thisproc()->pgid = *pgid_p;
-            info("TIOCSPGRP: pid %d, pgid %d -> %d\n", opgid, thisproc()->pgid, thisproc()->pgid);
             break;
         case TIOCGPGRP:
             if (argptr(2, (char **)&pgid_p, sizeof(pid_t)) < 0)
                 return -EINVAL;
             if (pgid_p == NULL) return -EINVAL;
             *pgid_p = thisproc()->pgid;
-            info("TIOCGPGRP: pid %d, pgid %d, pgid_p %d", thisproc()->pid, thisproc()->pgid, *pgid_p);
             break;
         default:
             return -EINVAL;

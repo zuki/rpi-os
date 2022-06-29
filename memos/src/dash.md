@@ -475,6 +475,50 @@ int tcsetpgrp(int fd, pid_t pgrp)
 [3]sys_ioctl: TIOCSPGRP: pid 7, pgid 7 -> 7
 ```
 
+## `kern/vm.c:78: assertion failed.	`の件
+
+```c
+// kern/vm.c#uvm_copy()
+	if (pgt3[i3] & PTE_VALID) {
+		assert(pgt3[i3] & PTE_PAGE);
+		assert(pgt3[i3] & PTE_USER);  	//	PROT_NONEの場合はPTE_USERは0なのでassert失敗
+		assert(pgt3[i3] & PTE_NORMAL);
+```
+
+- 当該行をコメントアウト
+
+```
+# /bin/ls
+[1]uvm_map: remap: p=0x600000000000, *pte=0x3bf2d647						// これが原因でforkに失敗
+
+/usr/bin/dash: 1: Cannot fork
+[2]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0
+[2]sys_mmap: return 0x600000001000
+[1]sys_munmap: addr: 0x600000001000, length: 0x1000
+```
+
+### fork時の親から子へのマッピングテーブルのコピー方法が変わっていた
+
+- mappingはmmap_region文を含めてuvm_copy()でコピーされる
+- copy_mmap_list()でmmap_region分のmmpingをしたのでremapとなった
+- copy_mmap_list()ではmmap_regionのコピーだけでmappingしないように変更
+
+```
+# /bin/ls
+CurrentEL: 0x1
+DAIF: Debug(1) SError(1) IRQ(1) FIQ(1)		// copy on writeの処理をtrapで
+SPSel: 0x1									// していないためと思わ割れる
+SPSR_EL1: 0x600003c5
+SP: 0xffff00003bf92d50
+SP_EL0: 0xfffffffffb40
+ELR_EL1: 0xffff000000082c7c, EC: 0x25, ISS: 0x4.
+FAR_EL1: 0x1000000000000
+irq of type 4 unimplemented.
+```
+
+
+
+
 ## gdbが動かなかったのはmacのセキュリティ設定のためだった
 
 [GDB Wiki: PermissionsDarwin](https://sourceware.org/gdb/wiki/PermissionsDarwin)の指示通りに処理したところ動くようになった。

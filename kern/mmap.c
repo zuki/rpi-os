@@ -656,7 +656,7 @@ copy_mmap_list(struct proc *parent, struct proc *child)
             kmfree(region);
             return error;
         }
-
+/* uvm_copy()でマッピングはコピー済み
         void *start  = node->addr;
         for (; start < node->addr + node->length; start += PGSIZE) {
             pte = pgdir_walk(parent->pgdir, start, 0);
@@ -674,6 +674,7 @@ copy_mmap_list(struct proc *parent, struct proc *child)
             if ((error = uvm_map(child->pgdir, start, PGSIZE, pa)) < 0)
                 goto bad;
         }
+    */
         if (cnode == 0)
             cnode = region;
         else
@@ -682,6 +683,7 @@ copy_mmap_list(struct proc *parent, struct proc *child)
         tail = region;
         node = node->next;
     }
+
 
     child->regions = cnode;
 

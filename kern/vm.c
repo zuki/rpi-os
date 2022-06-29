@@ -75,7 +75,7 @@ uvm_copy(uint64_t * pgdir)
                                 if (pgt3[i3] & PTE_VALID) {
 
                                     assert(pgt3[i3] & PTE_PAGE);
-                                    assert(pgt3[i3] & PTE_USER);
+                                    //assert(pgt3[i3] & PTE_USER);  //PROT_NONEの場合はPTE_USERは0
                                     assert(pgt3[i3] & PTE_NORMAL);
 
                                     assert(PTE_ADDR(pgt3[i3]) < KERNBASE);
