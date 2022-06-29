@@ -56,7 +56,7 @@ sys_brk()
     if (argu64(0, &newsz) < 0)
         return oldsz;
 
-    trace("name %s: 0x%llx to 0x%llx", p->name, oldsz, newsz);
+    info("name %s: 0x%llx to 0x%llx", p->name, oldsz, newsz);
 
     if (newsz == 0)
         return oldsz;
@@ -65,48 +65,93 @@ sys_brk()
         p->sz = uvm_dealloc(p->pgdir, p->base, oldsz, newsz);
     } else {
         sz = uvm_alloc(p->pgdir, p->base, p->stksz, oldsz, newsz);
-        if (sz == 0)
+        if (sz == 0) {
+            info("uvm_alloc failed");
             return oldsz;
+        }
         p->sz = sz;
     }
     return p->sz;
 }
 
-size_t
+long
 sys_mmap()
 {
     void *addr;
-    size_t len, off;
+    size_t length, offset;
     int prot, flags, fd;
-    if (argu64(0, (uint64_t *) & addr) < 0 ||
-        argu64(1, &len) < 0 ||
+    struct file *f;
+
+    if (argu64(0, (uint64_t *)&addr) < 0 ||
+        argu64(1, &length) < 0 ||
         argint(2, &prot) < 0 ||
-        argint(3, &flags) < 0 || argint(4, &fd) < 0 || argu64(5, &off) < 0)
+        argint(3, &flags) < 0 || argint(4, &fd) < 0 || argu64(5, &offset) < 0)
         return -EINVAL;
 
-    if ((flags & MAP_PRIVATE) == 0 || (flags & MAP_ANON) == 0 || fd != -1
-        || off != 0) {
-        warn("non-private mmap unimplemented: flags 0x%x, fd %d, off %d",
-             flags, fd, off);
-        return -EPERM;
+    info("addr=0x%llx, length=0x%lld, prot=0x%x, flags=0x%x, offset=0x%lld", addr, length, prot, flags, offset);
+
+    if (flags & MAP_ANONYMOUS) {
+        if (fd != -1) return -EINVAL;
+        f = NULL;
+    } else {
+        if (fd < 0 || fd >= NOFILE) return -EBADF;
+        if ((f = thisproc()->ofile[fd]) == 0) return -EBADF;
     }
 
-    if (addr) {
-        if (prot != PROT_NONE) {
-            warn("mmap unimplemented");
-            return -EPERM;
-        }
-        trace("map none at 0x%p", addr);
-        return (size_t)addr;
-    } else {
-        if (prot != (PROT_READ | PROT_WRITE)) {
-            warn("non-rw unimplemented");
-            return -EPERM;
-        }
-        //panic("unimplemented. ");
-        return -EPERM;
+    if ((flags & (MAP_PRIVATE | MAP_SHARED)) == 0) {
+        warn("invalid flags: 0x%x", flags);
+        return -EINVAL;
     }
+
+    if ((ssize_t)length < 0 || (ssize_t)offset < 0) {
+        warn("invalid length: %lld or offset: %lld", length, offset);
+        return -EINVAL;
+    }
+    if (length == 0) length = 4096;       // FIXME: これは?
+
+    // MAP_FIXEDの場合、addrが指定されていなければならない
+    if ((flags & MAP_FIXED) && addr == NULL) {
+        warn("MAP_FIXED and addr is NULL");
+        return -EINVAL;
+    }
+
+    // バックにあるファイルはreadableでなければならない
+    if (!(flags & MAP_ANONYMOUS) && !f->readable) {
+        warn("file is not readable");
+        return -EACCES;
+    }
+
+    // MAP_SHAREかつPROT_WRITEの場合はバックにあるファイルがwritableでなければならない
+    if (!(flags & MAP_ANONYMOUS) && (flags & MAP_SHARED)
+     && (prot & PROT_WRITE) && !f->writable) {
+        warn("file is not writable");
+        return -EACCES;
+    }
+
+    if (flags & MAP_ANONYMOUS)
+        length = ROUNDUP(length, PGSIZE);
+
+    long ret = mmap(addr, length, prot, flags, f, offset);
+    info("return 0x%llx", ret)
+    return ret;
+   // return mmap(addr, length, prot, flags, f, offset);
 }
+
+long
+sys_munmap()
+{
+    void *addr;
+    size_t length;
+
+    if (argu64(0, (uint64_t *)&addr) < 0 || argu64(1, &length) < 0)
+        return -EINVAL;
+
+    info("addr: 0x%llx, length: 0x%llx", addr, length);
+
+    return munmap(addr, length);
+}
+
+
 
 long
 sys_clone()
@@ -149,7 +194,7 @@ sys_kill()
     if (sig < 1 || sig >= NSIG)
         return -EINVAL;
 
-    trace("pid=%d, sig=%d", pid, sig);
+    info("pid=%d, sig=%d", pid, sig);
 
     return kill(pid, sig);
 }
@@ -684,13 +729,16 @@ sys_getpgid()
     if (argint(0, &pid) < 0)
         return -EINVAL;
 
-    return getpgid(pid);
+    long ret = getpgid(pid);
+    info("pid %d, return %lld", pid, ret);
+    return ret;
+    //return getpgid(pid);
 }
 
 long
 sys_setpgid()
 {
-    pid_t pid, pgid;
+    pid_t pid, pgid, opgid;
 
     if (argint(0, &pid) < 0 || argint(1, &pgid) < 0)
         return -EINVAL;

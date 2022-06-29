@@ -10,6 +10,7 @@
 #include "string.h"
 #include "clock.h"
 #include "mm.h"
+#include "random.h"
 #include "linux/resources.h"
 #include "linux/sysinfo.h"
 #include "linux/time.h"
@@ -22,10 +23,25 @@ int
 in_user(void *s, size_t n)
 {
     struct proc *p = thisproc();
-    if ((p->base <= (uint64_t) s && (uint64_t) s + n <= p->sz) ||
-        (USERTOP - p->stksz <= (uint64_t) s
-         && (uint64_t) s + n <= USERTOP))
+
+    // p + n は code+data 内にある
+    if (p->base <= (uint64_t) s && (uint64_t) s + n <= p->sz)
         return 1;
+
+    // p + n は stack 内にある
+    if (USERTOP - p->stksz <= (uint64_t) s && (uint64_t) s + n <= USERTOP)
+        return 1;
+
+    // p + n は mmap_region 内にある
+    struct mmap_region *region = p->regions;
+    while (region) {
+        if ((uint64_t)region->addr <= (uint64_t)s
+        && ((uint64_t)s + n) <= ((uint64_t)region->addr + region->length)) {
+            return 1;
+        }
+        region = region->next;
+    }
+    // 範囲外
     return 0;
 }
 
@@ -92,6 +108,7 @@ argu64(int n, uint64_t * ip)
  * Fetch the nth word-sized system call argument as a pointer
  * to a block of memory of size bytes. Check that the pointer
  * lies within the process address space.
+ * *p = 0 の場合は成功とする
  */
 long
 argptr(int n, char **pp, size_t size)
@@ -99,6 +116,10 @@ argptr(int n, char **pp, size_t size)
     uint64_t i = 0;
     if (argu64(n, &i) < 0) {
         return -1;
+    }
+    if (i == 0) {
+        *pp = (char *)0;
+        return 0;
     }
     if (in_user((void *)i, size)) {
         *pp = (char *)i;
@@ -351,7 +372,7 @@ static func syscalls[] = {
     [SYS_gettid] = sys_gettid,                  // 178
     [SYS_sysinfo] = sys_sysinfo,                // 179
     [SYS_brk] = (func)sys_brk,                  // 214
-//    [SYS_munmap] = sys_munmap,                  // 215
+    [SYS_munmap] = sys_munmap,                  // 215
 //    [SYS_mremap] = (func)sys_mremap,            // 216
     [SYS_clone] = sys_clone,                    // 220
     [SYS_execve] = sys_execve,                  // 221
@@ -468,7 +489,7 @@ syscall1(struct trapframe *tf)
 
     if (sysno > 0 && sysno < ARRAY_SIZE(syscalls) && syscalls[sysno]) {
         if (sysno != SYS_sched_yield)
-            debug("%s called\n", syscall_names[sysno]);
+            debug("%s called", syscall_names[sysno]);
         return syscalls[sysno]();
     } else {
         debug_reg();

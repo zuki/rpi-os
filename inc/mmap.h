@@ -7,7 +7,7 @@
 
 #define NOT_PAGEALIGN(a)  ((uint64_t)(a) & (PGSIZE-1))
 
-void *mmap(void *, size_t, int, int, struct file*, off_t);
+long mmap(void *, size_t, int, int, struct file*, off_t);
 long munmap(void *, size_t);
 void *mremap(void *, size_t, size_t, int, void *);
 long msync(void *, size_t, int);

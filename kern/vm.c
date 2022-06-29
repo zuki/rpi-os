@@ -1,11 +1,11 @@
 #include "vm.h"
 
+#include "linux/errno.h"
 #include "string.h"
 #include "types.h"
 #include "arm.h"
 #include "mmu.h"
 #include "memlayout.h"
-
 #include "console.h"
 #include "mm.h"
 
@@ -29,7 +29,7 @@ vm_init()
  * pgdir that corresponds to virtual address va.
  * if alloc != 0, create any required page table pages.
  */
-static uint64_t *
+uint64_t *
 pgdir_walk(uint64_t * pgdir, void *vap, int alloc)
 {
     uint64_t *pgt = pgdir, va = (uint64_t) vap;
@@ -162,10 +162,12 @@ uvm_map(uint64_t * pgdir, void *va, size_t sz, uint64_t pa)
         uint64_t *pte = pgdir_walk(pgdir, p, 1);
         if (!pte) {
             warn("walk failed");
-            return -1;
+            return -EINVAL;
         }
-        if (*pte & PTE_VALID)
-            panic("remap.");
+        if (*pte & PTE_VALID) {
+            warn("remap: p=0x%p, *pte=0x%llx\n", p, *pte);
+            return -EINVAL;
+        }
         *pte = pa | PTE_UDATA;
     }
     return 0;
@@ -197,7 +199,7 @@ uvm_alloc(uint64_t * pgdir, size_t base, size_t stksz, size_t oldsz,
             return 0;
         }
         if (uvm_map(pgdir, (void *)a, PGSIZE, V2P((uint64_t) p)) < 0) {
-            warn("uvm_map failed");
+            warn("uvm_map failed: p=0x%llx, size=%d, pa=0x%llx", a, PGSIZE, V2P((uint64_t) p));
             kfree(p);
             uvm_dealloc(pgdir, base, newsz, oldsz);
             return 0;
@@ -363,4 +365,34 @@ vm_test()
     vm_free(pgdir);
     info("pass");
 #endif
+}
+
+// vaからnpagesマッピングを削除する。
+//   オプションとして物理メモリを開放できる。
+// 1) vaはページ境界になければならない。
+// 2) 割り当てられた物理メモリが存在しなければならない。
+void
+uvm_unmap(uint64_t *pgdir, uint64_t va, uint64_t npages, int do_free)
+{
+    uint64_t a;
+    uint64_t *pte;
+
+    if ((va % PGSIZE) != 0)
+        panic("not aligned");
+    trace("va=0x%x, length=0x%x, free=%d", va, npages * PGSIZE, do_free);
+    for (a = va; a < va + npages * PGSIZE; a += PGSIZE) {
+        if ((pte = pgdir_walk(pgdir, (const void *)a, 0)) == 0)
+            panic("pgdir_walk\n");
+        if ((*pte & PTE_VALID) == 0)
+            panic("not mapped\n");
+        if ((PTE_FLAGS(*pte) & (PTE_PAGE | PTE_VALID)) == PTE_VALID)
+            panic("not a leaf\n");
+        if (do_free) {
+            uint64_t pa = (uint64_t)P2V(PTE_ADDR(*pte));
+            debug("uvm_unmap[%d]: free pa=0x%llx, *pte=0x%llx", thisproc()->pid, pa, PTE_ADDR(*pte));
+            kfree((char *)pa);
+        }
+        *pte = PTE_ADDR(0UL);  // PTEを削除
+        debug("- a=0x%llx, *p=0x%llx\n", a, *pte);
+    }
 }

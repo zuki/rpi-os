@@ -167,6 +167,314 @@ if (p==MAP_FAILED) {
 }
 ```
 
+## sys_mmapを実装
+
+```
+# /usr/bin/dash
+[3]sys_brk: name dash: 0x42f9e0 to 0x0                                          // [1]
+[1]sys_brk: name dash: 0x42f9e0 to 0x432000                                     // [2] ここで0x432000までmappingしているので
+[1]sys_mmap: addr=0x430000, length=0x4096, prot=0x0, flags=0x32, offset=0x0     // [3] sys_brk(432000)して、またsys_mmap(432000)するのは何故?(PROT_NONEで未使用領域にするためだった)
+[1]uvm_map: remap: p=0x430000, *pte=0x3bfbd647                                  // [4] 0x430000がremapなのは当然
+
+[1]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0          // [5]
+[1]uvm_map: remap: p=0x431000, *pte=0x3bfc1647
+
+[1]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0          // [6]
+[1]sys_munmap: addr: 0x432000, length: 0x1000                                   // [7]
+[1]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0          // [8]
+[1]sys_munmap: addr: 0x600000000000, length: 0x1000                             // [9]
+
+pid 7, exitshell(2)
+[0]exit: exit: pid 7, name dash, err 2
+```
+
+## libc/src/malloc/malloc.c
+
+```c
+struct meta *alloc_meta(void)
+{
+	struct meta *m;
+	unsigned char *p;
+	if (!ctx.init_done) {
+#ifndef PAGESIZE
+		ctx.pagesize = get_page_size();
+#endif
+		ctx.secret = get_random_secret();
+		ctx.init_done = 1;
+	}
+	size_t pagesize = PGSZ;
+	if (pagesize < 4096) pagesize = 4096;
+	if ((m = dequeue_head(&ctx.free_meta_head))) return m;
+	if (!ctx.avail_meta_count) {
+		int need_unprotect = 1;
+		if (!ctx.avail_meta_area_count && ctx.brk!=-1) {
+			uintptr_t new = ctx.brk + pagesize;
+			int need_guard = 0;
+			if (!ctx.brk) {
+				need_guard = 1;
+				ctx.brk = brk(0);                           // [1] ctx.brk = 0x42f9e0
+				ctx.brk += -ctx.brk & (pagesize-1);         //     ctx.brk = 0x430000
+				new = ctx.brk + 2*pagesize;                 //     new     = 0x432000
+			}
+			if (brk(new) != new) {                          // [2] brk(new) = 0x43200
+				ctx.brk = -1;                               //     ここで0x430000-0x432000までmapping
+			} else {                                        // こちらが実行される
+				if (need_guard) mmap((void *)ctx.brk, pagesize, // [3] 0x430000から1ページPROT_NONE
+					PROT_NONE, MAP_ANON|MAP_PRIVATE|MAP_FIXED, -1, 0);  // PROT_NONEが未実装なのでmappingしてremap
+				ctx.brk = new;                                      // ctx.brk = 0x43200
+				ctx.avail_meta_areas = (void *)(new - pagesize);    // avail_metaareas: 0x431000 - 0x432000
+				ctx.avail_meta_area_count = pagesize>>12;           // avail_meta_area_count = 1
+				need_unprotect = 0;
+			}
+		}
+		if (!ctx.avail_meta_area_count) {                   // 該当せず
+			size_t n = 2UL << ctx.meta_alloc_shift;
+			p = mmap(0, n*pagesize, PROT_NONE,
+				MAP_PRIVATE|MAP_ANON, -1, 0);
+			if (p==MAP_FAILED) return 0;
+			ctx.avail_meta_areas = p + pagesize;
+			ctx.avail_meta_area_count = (n-1)*(pagesize>>12);
+			ctx.meta_alloc_shift++;
+		}
+		p = ctx.avail_meta_areas;                               // p = 0x431000
+		if ((uintptr_t)p & (pagesize-1)) need_unprotect = 0;    // 該当せず
+		if (need_unprotect)                                     // 該当せず
+			if (mprotect(p, pagesize, PROT_READ|PROT_WRITE)
+			    && errno != ENOSYS)
+				return 0;
+		ctx.avail_meta_area_count--;                            // avail_meta_area_count = 0
+		ctx.avail_meta_areas = p + 4096;                        // avail_meta_areas = 0x432000 (未mapping)
+		if (ctx.meta_area_tail) {
+			ctx.meta_area_tail->next = (void *)p;
+		} else {
+			ctx.meta_area_head = (void *)p;
+		}
+		ctx.meta_area_tail = (void *)p;
+		ctx.meta_area_tail->check = ctx.secret;
+		ctx.avail_meta_count = ctx.meta_area_tail->nslots
+			= (4096-sizeof(struct meta_area))/sizeof *m;
+		ctx.avail_meta = ctx.meta_area_tail->slots;
+	}
+	ctx.avail_meta_count--;
+	m = ctx.avail_meta++;
+	m->prev = m->next = 0;
+	return m;
+}
+```
+
+### sys_mmapで`PROT_NONE`を実装
+
+```
+# /usr/bin/dash
+[0]sys_brk: name dash: 0x42f9e0 to 0x0
+[0]sys_brk: name dash: 0x42f9e0 to 0x432000
+[0]sys_mmap: addr=0x430000, length=0x4096, prot=0x0, flags=0x32, offset=0x0
+[0]sys_mmap: return 0x430000
+[0]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0
+[0]sys_mmap: return 0x600000000000      // ここでストール
+```
+
+```
+# /usr/bin/dash
+[2]syscall1: sys_rt_sigprocmask called
+[2]syscall1: sys_rt_sigprocmask called
+[2]syscall1: sys_clone called
+[3]syscall1: sys_gettid called
+[2]syscall1: sys_rt_sigprocmask called
+[3]syscall1: sys_rt_sigprocmask called
+[2]syscall1: sys_rt_sigprocmask called
+[3]syscall1: sys_rt_sigprocmask called
+[2]syscall1: sys_wait4 called
+[3]syscall1: sys_execve called
+[2]syscall1: sys_gettid called
+[2]syscall1: sys_getpid called
+[2]syscall1: sys_rt_sigprocmask called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_geteuid called
+[2]syscall1: sys_brk called
+[2]sys_brk: name dash: 0x42f9e0 to 0x0
+[2]syscall1: sys_brk called
+[2]sys_brk: name dash: 0x42f9e0 to 0x432000
+[2]syscall1: sys_mmap called
+[2]sys_mmap: addr=0x430000, length=0x4096, prot=0x0, flags=0x32, offset=0x0
+[0]syscall1: sys_mmap called
+[0]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0
+[2]syscall1: sys_getppid called
+[2]syscall1: sys_getcwd called          // これが問題か
+```
+
+### sys_getcwd
+
+- cwdがルートディレクトリの場合、cwdとdpが同じinodeを指すのでacquiresleep()でデッドロックになっていた。
+
+```
+/usr/bin/dash
+[3]syscall1: sys_brk called
+[3]sys_brk: name dash: 0x42f9e0 to 0x0
+[3]syscall1: sys_brk called
+[3]sys_brk: name dash: 0x42f9e0 to 0x432000
+[3]syscall1: sys_mmap called
+[3]sys_mmap: addr=0x430000, length=0x4096, prot=0x0, flags=0x32, offset=0x0
+[3]sys_mmap: return 0x430000
+[3]syscall1: sys_mmap called
+[3]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0
+[3]sys_mmap: return 0x600000000000
+[3]syscall1: sys_getppid called
+[3]syscall1: sys_getcwd called
+[3]syscall1: sys_ioctl called
+[3]syscall1: sys_ioctl called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_openat called
+[3]syscall1: sys_fcntl called
+[3]syscall1: sys_close called
+[3]syscall1: sys_fcntl called
+[3]syscall1: sys_ioctl called			// 以後、sys_iocntl, sys_getpgid, sys_killの
+[3]syscall1: sys_getpgid called			// 組で無限ループ
+[3]syscall1: sys_kill called
+```
+
+### sys_ioctlの問題だった
+
+- TIOCSPGRP, TIOCGPGRPを実装していなかったため
+
+```
+/usr/bin/dash
+[1]syscall1: sys_brk called
+[1]sys_brk: name dash: 0x42f9e0 to 0x0
+[1]syscall1: sys_brk called
+[1]sys_brk: name dash: 0x42f9e0 to 0x432000
+[1]syscall1: sys_mmap called
+[1]sys_mmap: addr=0x430000, length=0x4096, prot=0x0, flags=0x32, offset=0x0
+[1]sys_mmap: return 0x430000
+[0]syscall1: sys_mmap called
+[0]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0
+[0]sys_mmap: return 0x600000000000
+[2]syscall1: sys_getppid called
+[2]syscall1: sys_getcwd called
+[2]syscall1: sys_ioctl called
+[2]sys_ioctl: fd: 0, req: 0x5413, f->type: 3
+[2]syscall1: sys_ioctl called
+[2]sys_ioctl: fd: 1, req: 0x5413, f->type: 3
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_openat called
+[2]syscall1: sys_fcntl called
+[2]syscall1: sys_close called
+[2]syscall1: sys_fcntl called
+[2]syscall1: sys_ioctl called
+[2]sys_ioctl: fd: 10, req: 0x540f, f->type: 3
+[2]syscall1: sys_getpgid called
+[2]sys_getpgid: pid 0, return 1
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_setpgid called
+[2]syscall1: sys_ioctl called
+[2]sys_ioctl: fd: 10, req: 0x5410, f->type: 3
+[2]syscall1: sys_getuid called
+[2]syscall1: sys_geteuid called
+[2]syscall1: sys_getgid called
+[2]syscall1: sys_getegid called
+[2]syscall1: sys_write called
+[2]syscall1: sys_read called		// ここでストール
+```
+
+### 何点か修正することでdashのプロンプトがでる
+
+- kill()の`if (pid == 0 || pid < -1)`の場合を処理
+- in_user()でmmap_regiomを考慮
+- sys_ioctl()で変数pgid, pgid_pをswitch()の外で定義
+
+```
+$ /usr/bin/dash								// /bin/shのプロンプトを戻した
+[1]sys_brk: name dash: 0x42f3c8 to 0x0
+[1]sys_brk: name dash: 0x42f3c8 to 0x432000
+[1]sys_mmap: addr=0x430000, length=0x4096, prot=0x0, flags=0x32, offset=0x0
+[1]sys_mmap: return 0x430000
+[3]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0
+[3]sys_mmap: return 0x600000000000
+[0]sys_ioctl: fd: 0, req: 0x5413, f->type: 3
+[0]sys_ioctl: fd: 1, req: 0x5413, f->type: 3
+[0]sys_ioctl: fd: 10, req: 0x540f, f->type: 3
+[0]sys_ioctl: TIOCGPGRP: pid 7, pgid 1, pgid_p 1
+[0]sys_getpgid: pid 0, return 1
+[0]sys_ioctl: fd: 10, req: 0x5410, f->type: 3
+[0]sys_ioctl: TIOCSPGRP: pid 7, pgid -500 -> -500	// 指定のpgidの値がおかしい
+
+# /usr/bin/ls								// rootなのでdashのプロンプトは`#`
+kern/vm.c:78: assertion failed.				// uvm_copy()内のassert
+```
+
+### ioctl()はdash/src/jobs.c#setjobctl()内で呼び出している
+
+```c
+		fd = savefd(fd, ofd);
+		do { /* while we are in the background */
+            printf("call ioctlr GETPGRP\n");	// [1]
+			if ((pgrp = tcgetpgrp(fd)) < 0) {	// [2]
+out:
+				sh_warnx("can't access tty; job control turned off");
+				mflag = on = 0;
+				goto close;
+			}
+            printf("pgrp: %d\n", pgrp);			// [3]
+			if (pgrp == getpgrp()) {			// [4]
+                printf("call getpgid: pgid=%d\n", pgrp);	// [5]
+                break;
+            }
+
+			killpg(0, SIGTTIN);
+		} while (1);
+		initialpgrp = pgrp;
+
+		setsignal(SIGTSTP);
+		setsignal(SIGTTOU);
+		setsignal(SIGTTIN);
+		pgrp = rootpid;
+		setpgid(0, pgrp);
+        printf("call ioctlr GETSGRP: pgid=%d\n", pgrp);	// [6]
+		xtcsetpgrp(fd, pgrp);
+```
+```
+call ioctlr GETPGRP										// [1]
+[3]sys_ioctl: fd: 10, req: 0x540f, f->type: 3			// [2]
+[3]sys_ioctl: TIOCGPGRP: pid 7, pgid 1, pgid_p 1
+pgrp: 1													// [3]
+[2]sys_getpgid: pid 0, return 1							// [4]
+call getpgid: pgid=1									// [5]
+call ioctlr GETSGRP: pgid=7								// [6] pgid=7で呼び出している
+[2]sys_ioctl: fd: 10, req: 0x5410, f->type: 3
+[2]sys_ioctl: TIOCSPGRP: pid 7, pgid -516 -> -516		// 何故、-516
+```
+
+### ioctl()のTIOCSPGRPの第3パラメタもポインタだった
+
+```c
+int tcsetpgrp(int fd, pid_t pgrp)
+{
+    int pgrp_int = pgrp;
+    return ioctl(fd, TIOCSPGRP, &pgrp_int);
+}
+```
+
+- sys_ioctl()を修正して正しい値が設定された
+
+```
+[3]sys_ioctl: TIOCSPGRP: pid 7, pgid 7 -> 7
+```
+
 ## gdbが動かなかったのはmacのセキュリティ設定のためだった
 
 [GDB Wiki: PermissionsDarwin](https://sourceware.org/gdb/wiki/PermissionsDarwin)の指示通りに処理したところ動くようになった。

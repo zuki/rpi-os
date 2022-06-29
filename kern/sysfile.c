@@ -186,18 +186,23 @@ sys_ioctl()
     struct termios *term;
     struct winsize *win;
     struct file *f;
+    pid_t pgid;
+    pid_t *pgid_p;
 
     if (argfd(0, &fd, &f) < 0 || argu64(1, &req) < 0)
         return -EINVAL;
 
+    info("fd: %d, req: 0x%llx, f->type: %d", fd, req, f->ip->type);
+
     if (f->ip->type != T_DEV) return -ENOTTY;
+
     trace("fd=%d, req=0x%llx\n", fd, req);
 
     switch (req) {
         case TCGETS:
             if (argptr(2, (char **)&term, sizeof(struct termios)) < 0)
                 return -EINVAL;
-            if (!in_user(term, sizeof(struct termios))) return -EFAULT;
+            if (term == NULL) return -EINVAL;
             memmove(term, devsw[f->ip->major].termios, sizeof(struct termios));
             break;
         case TCSETS:
@@ -205,7 +210,7 @@ sys_ioctl()
         case TCSETSF:
             if (argptr(2, (char **)&term, sizeof(struct termios)) < 0)
                 return -EINVAL;
-            if (!in_user(term, sizeof(struct termios))) return -EFAULT;
+            if (term == NULL) return -EINVAL;
             memmove(devsw[f->ip->major].termios, term, sizeof(struct termios));
             break;
         case TCSBRK:
@@ -214,7 +219,7 @@ sys_ioctl()
         case TIOCGWINSZ:
             if (argptr(2, (char **)&win, sizeof(struct winsize)) < 0)
                 return -EINVAL;
-            if (!in_user(win, sizeof(struct winsize))) return -EFAULT;
+            if (win == NULL) return -EINVAL;
             win->ws_row = 24;
             win->ws_col = 80;
             break;
@@ -222,20 +227,18 @@ sys_ioctl()
             // Windowサイズ設定: 当面何もしない
             break;
         case TIOCSPGRP:  // TODO: 本来、dev(tty)用なのでp->sgid? ¥
-        /*
-            int pgid;
-            if (argint(2, &pgid) < 0) return -EINVAL;
-            p->pgid = pgid;
-        */
+            if (argptr(2, (char **)&pgid_p, sizeof(pid_t)) < 0)
+                return -EINVAL;
+            pid_t opgid = thisproc()->pgid;
+            thisproc()->pgid = *pgid_p;
+            info("TIOCSPGRP: pid %d, pgid %d -> %d\n", opgid, thisproc()->pgid, thisproc()->pgid);
             break;
         case TIOCGPGRP:
-        /*
-            int *pgid;
-            if (argptr(2, (char **)&pgid, sizeof(int)) < 0)
+            if (argptr(2, (char **)&pgid_p, sizeof(pid_t)) < 0)
                 return -EINVAL;
-            if (!in_user(pgid, sizeof(int))) return -EFAULT;
-            *pgid = p->pgid;
-        */
+            if (pgid_p == NULL) return -EINVAL;
+            *pgid_p = thisproc()->pgid;
+            info("TIOCGPGRP: pid %d, pgid %d, pgid_p %d", thisproc()->pid, thisproc()->pgid, *pgid_p);
             break;
         default:
             return -EINVAL;
@@ -252,8 +255,6 @@ sys_read()
 
     if (argfd(0, 0, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0)
         return -EINVAL;
-    if (!in_user(p, n))
-        return -EFAULT;
 
     return fileread(f, p, n);
 }
@@ -783,6 +784,7 @@ sys_getcwd()
         return (void *)-EINVAL;
 
     cwd = idup(p->cwd);
+    if (cwd->inum == ROOTINO) goto root;
     while (1) {
         dp = dirlookup(cwd, "..", 0);
         ilock(dp);
@@ -804,6 +806,7 @@ sys_getcwd()
         iput(dp);
     }
     iput(dp);
+root:
     buf[pos++] = '/'; buf[pos] = 0;             // NULL終端
 
    // bufを反転する

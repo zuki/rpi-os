@@ -27,6 +27,18 @@ struct context {
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+// mmap region
+struct mmap_region {
+    void       *addr;
+    uint64_t    length;
+    off_t       offset;
+    struct file *f;
+    int         prot;
+    int         flags;
+    int         original;
+    struct mmap_region  *next;
+};
+
 struct signal {
     sigset_t mask;
     sigset_t pending;
@@ -85,6 +97,10 @@ struct proc {
     struct file *ofile[NOFILE]; // Open files
     struct inode *cwd;          // Current directory
     char name[16];              // Process name (debugging)
+
+    int nregions;               /* Number of regions mapped by the process */
+    struct mmap_region *regions; /* head pointer of the mmap region list */
+    struct spinlock *regions_lock; /* mmap regions lock */
 
     struct signal signal;       // Signal
     struct trapframe *oldtf;    // To save the old trapframe

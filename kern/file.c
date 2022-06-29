@@ -12,6 +12,7 @@
 #include "pipe.h"
 #include "clock.h"
 #include "string.h"
+#include "pagecache.h"
 #include "linux/stat.h"
 #include "linux/capability.h"
 
@@ -255,8 +256,11 @@ filewrite(struct file *f, char *addr, ssize_t n)
             ssize_t n1 = MIN(max, n - i);
             begin_op();
             ilock(f->ip);
-            if ((r = writei(f->ip, addr + i, f->off, n1)) > 0)
+            if ((r = writei(f->ip, addr + i, f->off, n1)) > 0
+             && (f->ip->type == T_FILE)) {
+                update_page(f->off, f->ip->inum, f->ip->dev, addr + i, r);
                 f->off += r;
+             }
             clock_gettime(CLOCK_REALTIME, &ts);
             f->ip->mtime = f->ip->atime = ts;
             iunlock(f->ip);

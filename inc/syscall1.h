@@ -65,6 +65,12 @@ long sys_gettid();
 long sys_getpid();
 long sys_getppid();
 long sys_set_tid_address();
+long sys_mmap();
+long sys_munmap();
+long sys_msync();
+void *sys_mremap();
+long sys_mprotect();
+long sys_madvise();
 
 // kern/sysfile.c
 long sys_execve();
@@ -102,12 +108,6 @@ long sys_mount();
 long sys_renameat2();
 void *sys_getcwd();
 long sys_fadvise64();
-size_t sys_mmap();
-long sys_munmap();
-long sys_msync();
-void *sys_mremap();
-long sys_mprotect();
-long sys_madvise();
 long sys_utimensat();
 //int dirunlink(struct inode *, char *, uint32_t);
 //int direntlookup(struct inode *, int, struct dirent *);

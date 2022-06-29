@@ -9,7 +9,7 @@
 #include "mm.h"
 #include "vm.h"
 #include "spinlock.h"
-
+#include "mmap.h"
 #include "dev.h"
 #include "debug.h"
 #include "file.h"
@@ -137,6 +137,10 @@ proc_initx(char *name, char *code, size_t len)
     p->gid = p->egid = p->sgid = p->fsgid = 0;
     p->ngroups = 0;
     memset(p->groups, 0, sizeof(gid_t)*NGROUPS);
+
+    p->nregions = 0;
+    p->regions = 0;
+    initlock(p->regions_lock);
 
     p->tf->elr = 0;
 
@@ -300,10 +304,11 @@ fork()
 {
     struct proc *cp = thisproc();
     struct proc *np = proc_alloc();
+    long error;
 
     if (np == 0) {
         debug("proc_alloc returns null");
-        return -1;
+        return -ENOMEM;
     }
 
     if ((np->pgdir = uvm_copy(cp->pgdir)) == 0) {
@@ -314,7 +319,18 @@ fork()
         release(&ptable.lock);
 
         debug("uvm_copy returns null");
-        return -1;
+        return -ENOMEM;
+    }
+
+    if (cp->nregions != 0) {
+        if ((error = copy_mmap_list(cp, np)) < 0) {
+            kfree(np->kstack);
+            acquire(&ptable.lock);
+            np->state = UNUSED;
+            release(&ptable.lock);
+            debug("failed copy_mmap_list");
+            return error;
+        }
     }
 
     np->parent = cp;
@@ -425,7 +441,7 @@ exit(int err)
         panic("init exit");
 
     if (err) {
-        debug("exit: pid %d, err %d", cp->pid, err);
+        info("exit: pid %d, name %s, err %d", cp->pid, cp->name, err);
     }
 
     // Close all open files.
@@ -538,9 +554,7 @@ kill(pid_t pid, int sig)
     struct proc *p;
     long error = -ESRCH;
 
-
     if (pid == 0 || pid < -1) {
-    /* TODO: pgidを設定
         pid_t pgid = pid == 0 ? current->pgid : -pid;
         if (pgid > 0) {
             error = -ESRCH;
@@ -554,7 +568,6 @@ kill(pid_t pid, int sig)
             release(&ptable.lock);
         }
         return error;
-    */
     } else if (pid == -1) {
         acquire(&ptable.lock);
         for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {

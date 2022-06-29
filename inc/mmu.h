@@ -37,7 +37,13 @@
 
 #define PTE_KERN        (0 << 6)
 #define PTE_USER        (1 << 6)
+#define PTE_RW          (0<<7)      /* 読み書き可 */
+#define PTE_RO          (1<<7)      /* 読み込みのみ可 */
+#define PTE_SH          (3<<8)      /* キャッシュ可能なメモリでインナ共有可 */
+#define PTE_AF          (1<<10)     /* アクセスフラグ（0だとアクセスフォル発生） P2066 */
 #define PTE_NG          (1 << 11)
+#define PTE_PXN         (1UL<<53)   /* EL1以上での実行不可 */
+#define PTE_UXN         (1UL<<54)   /* EL0での実行不可 */
 
 /* 1GB/2MB block for kernel, and 4KB page for user. */
 #define PTE_KDATA       (PTE_KERN | PTE_NORMAL | PTE_BLOCK)
@@ -47,11 +53,13 @@
 // #define PTE_UDATA       (PTE_USER | PTE_NORMAL | PTE_PAGE | PTE_NG)
 
 /* Address in table or block entry, only support 32 bit physical address. */
-#define PTE_ADDR(pte)   ((pte) & ~0xFFF)
-#define PTE_FLAGS(pte)  ((pte) &  0xFFF)
+#define PTE_ADDR(pte)   ((uint64_t)(pte) & ~0xFFFF000000000FFFUL)
+#define PTE_FLAGS(pte)  ((uint64_t)(pte) &  0xFFFF000000000FFFUL)
+#define PTE_FLAGS_LOW(pte)  ((uint64_t)(pte) &  0x0000000000000FFFUL)
+#define PTE_FLAGS_HIGH(pte)  ((uint64_t)(pte) &  0xFFFF000000000000UL)
 
 /* Translation Control Register */
-#define TCR_T0SZ        (64 - 48) 
+#define TCR_T0SZ        (64 - 48)
 #define TCR_T1SZ        ((64 - 48) << 16)
 #define TCR_TG0_4K      (0 << 14)
 #define TCR_TG1_4K      (2 << 30)           /* Different from TG0 */

@@ -6,9 +6,9 @@
 
 uint64_t *  vm_init();
 void        vm_free(uint64_t *pgdir);
-
+uint64_t *  pgdir_walk(uint64_t * pgdir, void *vap, int alloc);
 uint64_t *  uvm_copy(uint64_t *pgdir);
-
+void        uvm_unmap(uint64_t *pgdir, uint64_t va, uint64_t npages, int do_free);
 void        uvm_switch(uint64_t *pgdir);
 int         uvm_map(uint64_t *pgdir, void *va, size_t sz, uint64_t pa);
 int         uvm_alloc(uint64_t *pgdir, size_t base, size_t stksz, size_t oldsz, size_t newsz);
