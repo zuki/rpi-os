@@ -516,8 +516,34 @@ FAR_EL1: 0x1000000000000
 irq of type 4 unimplemented.
 ```
 
+### irg type 4を実装
 
+- trap.cでEC_DABORT, EC_DABORT2の場合のハンドラを実装
 
+```
+$ /usr/bin/dash
+# /bin/ls				// コマンド入力でハング
+```
+
+- syscallをプリント
+
+```
+[1]syscall1: sys_rt_sigprocmask called
+[1]syscall1: sys_clone called
+[2]syscall1: sys_rt_sigprocmask called
+[0]syscall1: sys_getpid called
+[2]syscall1: sys_setpgid called
+[0]syscall1: sys_setpgid called
+[0]syscall1: sys_ioctl called
+[2]syscall1: sys_wait4 called
+[0]syscall1: sys_rt_sigaction called
+[0]syscall1: sys_rt_sigaction called
+[0]syscall1: sys_rt_sigaction called
+[0]syscall1: sys_rt_sigaction called
+[0]syscall1: sys_rt_sigaction called
+[0]syscall1: sys_rt_sigprocmask called
+[0]syscall1: sys_execve called				// execveで問題発生
+```
 
 ## gdbが動かなかったのはmacのセキュリティ設定のためだった
 

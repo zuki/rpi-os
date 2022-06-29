@@ -132,6 +132,17 @@ lesr()
     disb();
 }
 
+/* Read Fault Address Register (EL1) */
+static inline uint64_t
+rfar()
+{
+    disb();
+    uint64_t r;
+    asm volatile("mrs %[x], far_el1" : [x]"=r"(r));
+    disb();
+    return r;
+}
+
 /* Load vector base (virtual) address register (EL1) */
 static inline void
 lvbar(void *p)

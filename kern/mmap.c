@@ -124,10 +124,10 @@ get_perm(int prot, int flags)
     uint64_t perm;
 
     if (flags & MAP_ANONYMOUS)
-        perm = PTE_VALID | PTE_USER | PTE_PXN | PTE_TABLE
+        perm = PTE_VALID | PTE_USER | PTE_PXN | PTE_PAGE
              | (MT_NORMAL_NC << 2) | PTE_AF | PTE_SH;
     else
-        perm = PTE_VALID | PTE_USER | PTE_PXN | PTE_TABLE
+        perm = PTE_VALID | PTE_USER | PTE_PXN | PTE_PAGE
              | (MT_NORMAL << 2) | PTE_AF | PTE_SH;
     if (prot & PROT_WRITE)
         perm &= ~PTE_RO;

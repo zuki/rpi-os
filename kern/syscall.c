@@ -489,7 +489,7 @@ syscall1(struct trapframe *tf)
 
     if (sysno > 0 && sysno < ARRAY_SIZE(syscalls) && syscalls[sysno]) {
         if (sysno != SYS_sched_yield)
-            debug("%s called", syscall_names[sysno]);
+            info("%s called", syscall_names[sysno]);
         return syscalls[sysno]();
     } else {
         debug_reg();
