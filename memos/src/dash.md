@@ -414,7 +414,7 @@ $ /usr/bin/dash								// /bin/shのプロンプトを戻した
 [0]sys_ioctl: TIOCSPGRP: pid 7, pgid -500 -> -500	// 指定のpgidの値がおかしい
 
 # /usr/bin/ls								// rootなのでdashのプロンプトは`#`
-kern/vm.c:78: assertion failed.				// uvm_copy()内のassert
+kern/vm.c:78: assertion failed.				// uvm_copy()内のassert					dash step 1
 ```
 
 ### ioctl()はdash/src/jobs.c#setjobctl()内で呼び出している
@@ -513,16 +513,16 @@ SP: 0xffff00003bf92d50
 SP_EL0: 0xfffffffffb40
 ELR_EL1: 0xffff000000082c7c, EC: 0x25, ISS: 0x4.
 FAR_EL1: 0x1000000000000
-irq of type 4 unimplemented.
+irq of type 4 unimplemented.									// dash step 2
 ```
 
-### irg type 4を実装
+### type 4 irqを実装
 
 - trap.cでEC_DABORT, EC_DABORT2の場合のハンドラを実装
 
 ```
 $ /usr/bin/dash
-# /bin/ls				// コマンド入力でハング
+# /bin/ls				// コマンド入力でハング  step 3
 ```
 
 - syscallをプリント
@@ -542,7 +542,99 @@ $ /usr/bin/dash
 [0]syscall1: sys_rt_sigaction called
 [0]syscall1: sys_rt_sigaction called
 [0]syscall1: sys_rt_sigprocmask called
-[0]syscall1: sys_execve called				// execveで問題発生
+[0]syscall1: sys_execve called				// execveで問題発生	dash step 3
+```
+
+- exec.c#L144 dccivac() でストール
+- L144をコメントアウトするとexec.c#205でストール
+
+### fetchstr()を修正
+
+- addrがmmap_regionにある場合を考慮するよう変更
+- dashでコマンド実行成功
+
+```
+$ /usr/bin/dash
+[3]execve: argv[0] = '/usr/bin/dash', len: 13
+[3]execve: envp[0] = 'TEST_ENV=FROM_INIT', len: 18
+[3]execve: envp[1] = 'TZ=JST-9', len: 8
+# /bin/ls /
+[2]execve: argv[0] = '/bin/ls', len: 7
+[2]execve: argv[1] = '/', len: 1
+[2]execve: envp[0] = 'TEST_ENV=FROM_INIT', len: 18
+[2]execve: envp[1] = 'PWD=/', len: 5
+[2]execve: envp[2] = 'TZ=JST-9', len: 8
+drwxrwxr-x    1 root wheel   512  6 29 14:31 .
+drwxrwxr-x    1 root wheel   512  6 29 14:31 ..
+drwxrwxr-x    2 root wheel   896  6 29 14:31 bin
+drwxrwxr-x    3 root wheel   384  6 29 14:31 dev
+drwxrwxr-x    8 root wheel   128  6 29 14:31 etc
+drwxrwxrwx    9 root wheel   128  6 29 14:31 lib
+drwxrwxr-x   10 root wheel   192  6 29 14:31 home
+drwxrwxr-x   12 root wheel   256  6 29 14:31 usr
+# /usr/bin/ls /
+[2]execve: argv[0] = '/usr/bin/ls', len: 11
+[2]execve: argv[1] = '/', len: 1
+[2]execve: envp[0] = 'TEST_ENV=FROM_INIT', len: 18
+[2]execve: envp[1] = 'PWD=/', len: 5
+[2]execve: envp[2] = 'TZ=JST-9', len: 8
+bin  dev  etc  home  lib  usr
+# echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# ls -l /
+[0]execve: argv[0] = 'ls', len: 2
+[0]execve: argv[1] = '-l', len: 2
+[0]execve: argv[2] = '/', len: 1
+[0]execve: envp[0] = 'TEST_ENV=FROM_INIT', len: 18
+[0]execve: envp[1] = 'PWD=/', len: 5
+[0]execve: envp[2] = 'TZ=JST-9', len: 8
+[2]sys_fstatat: flags unimplemented: flags=256	// flags = AT_EMPTY_PATH
+ls: cannot access '/': Invalid argument
+[1]exit: exit: pid 10, name ls, err 2
+CurrentEL: 0x1
+DAIF: Debug(1) SError(1) IRQ(1) FIQ(1)
+SPSel: 0x1
+SPSR_EL1: 0x0
+SP: 0xffff00003bffce50
+SP_EL0: 0xfffffffffcb0
+ELR_EL1: 0x41b510, EC: 0x0, ISS: 0x0.
+FAR_EL1: 0x0
+Unexpected syscall #130 (unknown)
+kern/console.c:283: kernel panic at cpu 0.
+```
+
+### sys_fstatat()でflagsが設定している場合、エラーにしていた
+
+- 無視することにした
+
+```
+$ /usr/bin/dash
+# ls -l /
+[2]fileopen: cant namei /etc/passwd
+[1]fileopen: cant namei /etc/group
+total 4
+drwxrwxr-x 1 0 0 896 Jun 29  2022 bin
+drwxrwxr-x 1 0 0 384 Jun 29  2022 dev
+drwxrwxr-x 1 0 0 128 Jun 29  2022 etc
+drwxrwxr-x 1 0 0 192 Jun 29  2022 home
+drwxrwxrwx 1 0 0 128 Jun 29  2022 lib
+drwxrwxr-x 1 0 0 256 Jun 29  2022 usr
+# ls -l /bin
+[1]fileopen: cant namei /etc/passwd
+[1]fileopen: cant namei /etc/group
+total 495
+-rwxr-xr-x 1 0 0 39816 Jun 29  2022 bigtest
+-rwxr-xr-x 1 0 0 38568 Jun 29  2022 cat
+-rwxr-xr-x 1 0 0 48552 Jun 29  2022 date
+-rwxr-xr-x 1 0 0 39480 Jun 29  2022 echo
+-rwxr-xr-x 1 0 0 44736 Jun 29  2022 init
+-rwxr-xr-x 1 0 0 53064 Jun 29  2022 ls
+-rwxr-xr-x 1 0 0 51840 Jun 29  2022 mkfs
+-rwxr-xr-x 1 0 0 54056 Jun 29  2022 sh
+-rwxr-xr-x 1 0 0 45040 Jun 29  2022 sigtest
+-rwxr-xr-x 1 0 0 48640 Jun 29  2022 sigtest2
+-rwxr-xr-x 1 0 0 22104 Jun 29  2022 sigtest3
+-rwxr-xr-x 1 0 0 17744 Jun 29  2022 utest
 ```
 
 ## gdbが動かなかったのはmacのセキュリティ設定のためだった

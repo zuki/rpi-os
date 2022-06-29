@@ -379,10 +379,12 @@ sys_fstatat()
         return -EINVAL;
     }
     // TODO: AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOWは実装する
+    /* 当面、無視する: AT_EMPTY_PATH の使用があった
     if (flags != 0) {
-        warn("flags unimplemented");
+        warn("flags unimplemented: flags=%d", flags);
         return -EINVAL;
     }
+    */
 
     struct inode *ip;
     begin_op();

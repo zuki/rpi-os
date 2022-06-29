@@ -11,6 +11,7 @@
 #include "clock.h"
 #include "mm.h"
 #include "random.h"
+#include "mmap.h"
 #include "linux/resources.h"
 #include "linux/sysinfo.h"
 #include "linux/time.h"
@@ -54,7 +55,9 @@ long
 fetchstr(uint64_t addr, char **pp)
 {
     struct proc *p = thisproc();
+    struct mmap_region *region = 0;
     char *s;
+
     *pp = s = (char *)addr;
     if (p->base <= addr && addr < p->sz) {
         for (; (uint64_t) s < p->sz; s++)
@@ -62,6 +65,10 @@ fetchstr(uint64_t addr, char **pp)
                 return s - *pp;
     } else if (USERTOP - p->stksz <= addr && addr < USERTOP) {
         for (; (uint64_t) s < USERTOP; s++)
+            if (*s == 0)
+                return s - *pp;
+    } else if ((region = is_mapped(addr)) != 0) {
+        for(; (uint64_t)region->addr + region->length; s++)
             if (*s == 0)
                 return s - *pp;
     }
@@ -489,7 +496,7 @@ syscall1(struct trapframe *tf)
 
     if (sysno > 0 && sysno < ARRAY_SIZE(syscalls) && syscalls[sysno]) {
         if (sysno != SYS_sched_yield)
-            info("%s called", syscall_names[sysno]);
+            debug("%s called", syscall_names[sysno]);
         return syscalls[sysno]();
     } else {
         debug_reg();
