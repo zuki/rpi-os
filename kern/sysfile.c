@@ -151,7 +151,7 @@ sys_fcntl()
 
     if (argfd(0, &fd, &f) < 0 || argint(1, &cmd) < 0 || argint(2, &args))
         return -EINVAL;
-    trace("fd=%d, cmd=0x%x, args=%d", fd, cmd, args);
+    debug("fd=%d, cmd=0x%x, args=%d", fd, cmd, args);
 
     switch (cmd) {
         case F_DUPFD:
@@ -289,9 +289,12 @@ sys_write()
     struct file *f;
     ssize_t n;
     char *p;
+    int fd;
 
-    if (argfd(0, 0, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0)
+    if (argfd(0, &fd, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0)
         return -EINVAL;
+
+    debug("fd: %d, p: %s, n: %lld, f->type: %d", fd, p, n, f->type);
     return filewrite(f, p, n);
 }
 
@@ -387,15 +390,12 @@ sys_fstatat()
     */
 
     struct inode *ip;
-    begin_op();
     if ((ip = namei(path)) == 0) {
-        end_op();
         return -ENOENT;
     }
     ilock(ip);
     stati(ip, st);
     iunlockput(ip);
-    end_op();
 
     return 0;
 }
@@ -493,18 +493,19 @@ sys_openat()
     mode_t mode;
 
     if (argint(0, &dirfd) < 0 || argstr(1, &path) < 0
-        || argint(2, &flags) < 0 || argint(2, (int *)&mode) < 0)
+        || argint(2, &flags) < 0 || argint(3, (int *)&mode) < 0)
         return -EINVAL;
+
+    debug("dirfd %d, path '%s', flag 0x%x, mode0x%x", dirfd, path, flags, mode);
 
     if (dirfd != AT_FDCWD) {
         warn("dirfd unimplemented");
         return -EINVAL;
     }
-    if ((mode & O_LARGEFILE) == 0) {
+    if ((flags & O_LARGEFILE) == 0) {
         warn("expect O_LARGEFILE in open flags");
         return -EINVAL;
     }
-    trace("dirfd %d, path '%s', flag 0x%x, mode0x%x", dirfd, path, flags, mode);
 
     return fileopen(path, flags, mode);
 

@@ -19,7 +19,7 @@ typedef uint64_t ulong;
 #define sleep xv6_sleep
 #include "param.h"
 #include "fs.h"
-#include "usrbins.h"
+#include "files.h"
 
 #ifndef static_assert
 #define static_assert(a, b) do { switch (0) case 0: case (a): ; } while (0)
@@ -190,7 +190,10 @@ main(int argc, char *argv[])
     copy_file(2, argc, argv, binino, 0, 0, S_IFREG|0755);
 
     // /usr/bin  (coreutils)
-    copy_file(0, nbins(), usrbins, usrbinino, 0, 0, S_IFREG|0755);
+    copy_file(0, nelms(usrbins), usrbins, usrbinino, 0, 0, S_IFREG|0755);
+
+    // /etc/passwd, group
+    copy_file(0, nelms(etc_files), etc_files, etcino, 0, 0, S_IFREG|0644);
 
     // fix size of root inode dir
     rinode(rootino, &din);

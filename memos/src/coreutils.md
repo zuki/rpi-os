@@ -68,3 +68,22 @@ $ vi usr/inc/usrbins.h
 ```
 $ find . -type f -perm +0111 -not -name 'make-prime-list' -not -name '*.so' -exec cp {} ../../usr/bin \;
 ```
+
+# コマンド実行チェック
+
+## ok
+
+```
+# ls -l
+total 4
+drwxrwxr-x 1 root root 896 Jun 30  2022 bin
+drwxrwxr-x 1 root root 384 Jun 30  2022 dev
+drwxrwxr-x 1 root root 256 Jun 30  2022 etc
+drwxrwxr-x 1 root root 192 Jun 30  2022 home
+drwxrwxrwx 1 root root 128 Jun 30  2022 lib
+?--------- 1 root root   0 Jun 21 10:31 test
+drwxrwxr-x 1 root root 256 Jun 30  2022 usr
+# rm test
+# ls
+bin  dev  etc  home  lib  usr
+```

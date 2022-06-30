@@ -660,3 +660,166 @@ Thread 3 hit Breakpoint 1, wait4 (pid=-1, status=0xffffffffff9c, options=<optimi
 379	            if (p->parent != cp) continue;
 (gdb)
 ```
+
+# /binディレクトリのコマンド実行チェック
+
+## ok
+
+```
+# /bin/date
+2022年 6日21日 火曜日 10時32分17秒 JST
+# sigtest3
+Got signal!
+Hangup
+# sigtest2
+part1 start
+PID 8 function A got 10
+PID 8 function A got 999
+PID 8 function B got 10
+
+part2 start
+PID 8 sends signal to PID 9
+PID 9 function C got 10
+PID 9 got signal and sends signal to PID 8
+PID 8 function C got 10
+PID 8 got signal from PID 9
+
+part3 start
+PID 10 function D got 10
+PID 10 function E got 12
+bye bye
+
+all ok
+# utest
+# echo abc
+abc
+```
+
+## エラー
+
+```
+# echo abc > test
+dash: 6: cannot create test: Permission denied
+# cat > test
+dash: 10: cannot create test: Permission denied
+```
+
+### iupdate()にバグ
+
+- ip->modeをdinodeにコピーしていなかった
+
+```
+# ls
+bin  dev  etc  home  lib  usr
+# echo abc > test
+# cat test
+abc
+# ls -l
+total 4
+drwxrwxr-x 1 root root 896 Jun 30  2022 bin
+drwxrwxr-x 1 root root 384 Jun 30  2022 dev
+drwxrwxr-x 1 root root 256 Jun 30  2022 etc
+drwxrwxr-x 1 root root 192 Jun 30  2022 home
+drwxrwxrwx 1 root root 128 Jun 30  2022 lib
+-rw-rw-rw- 1 root root   4 Jun 21 10:31 test
+drwxrwxr-x 1 root root 256 Jun 30  2022 usr
+# rm test
+# ls
+bin  dev  etc  home  lib  usr
+```
+
+```
+# bin/sigtest
+PID 15 ready
+PID 16 ready
+PID 17 ready
+PID 18 ready
+PID 19 ready
+PID 19 caught sig 2
+unknown error: ecr=0x2000000, il=3355443 (=0x2000000)
+PID 18 caught sig 2
+kern/console.c:283: kernel panic at cpu 0.
+
+PID 17 caught sig 2
+PID 16 caught sig 2
+```
+
+### EL1の割り込みでIL=1になり、panicになっていた
+
+- IL=1の場合はNOPとした
+
+```
+# sigtest
+PID 8 ready
+PID 9 ready
+PID 10 ready
+[3]yield: pid 11 to runable
+[3]yield: pid 11 to running
+PID 11 ready
+PID 12 ready
+[1]yield: pid 12 to runable
+[1]yield: pid 12 to running
+[0]sys_kill: pid=12, sig=2
+[0]send_signal: pid=12, sig=2, state=2, paused=1
+[0]send_signal: paused! continue
+[0]cont_handler: pid=12
+[0]wakeup1: pid 12 woke up		// PID=12はCPU=0でwoke up
+PID 12 caught sig 2
+[2]sys_kill: pid=11, sig=2
+[2]send_signal: pid=11, sig=2, state=2, paused=1
+[2]send_signal: paused! continue
+[2]cont_handler: pid=11
+[2]wakeup1: pid 11 woke up		// PID=11はCPU=2でwoke up
+PID 11 caught sig 2
+[1]sys_kill: pid=10, sig=2
+[2]yield: pid 12 to runable
+[1]send_signal: pid=10, sig=2, state=2, paused=1
+[1]send_signal: paused! continue
+[1]cont_handler: pid=10
+[1]wakeup1: pid 10 woke up		// PID=10はCPU=1でwoke up
+[2]yield: pid 12 to running		<=
+PID 10 caught sig 2
+[0]sys_kill: pid=9, sig=2
+[0]send_signal: pid=9, sig=2, state=2, paused=1
+[0]send_signal: paused! continue
+[0]cont_handler: pid=9
+[0]wakeup1: pid 9 woke up		// PID=9はCPU=0でwoke up
+[1]yield: pid 11 to runable
+[3]yield: pid 11 to running		<=
+PID 9 caught sig 2
+[1]sys_kill: pid=8, sig=2
+[2]yield: pid 12 to runable
+[1]send_signal: pid=8, sig=2, state=2, paused=1
+[1]send_signal: paused! continue
+[1]cont_handler: pid=8
+[1]wakeup1: pid 8 woke up		// PID=8はCPU=1でwoke up
+[0]yield: pid 10 to runable
+[2]yield: pid 12 to running		<=
+PID [83 caug]ht yielsdig:  2pid 11 to runable
+[3]yield: pid 10 to running		<=
+
+
+[1]yield: pid 11 to running		// CPU=1: 11, 10, 12, 8, 11, 9
+[0]yield: pid 9 to running		// CPU=0: 9, 11, 9, 10, 8
+[2]yield: pid 8 to running		// CPU=2: 8, 9, 10, 12, 10
+[3]yield: pid 12 to running		// CPU=3: 12, 8, 11, 9, 12
+[1]yield: pid 10 to running
+[0]yield: pid 11 to running
+[3]yield: pid 8 to running
+[1]yield: pid 12 to running
+[2]yield: pid 10 to running
+[0]yield: pid 9 to running
+[3]yield: pid 11 to running
+[1]yield: pid 8 to running
+[2]yield: pid 12 to running
+[0]yield: pid 10 to running
+[3]yield: pid 9 to running
+[1]yield: pid 11 to running
+[0]yield: pid 8 to running
+[2]yield: pid 10 to running
+[3]yield: pid 12 to running
+[1]yield: pid 9 to running
+...
+```
+
+### 子プロセスがpause()から戻らない

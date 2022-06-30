@@ -1,5 +1,5 @@
-#ifndef USR_INC_USRBINS_H
-#define USR_INC_USRBINS_H
+#ifndef USR_INC_FILES_H
+#define USR_INC_FILES_H
 
 char *usrbins[] = {
     "usr/bin/tee",
@@ -114,9 +114,15 @@ char *usrbins[] = {
     NULL
 };
 
-int nbins(void) {
+char *etc_files[] = {
+    "usr/etc/passwd",
+    "usr/etc/group",
+    NULL
+};
+
+int nelms(char **ary) {
     int num = 0;
-    for (char **p = usrbins; *p; p++) {
+    for (char **p = ary; *p; p++) {
         num++;
     }
     return num;

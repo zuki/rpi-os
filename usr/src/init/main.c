@@ -7,8 +7,9 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 
-char *argv[] = { "sh", 0 };
-char *envp[] = { "TEST_ENV=FROM_INIT", "TZ=JST-9", 0 };
+char *argv[] = { "dash", 0 };
+//char *envp[] = { "TEST_ENV=FROM_INIT", "TZ=JST-9", 0 };
+char *envp[] = { "TZ=JST-9", 0 };
 
 int
 main()
@@ -31,8 +32,8 @@ main()
             exit(1);
         }
         if (pid == 0) {
-            execve("/bin/sh", argv, envp);
-            //execve("/usr/bin/dash", argv, envp);
+            //execve("/bin/sh", argv, envp);
+            execve("/usr/bin/dash", argv, envp);
             printf("init: exec sh failed\n");
             exit(1);
         }

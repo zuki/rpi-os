@@ -248,6 +248,7 @@ iupdate(struct inode *ip)
     dip->size  = ip->size;
     dip->uid   = ip->uid;
     dip->gid   = ip->gid;
+    dip->mode  = ip->mode;
     dip->atime = ip->atime;
     dip->mtime = ip->mtime;
     dip->ctime = ip->ctime;
@@ -836,8 +837,7 @@ create(char *path, short type, short major, short minor, mode_t mode)
     ip->major = major;
     ip->minor = minor;
     ip->nlink = 1;
-    //ip->mode  = mode & ~thisproc()->umask;
-    ip->mode  = mode;
+    ip->mode  = mode & ~thisproc()->umask;
     ip->type  = type;
     clock_gettime(CLOCK_REALTIME, &ts);
     ip->atime = ip->mtime = ip->ctime = ts;
@@ -859,7 +859,7 @@ create(char *path, short type, short major, short minor, mode_t mode)
         panic("create: dirlink");
 
     iunlockput(dp);
-
+    debug("mode: 0x%x, name: %s", ip->mode, name);
     return ip;
 }
 

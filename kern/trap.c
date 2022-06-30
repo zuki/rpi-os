@@ -40,11 +40,11 @@ trap(struct trapframe *tf)
     switch (ec) {
     case EC_UNKNOWN:
         if (il) {
-            panic("unknown error");
+            debug("IL bit on");
         } else {
             irq_handler();
-            check_pending_signal();
         }
+        check_pending_signal();
         break;
 
     case EC_SVC64:

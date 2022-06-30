@@ -151,7 +151,7 @@ loop:
     f->writable = writable;
     if (flags & O_CLOEXEC)
         bit_add(thisproc()->fdflag, fd);
-    trace("proc[%d], path: %s, fd: %d, flags: %d", thisproc()->pid, path, fd, ip->flags);
+    debug("proc[%d], path: %s, fd: %d, flags: %d, mode: 0x%x", thisproc()->pid, path, fd, f->flags, f->ip->mode);
     return fd;
 
 bad:

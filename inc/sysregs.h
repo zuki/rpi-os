@@ -46,6 +46,6 @@
 #define EC_DABORT2                  0x25
 
 #define ISS_MASK                    0xFFFFFF
-#define IR_MASK                     (1 << 25)
+#define IR_MASK                     (1UL << 25)
 
 #endif
