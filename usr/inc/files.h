@@ -120,6 +120,11 @@ char *etc_files[] = {
     NULL
 };
 
+char *text_files[] = {
+    "usr/test.txt",
+    NULL
+};
+
 int nelms(char **ary) {
     int num = 0;
     for (char **p = ary; *p; p++) {

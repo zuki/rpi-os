@@ -108,7 +108,7 @@ sys_pipe2()
     if (argptr(0, (char **)&pipefd, sizeof(int)*2) < 0 || argint(1, &flags) < 0)
         return -EINVAL;
 
-    trace("pipefd: 0x%p, flags=0x%x\n", pipefd, flags);
+    debug("pipefd: 0x%p, flags=0x%x\n", pipefd, flags);
 
     if (flags & ~PIPE2_FLAGS) {
         warn("invalid flags=%d", flags);
@@ -130,15 +130,17 @@ sys_pipe2()
         return -EMFILE;
     }
 
-    memmove((void *)pipefd, &fd0, sizeof(int));
-    memmove((void *)pipefd+sizeof(int), &fd1, sizeof(int));
+    //memmove((void *)pipefd, &fd0, sizeof(int));
+    //memmove((void *)pipefd+sizeof(int), &fd1, sizeof(int));
+    pipefd[0] = fd0;
+    pipefd[1] = fd1;
 
     if (flags & O_CLOEXEC) {
         bit_add(p->fdflag, fd0);
         bit_add(p->fdflag, fd1);
     }
 
-    trace("fd0=%d, fd1=%d, pipefd[%d, %d]", fd0, fd1, pipefd[0], pipefd[1]);
+    debug("fd0=%d, fd1=%d, pipefd[%d, %d]", fd0, fd1, pipefd[0], pipefd[1]);
     return 0;
 }
 
@@ -186,7 +188,6 @@ sys_ioctl()
     struct termios *term;
     struct winsize *win;
     struct file *f;
-    pid_t pgid;
     pid_t *pgid_p;
 
     if (argfd(0, &fd, &f) < 0 || argu64(1, &req) < 0)
@@ -449,9 +450,10 @@ sys_unlinkat()
         return -EINVAL;
 
     if (dirfd != AT_FDCWD) return -EINVAL;
-    if (flags) return -EINVAL;
 
-    return fileunlink(path);
+    if (flags & ~AT_REMOVEDIR) return -EINVAL;
+
+    return fileunlink(path, flags);
 }
 
 ssize_t
@@ -522,12 +524,14 @@ sys_mkdirat()
     if (argint(0, &dirfd) < 0 || argstr(1, &path) < 0
         || argint(2, (int *)&mode) < 0)
         return -EINVAL;
+
+    debug("dirfd %d, path '%s', mode 0x%x", dirfd, path, mode);
+
     if (dirfd != AT_FDCWD) {
         warn("dirfd unimplemented");
         return -EINVAL;
     }
 
-    trace("path '%s', mode 0x%x", path, mode);
 
     begin_op();
     if ((long)(ip = create(path, T_DIR, 0, 0, mode | S_IFDIR)) == 0) {

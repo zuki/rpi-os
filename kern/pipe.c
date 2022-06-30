@@ -11,34 +11,34 @@
 int
 pipealloc(struct file **f0, struct file **f1, int flags)
 {
-    struct pipe *p;
+    struct pipe *pi;
 
-    p = 0;
+    pi = 0;
     *f0 = *f1 = 0;
     if ((*f0 = filealloc()) == 0 || (*f1 = filealloc()) == 0)
         goto bad;
-    if ((p = (struct pipe *)kalloc()) == 0)
+    if ((pi = (struct pipe *)kalloc()) == 0)
         goto bad;
-    p->readopen = 1;
-    p->writeopen = 1;
-    p->nwrite = 0;
-    p->nread = 0;
-    initlock(&p->lock);
+    pi->readopen = 1;
+    pi->writeopen = 1;
+    pi->nwrite = 0;
+    pi->nread = 0;
+    initlock(&pi->lock);
     (*f0)->type = FD_PIPE;
     (*f0)->readable = 1;
     (*f0)->writable = 0;
-    (*f0)->pipe = p;
+    (*f0)->pipe = pi;
     (*f0)->flags = O_RDONLY | O_APPEND | (flags & PIPE2_FLAGS);
     (*f1)->type = FD_PIPE;
     (*f1)->readable = 0;
     (*f1)->writable = 1;
-    (*f1)->pipe = p;
+    (*f1)->pipe = pi;
     (*f1)->flags = O_WRONLY | O_APPEND | (flags & PIPE2_FLAGS);
     return 0;
 
   bad:
-    if (p)
-        kfree((char *)p);
+    if (pi)
+        kfree((char *)pi);
     if (*f0)
         fileclose(*f0);
     if (*f1)
@@ -47,64 +47,70 @@ pipealloc(struct file **f0, struct file **f1, int flags)
 }
 
 void
-pipeclose(struct pipe *p, int writable)
+pipeclose(struct pipe *pi, int writable)
 {
-    acquire(&p->lock);
+    acquire(&pi->lock);
     if (writable) {
-        p->writeopen = 0;
-        wakeup(&p->nread);
+        pi->writeopen = 0;
+        wakeup(&pi->nread);
     } else {
-        p->readopen = 0;
-        wakeup(&p->nwrite);
+        pi->readopen = 0;
+        wakeup(&pi->nwrite);
     }
-    if (p->readopen == 0 && p->writeopen == 0) {
-        release(&p->lock);
-        kfree((char *)p);
-    } else
-        release(&p->lock);
+    if (pi->readopen == 0 && pi->writeopen == 0) {
+        release(&pi->lock);
+        kfree((char *)pi);
+    } else {
+        release(&pi->lock);
+    }
 }
 
 ssize_t
-pipewrite(struct pipe *p, char *addr, ssize_t n)
+pipewrite(struct pipe *pi, char *addr, ssize_t n)
 {
     ssize_t i;
+    struct proc *p = thisproc();
 
-    acquire(&p->lock);
-    for (i = 0; i < n; i++) {
-        while (p->nwrite == p->nread + PIPESIZE) {
-            if (p->readopen == 0 || thisproc()->killed) {
-                release(&p->lock);
-                return -1;
-            }
-            wakeup(&p->nread);
-            sleep(&p->nwrite, &p->lock);
-        }
-        p->data[p->nwrite++ % PIPESIZE] = addr[i];
-    }
-    wakeup(&p->nread);
-    release(&p->lock);
-    return n;
-}
-
-ssize_t
-piperead(struct pipe *p, char *addr, ssize_t n)
-{
-    ssize_t i;
-
-    acquire(&p->lock);
-    while (p->nread == p->nwrite && p->writeopen) {
-        if (thisproc()->killed) {
-            release(&p->lock);
+    acquire(&pi->lock);
+    while (i < n) {
+        if (pi->readopen == 0 || p->killed) {
+            release(&pi->lock);
             return -1;
         }
-        sleep(&p->nread, &p->lock);
+        if (pi->nwrite == pi->nread + PIPESIZE) {
+            wakeup(&pi->nread);
+            sleep(&pi->nwrite, &pi->lock);
+        } else {
+            pi->data[pi->nwrite++ % PIPESIZE] = addr[i];
+            i++;
+        }
+    }
+    wakeup(&pi->nread);
+    release(&pi->lock);
+    return i;
+}
+
+ssize_t
+piperead(struct pipe *pi, char *addr, ssize_t n)
+{
+    ssize_t i;
+    struct proc *p = thisproc();
+
+    acquire(&pi->lock);
+    while (pi->nread == pi->nwrite && pi->writeopen) {
+        if (p->killed) {
+            release(&pi->lock);
+            return -1;
+        }
+        sleep(&pi->nread, &pi->lock);
     }
     for (i = 0; i < n; i++) {
-        if (p->nread == p->nwrite)
+        if (pi->nread == pi->nwrite)
             break;
-        addr[i] = p->data[p->nread++ % PIPESIZE];
+        addr[i] = pi->data[pi->nread++ % PIPESIZE];
     }
-    wakeup(&p->nwrite);
-    release(&p->lock);
+    wakeup(&pi->nwrite);
+    release(&pi->lock);
+
     return i;
 }

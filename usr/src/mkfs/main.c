@@ -189,6 +189,9 @@ main(int argc, char *argv[])
 
     copy_file(2, argc, argv, binino, 0, 0, S_IFREG|0755);
 
+    // /usr/test.txt
+    copy_file(0, nelms(text_files), text_files, rootino, 0, 0, S_IFREG|0755);
+
     // /usr/bin  (coreutils)
     copy_file(0, nelms(usrbins), usrbins, usrbinino, 0, 0, S_IFREG|0755);
 

@@ -452,7 +452,7 @@ filereadlink(char *path, char *buf, size_t bufsize)
 }
 
 long
-fileunlink(char *path)
+fileunlink(char *path, int flags)
 {
     struct inode *ip, *dp;
     char name[DIRSIZ];
@@ -468,28 +468,46 @@ fileunlink(char *path)
     ilock(dp);
 
     /* Cannot unlink "." or "..". */
+
     if (namecmp(name, ".") == 0 || namecmp(name, "..") == 0) {
         error = -EPERM;
-        goto bad;
+        goto baddp;
     }
 
     if ((ip = dirlookup(dp, name, &off)) == 0) {
         error = -ENOENT;
-        goto bad;
+        goto baddp;
     }
 
     ilock(ip);
 
-    if (ip->nlink < 1)
-        panic("unlink: nlink < 1");
-    if (ip->type == T_DIR && !isdirempty(ip)) {
-        iunlockput(ip);
-        error = -EPERM;
-        goto bad;
+    if (ip->nlink < 1) {
+        return -EPERM;
+        goto badip;
+        //panic("unlink: nlink < 1");
     }
 
-    if (unlink(dp, off) < 0)
-        panic("unlink: unlink");
+    if (flags & AT_REMOVEDIR) {
+        if (ip->type != T_DIR) {
+            error = -ENOTDIR;
+            goto badip;
+        }
+        if (!isdirempty(ip)) {
+            error = -EPERM;
+            goto badip;
+        }
+    } else {
+        if (ip->type == T_DIR) {
+            error = -EISDIR;
+            goto badip;
+        }
+    }
+
+    if (unlink(dp, off) < 0) {
+        error = -EIO;
+        goto badip;
+        //panic("unlink: unlink");
+    }
 
     if (ip->type == T_DIR) {
         dp->nlink--;
@@ -503,7 +521,9 @@ fileunlink(char *path)
     end_op();
     return 0;
 
-bad:
+badip:
+    iunlockput(ip);
+baddp:
     iunlockput(dp);
     end_op();
     return error;
@@ -792,7 +812,7 @@ filerename(char *path1, char *path2)
                 warn("ename2 failed");
                 goto bad;
             }
-            if ((error = fileunlink(path2)) < 0) {
+            if ((error = fileunlink(path2, 0)) < 0) {
                 warn("fileunlink failed");
                 goto bad;
             }

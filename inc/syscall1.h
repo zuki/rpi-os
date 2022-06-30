@@ -40,6 +40,7 @@ long sys_rt_sigaction();
 long sys_rt_sigpending();
 long sys_rt_sigreturn();
 long sys_kill();
+long sys_tkill();
 mode_t sys_umask();
 long sys_getpgid();
 long sys_setpgid();

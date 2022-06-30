@@ -95,7 +95,7 @@ ssize_t         fileread(struct file *f, char *addr, ssize_t n);
 ssize_t         filewrite(struct file *f, char *addr, ssize_t n);
 ssize_t         filelseek(struct file *f, off_t offset, int whence);
 long            filelink(char *old, char *new);
-long            fileunlink(char *path);
+long            fileunlink(char *path, int flags);
 long            filesymlink(char *old, char *new);
 ssize_t         filereadlink(char *path, char *buf, size_t bufsize);
 long            filerename(char *path1, char *path2);

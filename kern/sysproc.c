@@ -197,6 +197,12 @@ sys_kill()
 }
 
 long
+sys_tkill()
+{
+    return 0;
+}
+
+long
 sys_rt_sigsuspend()
 {
     sigset_t *mask;
@@ -732,7 +738,7 @@ sys_getpgid()
 long
 sys_setpgid()
 {
-    pid_t pid, pgid, opgid;
+    pid_t pid, pgid;
 
     if (argint(0, &pid) < 0 || argint(1, &pgid) < 0)
         return -EINVAL;
