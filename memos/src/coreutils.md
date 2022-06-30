@@ -317,3 +317,25 @@ ls: cannot access 'dir1': No such file or directory
 touch: setting times of 'test1': Invalid argument
 Hangup
 ```
+
+### sys_utimensat()がpathがNULLで呼び出されていた
+
+- utimesnsat()は時刻を変更するファイルをpathで指定するはずがNULLであった
+- pathをargstr()でparseしていたが、pathがNULLだとエラーになっていた。
+- argstr()をNULLの場合はNULLを返すように修正
+- utimesnsat()でpathがNULLの場合は処理をせず0を返すように修正
+
+```
+# touch file1
+[0]sys_utimensat: dirfd: 0, path: (null), times[0]: (0, 0), times[1]: (12885035329, 12884901888), flags: 0x0
+# ls -l
+total 5
+drwxrwxr-x 1 root root 896 Jun 30  2022 bin
+drwxrwxr-x 1 root root 384 Jun 30  2022 dev
+drwxrwxr-x 1 root root 256 Jun 30  2022 etc
+-rw-rw-rw- 1 root root   0 Jun 21 10:31 file1
+drwxrwxr-x 1 root root 192 Jun 30  2022 home
+drwxrwxrwx 1 root root 128 Jun 30  2022 lib
+-rwxr-xr-x 1 root root  94 Jun 30  2022 test.txt
+drwxrwxr-x 1 root root 256 Jun 30  2022 usr
+```

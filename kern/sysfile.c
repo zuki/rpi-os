@@ -709,8 +709,16 @@ sys_utimensat()
     struct timespec times[2];
 
     if (argint(0, &dirfd) < 0 || argstr(1, &path) < 0
-     || argptr(2, (char **)&times, 2 * sizeof(struct timespec)) < 0 || argint(3, &flags) < 0)
+     || argptr(2, (char **)&times, 2 * sizeof(struct timespec)) < 0
+     || argint(3, &flags) < 0)
         return -EINVAL;
+
+
+    debug("dirfd: %d, path: %s, times[0]: (%lld, %lld), times[1]: (%lld, %lld), flags: 0x%x", dirfd, path, times[0].tv_sec, times[0].tv_nsec, times[1].tv_sec, times[1].tv_nsec, flags);
+
+    // pathがNULLの場合は、ファイルを特定できないので処理せず0を返す
+    if (path == NULL) return 0;
+
     // TODO: dirfdの実装
     if (dirfd != AT_FDCWD) return -EINVAL;
     // TODO: AT_SYMLINK_NOFOLLOWを実装

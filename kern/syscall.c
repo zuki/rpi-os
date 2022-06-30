@@ -148,6 +148,10 @@ argstr(int n, char **pp)
     uint64_t addr = 0;
     if (argu64(n, &addr) < 0)
         return -1;
+    if (addr == 0) {
+        *pp = NULL;
+        return 0;
+    }
     int r = fetchstr(addr, pp);
     return r;
 }
