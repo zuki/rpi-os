@@ -408,13 +408,15 @@ sys_linkat()
     char *newpath, *oldpath;
     int oldfd, newfd, flags;
 
-    if (argfd(0, &oldfd, 0) < 0 || argstr(1, &oldpath) < 0
-     || argfd(2, &newfd, 0) < 0 || argstr(3, &newpath) < 0 || argint(4, &flags))
+    if (argint(0, &oldfd) < 0 || argstr(1, &oldpath) < 0
+     || argint(2, &newfd) < 0 || argstr(3, &newpath) < 0 || argint(4, &flags))
         return -EINVAL;
+
+    trace("oldfd: %d, oldpath: %s, newfd: %d, newpath: %s, flags: %d", oldfd, oldpath, newfd, newpath, flags);
 
     // TODO: AT_FDCWD以外の実装
     if (oldfd != AT_FDCWD || newfd != AT_FDCWD) return -EINVAL;
-    // TODO: AT_SYMLINK_FOLLOWは実装する
+    // TODO: AT_SYMLINK_FOLLOW は実装する
     if (flags) return -EINVAL;
 
     return filelink(oldpath, newpath);
@@ -429,6 +431,8 @@ sys_symlinkat()
 
     if (argstr(0, &target) < 0 || argint(1, &fd) < 0 || argstr(2, &linkpath) < 0)
         return -EINVAL;
+
+    trace("fd: %d, target: %s, path: %s", fd, target, linkpath);
 
     // TODO: AT_FDCWD以外の実装
     if (fd != AT_FDCWD) return -EINVAL;
@@ -498,7 +502,7 @@ sys_openat()
         || argint(2, &flags) < 0 || argint(3, (int *)&mode) < 0)
         return -EINVAL;
 
-    debug("dirfd %d, path '%s', flag 0x%x, mode0x%x", dirfd, path, flags, mode);
+    trace("dirfd %d, path '%s', flag 0x%x, mode0x%x", dirfd, path, flags, mode);
 
     if (dirfd != AT_FDCWD) {
         warn("dirfd unimplemented");

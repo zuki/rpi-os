@@ -339,3 +339,132 @@ drwxrwxrwx 1 root root 128 Jun 30  2022 lib
 -rwxr-xr-x 1 root root  94 Jun 30  2022 test.txt
 drwxrwxr-x 1 root root 256 Jun 30  2022 usr
 ```
+
+## ln
+
+- シンボリックリンクはOK
+- ハードリンクでエラー（エラーメッセージによるとtargetとlinkが逆）
+
+```
+# ln -s test.txt test_s.txt
+# ls -l
+total 5
+drwxrwxr-x 1 root root 896 Jun 30  2022 bin
+drwxrwxr-x 1 root root 384 Jun 30  2022 dev
+drwxrwxr-x 1 root root 256 Jun 30  2022 etc
+-rw-rw-rw- 1 root root   0 Jun 21 10:31 file1
+drwxrwxr-x 1 root root 192 Jun 30  2022 home
+drwxrwxrwx 1 root root 128 Jun 30  2022 lib
+-rwxr-xr-x 1 root root  94 Jun 30  2022 test.txt
+lrwxrwxrwx 1 root root   8 Jun 21 10:31 test_s.txt -> test.txt
+drwxrwxr-x 1 root root 256 Jun 30  2022 usr
+# ln test.txt test_h.txt
+[3]fileopen: cant namei test_h.txt
+ln: failed to create hard link 'test_h.txt' => 'test.txt': Invalid argument
+[2]exit: exit: pid 11, name ln, err 1
+Hangup
+# ln --help
+Usage: ln [OPTION]... [-T] TARGET LINK_NAME
+  or:  ln [OPTION]... TARGET
+  or:  ln [OPTION]... TARGET... DIRECTORY
+  or:  ln [OPTION]... -t DIRECTORY TARGET...
+In the 1st form, create a link to TARGET with the name LINK_NAME.
+```
+
+### ハードリンクとシンボリックリンクではシステムコールが異なり、ハードリンク用のシステムコールにバグ
+
+- oldfd, newfdをstrfd()でパースしていたが、これだとAT_FDCWD(-100)が指定されているとEINVAL
+- argint()でパースするように変更
+
+```
+# ls -l test*
+-rwxr-xr-x 1 root root 94 Jun 30  2022 test.txt
+# ln test.txt test_h.txt
+[1]fileopen: cant namei test_h.txt                // エラー出力があるが
+# ln -s test.txt test_s.txt
+# ls -l test*
+-rwxr-xr-x 2 root root 94 Jun 30  2022 test.txt
+-rwxr-xr-x 2 root root 94 Jun 30  2022 test_h.txt   // リンクは正常にできている
+lrwxrwxrwx 1 root root  8 Jun 21 10:31 test_s.txt -> test.txt
+# rm test_h.txt test_s.txt
+# ls -l test*
+-rwxr-xr-x 1 root root 94 Jun 30  2022 test.txt
+```
+
+### fileopenエラーが出ている件
+
+- libcがまずターゲットが存在しないかチェックしているためで、存在しないためエラーになるのは正常
+- エラーメッセージはwarn()で出しているが現在のログレベルはLOG_INFOなので出力される。LOG_ERRORにすれば出力されないのでこのままとする。
+
+```
+# ls -l test*
+[3]sys_openat: dirfd -100, path '.', flag 0xa4000, mode0x0
+[1]sys_openat: dirfd -100, path '/etc/passwd', flag 0xa0000, mode0x1b6
+[0]sys_openat: dirfd -100, path '/etc/group', flag 0xa0000, mode0x1b6
+-rwxr-xr-x 1 root root 94 Jun 30  2022 test.txt
+# ln test.txt test_h.txt
+[0]sys_openat: dirfd -100, path 'test_h.txt', flag 0x224000, mode0x0    // linkpathの存在をチェック
+[0]fileopen: cant namei test_h.txt                                      // 存在しないのでエラーは正常
+[2]sys_linkat: oldfd: -100, oldpath: test.txt, newfd: -100, newpath: test_h.txt, flags: 1024
+[1]sys_linkat: oldfd: -100, oldpath: test.txt, newfd: -100, newpath: test_h.txt, flags: 0
+# ls -l test*
+[2]sys_openat: dirfd -100, path '.', flag 0xa4000, mode0x0
+[1]sys_openat: dirfd -100, path '/etc/passwd', flag 0xa0000, mode0x1b6
+[0]sys_openat: dirfd -100, path '/etc/group', flag 0xa0000, mode0x1b6
+-rwxr-xr-x 2 root root 94 Jun 30  2022 test.txt
+-rwxr-xr-x 2 root root 94 Jun 30  2022 test_h.txt
+# ln -s test.txt test_s.txt
+[3]sys_symlinkat: fd: -100, target: test.txt, path: test_s.txt
+# ls -l test*
+[3]sys_openat: dirfd -100, path '.', flag 0xa4000, mode0x0
+[3]sys_openat: dirfd -100, path '/etc/passwd', flag 0xa0000, mode0x1b6
+[3]sys_openat: dirfd -100, path '/etc/group', flag 0xa0000, mode0x1b6
+-rwxr-xr-x 2 root root 94 Jun 30  2022 test.txt
+-rwxr-xr-x 2 root root 94 Jun 30  2022 test_h.txt
+lrwxrwxrwx 1 root root  8 Jun 21 10:32 test_s.txt -> test.txt
+# cat test_s.txt
+[0]sys_openat: dirfd -100, path 'test_s.txt', flag 0x20000, mode0x0
+123
+111
+111
+123
+999
+あいうえお
+あいうえお
+999
+かきくけこ
+12345
+あいうえお
+# cat test_h.txt
+[0]sys_openat: dirfd -100, path 'test_h.txt', flag 0x20000, mode0x0
+123
+111
+111
+123
+999
+あいうえお
+あいうえお
+999
+かきくけこ
+12345
+あいうえお
+# cat test.txt
+[2]sys_openat: dirfd -100, path 'test.txt', flag 0x20000, mode0x0
+123
+111
+111
+123
+999
+あいうえお
+あいうえお
+999
+かきくけこ
+12345
+あいうえお
+# rm test_s.txt test_h.txt      // 複数ファイルを指定したrmも成功している
+# ls -l test*
+[3]sys_openat: dirfd -100, path '.', flag 0xa4000, mode0x0
+[2]sys_openat: dirfd -100, path '/etc/passwd', flag 0xa0000, mode0x1b6
+[0]sys_openat: dirfd -100, path '/etc/group', flag 0xa0000, mode0x1b6
+-rwxr-xr-x 1 root root 94 Jun 30  2022 test.txt
+```
