@@ -193,7 +193,7 @@ iinit(int dev)
  inodestart %d bmapstart %d", sb.size, sb.nblocks, sb.ninodes, sb.nlog, sb.logstart, sb.inodestart, sb.bmapstart);
 }
 
-static struct inode *iget(uint32_t dev, uint32_t inum);
+static struct inode *iget(uint32_t dev, uint32_t inum, uint16_t type);
 
 /* Allocate an inode on device dev.
  *
@@ -215,7 +215,7 @@ ialloc(uint32_t dev, short type)
             dip->type = type;
             log_write(bp);      // mark it allocated on the disk
             brelse(bp);
-            struct inode *ip = iget(dev, inum);
+            struct inode *ip = iget(dev, inum, type);
             struct timespec tp;
             clock_gettime(CLOCK_REALTIME, &tp);
             ip->atime = ip->ctime = ip->mtime = tp;
@@ -263,7 +263,7 @@ iupdate(struct inode *ip)
  * the inode and does not read it from disk.
  */
 static struct inode *
-iget(uint32_t dev, uint32_t inum)
+iget(uint32_t dev, uint32_t inum, uint16_t type)
 {
     struct inode *ip, *empty;
 
@@ -288,6 +288,7 @@ iget(uint32_t dev, uint32_t inum)
     ip = empty;
     ip->dev = dev;
     ip->inum = inum;
+    ip->type = type;
     ip->ref = 1;
     ip->valid = 0;
     release(&icache.lock);
@@ -635,12 +636,15 @@ namecmp(const char *s, const char *t)
 /*
  * Look for a directory entry in a directory.
  * If found, set *poff to byte offset of entry.
+ * If not found, set *poff to byte offset of 1st free entry.
  */
 struct inode *
 dirlookup(struct inode *dp, char *name, size_t *poff)
 {
-    size_t off, inum;
+    size_t off;
+    ssize_t free = -1;
     struct dirent de;
+    struct inode *ret;
 
     if (dp->type != T_DIR)
         panic("dirlookup not DIR");
@@ -648,22 +652,25 @@ dirlookup(struct inode *dp, char *name, size_t *poff)
     for (off = 0; off < dp->size; off += sizeof(de)) {
         if (readi(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
             panic("dirlookup read");
-        if (de.inum == 0)
+        if (de.inum == 0) {
+            if (free == -1) free = off;
             continue;
+        }
         if (namecmp(name, de.name) == 0) {
             // entry matches path element
             if (poff)
                 *poff = off;
-            inum = de.inum;
-            return iget(dp->dev, inum);
+            return iget(dp->dev, de.inum, de.type);
         }
     }
+    if (poff)
+        *poff = (size_t)free;
     return 0;
 }
 
-/* Write a new directory entry (name, inum) into the directory dp. */
+// 新しいdirent (inum, type, name)をdirectory dpに書き込む
 int
-dirlink(struct inode *dp, char *name, uint32_t inum)
+dirlink(struct inode *dp, char *name, uint32_t inum, uint16_t type)
 {
     ssize_t off;
     struct dirent de;
@@ -685,6 +692,7 @@ dirlink(struct inode *dp, char *name, uint32_t inum)
 
     strncpy(de.name, name, DIRSIZ);
     de.inum = inum;
+    de.type = type;
     if (writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
         panic("dirlink");
 
@@ -693,7 +701,7 @@ dirlink(struct inode *dp, char *name, uint32_t inum)
 
 /* 指定のディレクトリから指定のinumを持つディレクトリエントリを検索する */
 int
-direntlookup(struct inode *dp, int inum, struct dirent *dep)
+direntlookup(struct inode *dp, int inum, struct dirent *dep, size_t *ofp)
 {
     struct dirent de;
 
@@ -703,6 +711,7 @@ direntlookup(struct inode *dp, int inum, struct dirent *dep)
         if (readi(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
             panic("readi");
         if (de.inum == inum) {
+            if (ofp) *ofp = off;
             memmove(dep, &de, sizeof(de));
             return 0;
         }
@@ -763,7 +772,7 @@ namex(const char *path, int nameiparent, char *name)
     struct inode *ip, *next;
 
     if (*path == '/')
-        ip = iget(ROOTDEV, ROOTINO);
+        ip = iget(ROOTDEV, ROOTINO, T_DIR);
     else
         ip = idup(thisproc()->cwd);
 
@@ -789,6 +798,7 @@ namex(const char *path, int nameiparent, char *name)
         iput(ip);
         return 0;
     }
+    debug("inum: %d, type: %d", ip->inum, ip->type);
     return ip;
 }
 
@@ -850,12 +860,12 @@ create(char *path, short type, short major, short minor, mode_t mode)
         dp->nlink++;            // for ".."
         iupdate(dp);
         // No ip->nlink++ for ".": avoid cyclic ref count.
-        if (dirlink(ip, ".", ip->inum) < 0
-            || dirlink(ip, "..", dp->inum) < 0)
+        if (dirlink(ip, ".", ip->inum, ip->type) < 0
+            || dirlink(ip, "..", dp->inum, dp->type) < 0)
             panic("create dots");
     }
 
-    if (dirlink(dp, name, ip->inum) < 0)
+    if (dirlink(dp, name, ip->inum, ip->type) < 0)
         panic("create: dirlink");
 
     iunlockput(dp);
@@ -867,7 +877,7 @@ int
 unlink(struct inode *dp, uint32_t off)
 {
     struct dirent de;
-
+    // FIXME: 取り詰めとsizeの変更
     memset(&de, 0, sizeof(de));
     if (writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
         return -1;

@@ -106,6 +106,7 @@ long sys_fchownat();
 long sys_fchown();
 long sys_umount2();
 long sys_mount();
+long sys_renameat();
 long sys_renameat2();
 void *sys_getcwd();
 long sys_fadvise64();

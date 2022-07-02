@@ -54,14 +54,15 @@ struct dinode {
 #define BBLOCK(b, sb) (b/BPB + sb.bmapstart)
 
 /* Directory is a file containing a sequence of dirent structures. */
-#define DIRSIZ 60
+#define DIRSIZ 58
 
 struct dirent {
   uint32_t inum;
+  uint16_t type;
   char name[DIRSIZ];
 };
 
-#define T_DIR        1   // Directory
+#define T_DIR       1   // Directory
 #define T_FILE      2   // File
 #define T_DEV       3   // Device
 #define T_MOUNT     4   // Mount Point

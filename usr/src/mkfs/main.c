@@ -52,7 +52,7 @@ void iappend(uint inum, void *p, int n);
 uint make_dir(uint parent, char *name, uid_t uid, gid_t gid, mode_t mode);
 uint make_dev(uint parent, char *name, int major, int minor, uid_t uid, gid_t gid, mode_t mode);
 uint make_file(uint parent, char *name, uid_t uid, gid_t gid, mode_t mode);
-void make_dirent(uint inum, uint parent, char *name);
+void make_dirent(uint inum, ushort type, uint parent, char *name);
 void copy_file(int start, int argc, char *files[], uint parent, uid_t uid, gid_t gid, mode_t mode);
 
 // convert to little-endian byte order
@@ -149,8 +149,8 @@ main(int argc, char *argv[])
 
     rootino = ialloc(T_DIR, 0, 0, S_IFDIR|0775);
     assert(rootino == ROOTINO);
-    make_dirent(rootino, rootino, ".");
-    make_dirent(rootino, rootino, "..");
+    make_dirent(rootino, T_DIR, rootino, ".");
+    make_dirent(rootino, T_DIR, rootino, "..");
 
     // Create /bin
     binino = make_dir(rootino, "bin", 0, 0, S_IFDIR|0775);
@@ -211,12 +211,13 @@ main(int argc, char *argv[])
 }
 
 void
-make_dirent(uint inum, uint parent, char *name)
+make_dirent(uint inum, ushort type, uint parent, char *name)
 {
     struct dirent de;
 
     bzero(&de, sizeof(de));
     de.inum = xint(inum);
+    de.type = xshort(type);
     strncpy(de.name, name, DIRSIZ);
     //printf("DIRENT: inum=%d, name='%s' to PARNET[%d]\n", de.inum, de.name, parent);
     iappend(parent, &de, sizeof(de));
@@ -227,13 +228,13 @@ make_dir(uint parent, char *name, uid_t uid, gid_t gid, mode_t mode)
 {
     // Create parent/name
     uint inum = ialloc(T_DIR, uid, gid, mode);
-    make_dirent(inum, parent, name);
+    make_dirent(inum, T_DIR, parent, name);
 
     // Create parent/name/.
-    make_dirent(inum, inum, ".");
+    make_dirent(inum, T_DIR, inum, ".");
 
     // Create parent/name/..
-    make_dirent(parent, inum, "..");
+    make_dirent(parent, T_DIR, inum, "..");
 
     return inum;
 }
@@ -244,7 +245,7 @@ make_dev(uint parent, char *name, int major, int minor, uid_t uid, gid_t gid, mo
     struct dinode din;
 
     uint inum = ialloc(T_DEV, uid, gid, mode);
-    make_dirent(inum, parent, name);
+    make_dirent(inum, T_DEV, parent, name);
     rinode(inum, &din);
     din.major = xshort(major);
     din.minor = xshort(minor);
@@ -256,7 +257,7 @@ uint
 make_file(uint parent, char *name, uid_t uid, gid_t gid, mode_t mode)
 {
     uint inum = ialloc(T_FILE, uid, gid, mode);
-    make_dirent(inum, parent, name);
+    make_dirent(inum, T_FILE, parent, name);
     return inum;
 }
 

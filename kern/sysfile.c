@@ -799,12 +799,13 @@ sys_getcwd()
     if (argu64(1, &size) < 0 || argptr(0, &buf, size) < 0)
         return (void *)-EINVAL;
 
+    begin_op();
     cwd = idup(p->cwd);
     if (cwd->inum == ROOTINO) goto root;
     while (1) {
         dp = dirlookup(cwd, "..", 0);
         ilock(dp);
-        if (direntlookup(dp, cwd->inum, &de) < 0)
+        if (direntlookup(dp, cwd->inum, &de, 0) < 0)
             goto bad;
         n = strlen(de.name);
         if ((n + pos + 2) > size)
@@ -822,6 +823,7 @@ sys_getcwd()
         iput(dp);
     }
     iput(dp);
+    end_op();
 root:
     buf[pos++] = '/'; buf[pos] = 0;             // NULL終端
 
@@ -837,6 +839,7 @@ root:
 bad:
     iput(cwd);
     iunlockput(dp);
+    end_op();
     return NULL;
 }
 
@@ -889,6 +892,25 @@ sys_renameat2()
     // TODO: olddirfd, newdirfd, flagsは未実装
     if (olddirfd != AT_FDCWD || newdirfd != AT_FDCWD) return -EINVAL;
     // TODO: flagsの実装
+
+    if (strcmp(oldpath, newpath) == 0) return 0;
+
+    return filerename(oldpath, newpath);
+
+}
+
+long
+sys_renameat()
+{
+    int olddirfd, newdirfd;
+    char *oldpath, *newpath;
+
+    if (argint(0, &olddirfd) < 0 || argstr(1, &oldpath) < 0
+     || argint(2, &newdirfd) < 0 || argstr(3, &newpath) < 0)
+        return -EINVAL;
+
+    // TODO: olddirfd, newdirfdは未実装
+    if (olddirfd != AT_FDCWD || newdirfd != AT_FDCWD) return -EINVAL;
 
     if (strcmp(oldpath, newpath) == 0) return 0;
 

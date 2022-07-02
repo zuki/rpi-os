@@ -91,10 +91,11 @@ struct dinode {
 #define BBLOCK(b, sb) (b/BPB + sb.bmapstart)
 
 /* Directory is a file containing a sequence of dirent structures. */
-#define DIRSIZ 60
+#define DIRSIZ 58
 
 struct dirent {
   uint32_t inum;
+  uint16_t type;
   char name[DIRSIZ];
 };
 

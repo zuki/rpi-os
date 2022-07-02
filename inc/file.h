@@ -64,9 +64,9 @@ struct devsw {
 extern struct devsw devsw[];
 
 void            readsb(int, struct superblock *);
-int             dirlink(struct inode *, char *, uint32_t);
+int             dirlink(struct inode *, char *, uint32_t, uint16_t);
 struct inode *  dirlookup(struct inode *, char *, size_t *);
-int             direntlookup(struct inode *dp, int inum, struct dirent *dep);
+int             direntlookup(struct inode *dp, int inum, struct dirent *dep, size_t *ofp);
 struct inode *  ialloc(uint32_t, short);
 struct inode *  idup(struct inode *);
 void            iinit(int dev);

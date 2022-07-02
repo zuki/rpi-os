@@ -219,6 +219,41 @@ Tested on Raspberry Pi 3A+, 3B+, 4B.
 123
 ```
 
+## uname
+
+```
+# uname
+xv6
+# uname -a
+xv6 mini 1.0.1 2022-06-26 (musl) AArch64 Elf
+```
+
+## pwd
+
+```
+# pwd
+/
+# cd usr/bin
+# pwd
+/usr/bin
+```
+
+## wc
+
+```
+# wc test.txt
+11 11 94 test.txt
+# wc -l test.txt
+11 test.txt
+```
+
+## whoami
+
+```
+# whoami
+root
+```
+
 ## mkdir
 
 ```
@@ -467,4 +502,183 @@ lrwxrwxrwx 1 root root  8 Jun 21 10:32 test_s.txt -> test.txt
 [2]sys_openat: dirfd -100, path '/etc/passwd', flag 0xa0000, mode0x1b6
 [0]sys_openat: dirfd -100, path '/etc/group', flag 0xa0000, mode0x1b6
 -rwxr-xr-x 1 root root 94 Jun 30  2022 test.txt
+```
+
+## mv
+
+```
+# mv mvtest mvtest2
+CurrentEL: 0x1
+DAIF: Debug(1) SError(1) IRQ(1) FIQ(1)
+SPSel: 0x1
+SPSR_EL1: 0x20000000
+SP: 0xffff00003bee3e50
+SP_EL0: 0xfffffffffc70
+ELR_EL1: 0x42ca94, EC: 0x0, ISS: 0x0.
+FAR_EL1: 0x0
+Unexpected syscall #38 (unknown)              // 38: SYS_renameat
+kern/console.c:283: kernel panic at cpu 0.
+```
+
+### SYS_renameat2()は実装していたが、SYS_renameat()は実装していなかった
+
+- SYS_renameat()を実装
+
+```
+# mv mvtest mvtest2                             // file -> fileはOK
+# cat mvtest2
+123
+abc
+# ls -l mvtest*
+-rw-rw-rw- 1 root root 8 Jun 21 10:31 mvtest2
+# mkdir dir1
+# mv mvtest2 dir1                               // file -> dirはNG
+# cat dir1/mvtest2
+[0]fileopen: cant namei dir1/mvtest2
+cat: dir1/mvtest2: No such file or directory
+[1]exit: exit: pid 16, name cat, err 1
+Hangup
+# ls dir1
+# ls -l
+total 5
+drwxrwxr-x 1 root root 896 Jun 30  2022 bin
+drwxrwxr-x 1 root root 384 Jun 30  2022 dev
+drwxrwxrwx 1 root root 128 Jun 21 10:32 dir1
+drwxrwxr-x 1 root root 256 Jun 30  2022 etc
+drwxrwxr-x 1 root root 192 Jun 30  2022 home
+drwxrwxrwx 1 root root 128 Jun 30  2022 lib
+-rw-rw-rw- 1 root root   8 Jun 21 10:31 mvtest2   // コピーされていない
+-rwxr-xr-x 1 root root  94 Jun 30  2022 test.txt
+drwxrwxr-x 1 root root 256 Jun 30  2022 usr
+# mv mvtest2 dir1/                                // '/'をつけても結果は同じ
+# cat dir1/mvtest2
+[1]fileopen: cant namei dir1/mvtest2
+cat: dir1/mvtest2: No such file or directory
+[2]exit: exit: pid 20, name cat, err 1
+Hangup
+# ls -l
+drwxrwxrwx 1 root root 128 Jun 21 10:32 dir1
+rw-rw-rw- 1 root root   8 Jun 21 10:31 mvtest2
+# ls -al dir1
+total 2
+drwxrwxrwx 1 root root  128 Jun 21 10:32 .
+drwxrwxr-x 2 root root 1024 Jun 30  2022 ..
+```
+
+- filerename()のdebug
+- 処理がおかしい
+
+```
+(gdb) p path1
+$1 = 0xfffffffffff6 "mvtest"
+(gdb) p path2
+$2 = 0x600000001230 "dir1/mvtest"
+(gdb) p dp1->inum                         // dp1: '/'
+$6 = 1
+(gdb) p ip1->inum                         // ip1: 'mvtest'
+$3 = 142
+(gdb) p ip2
+$7 = <optimized out>
+(gdb) p name2
+$8 = "mvtest\000 .... "
+(gdb) p ip1->type                         // ip1はtype=2のはずだが
+$9 = 1
+(gdb) n
+805	            if ((error = rename(dp1, name1, name2)) < 0) {
+(gdb) n
+843	    end_op();
+(gdb) n
+844	    return error;
+```
+
+```
+# mv mvtest dir1/
+[0]namex: inum: 111, type: 1
+[3]namex: inum: 111, type: 1
+[0]namex: inum: 141, type: 2      // dir1のtypeが2->1へ
+[0]namex: inum: 141, type: 1
+[1]namex: inum: 140, type: 1      // mvtestのtype=1
+```
+
+- direntにtypeがないため、dirlookup()でiget()した時にtypeがわからない
+- direntにtypeを追加
+
+```
+# mv mvtest dir1
+[3]filerename: path1: mvtest, dp1: 1, ip1: 140, name1: mvtest
+[3]filerename: path2: dir1/mvtest, dp2: 141, ip2: -1, name2: mvtest
+[3]rename: writei
+[3]filerename: rename3 failed
+# mv mvtest mvtest2
+[3]filerename: path1: mvtest, dp1: 1, ip1: 140, name1: mvtest
+[3]filerename: path2: mvtest2, dp2: 1, ip2: -1, name2: mvtest2  // ストール
+# mv dir1 dir2
+[1]filerename: path1: dir1, dp1: 1, ip1: 141, name1: dir1
+[1]filerename: path2: dir2, dp2: 1, ip2: -1, name2: dir2    // ストール
+```
+
+- rename()でdp1==dp2の場合、ilock(dp2)をしない
+
+```
+# mv mvtest mvtest2
+[2]filerename: path1: mvtest, dp1: 1, ip1: 140, name1: mvtest
+[2]filerename: path2: mvtest2, dp2: 1, ip2: -1, name2: mvtest2
+# ls
+bin  dev  etc  home  lib  mvtest  mvtest2  test.txt  usr    // cpになってしまった
+# ls -l
+-rw-rw-rw- 1 root root   8 Jun 21 10:31 mvtest
+-rw-rw-rw- 1 root root   8 Jun 21 10:31 mvtest2
+# cat mvtest
+abc
+123
+# cat mvtest2
+abc
+123
+# mkdir dir1
+# mv dir1 dir2
+[1]filerename: path1: dir1, dp1: 1, ip1: 141, name1: dir1
+[1]filerename: path2: dir2, dp2: 1, ip2: -1, name2: dir2        // dir2を作成して
+[1]filerename: path1: dir1, dp1: 1, ip1: 141, name1: dir1
+[1]filerename: path2: dir2/dir1, dp2: 141, ip2: -1, name2: dir1 // その下に置こうとしている。ストール
+```
+
+### filerename()のロジックを修正
+
+```
+# ls
+bin  dev  etc  home  lib  test.txt  usr
+# cat > mvtest
+c
+123
+abc
+# ls -il mvtest
+140 -rw-rw-rw- 1 root root 12 Jun 21 10:31 mvtest
+# mv mvtest mvtest2
+[0]filerename: path1: mvtest, dp1: 1, ip1: 140, name1: mvtest
+[0]filerename: path2: mvtest2, dp2: 1, ip2: -1, name2: mvtest2
+# ls -il
+140 -rw-rw-rw- 1 root root  12 Jun 21 10:31 mvtest2
+# mkdir dir1
+# ls -il
+141 drwxrwxrwx 1 root root 128 Jun 21 10:32 dir1
+140 -rw-rw-rw- 1 root root  12 Jun 21 10:31 mvtest2
+# mv dir1 dir2
+# ls -il
+total 5
+141 drwxrwxrwx 1 root root 128 Jun 21 10:32 dir2
+140 -rw-rw-rw- 1 root root  12 Jun 21 10:31 mvtest2
+# mv mvtest2 dir2
+# ls -il
+total 5
+  2 drwxrwxr-x 1 root root 896 Jul  1  2022 bin
+  3 drwxrwxr-x 1 root root 384 Jul  1  2022 dev
+141 drwxrwxrwx 1 root root 192 Jun 21 10:32 dir2
+  8 drwxrwxr-x 1 root root 256 Jul  1  2022 etc
+ 10 drwxrwxr-x 1 root root 192 Jul  1  2022 home
+  9 drwxrwxrwx 1 root root 128 Jul  1  2022 lib
+ 28 -rwxr-xr-x 1 root root  94 Jul  1  2022 test.txt
+ 12 drwxrwxr-x 1 root root 256 Jul  1  2022 usr
+# ls -il dir2
+total 1
+140 -rw-rw-rw- 0 root root 12 Jun 21 10:31 mvtest2
 ```
