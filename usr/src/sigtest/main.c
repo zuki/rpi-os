@@ -9,13 +9,14 @@ int cpid[5];
 int j;
 
 void sig_catcher(int sig) {
-    printf("PID %d caught sig %d\n", getpid(), sig);
+    printf("PID %d caught sig %d, j %d\n", getpid(), sig, j);
     if (j > -1)
         kill(cpid[j], SIGINT);
 }
 
 int main(void) {
     int i, zombie, status, pid;
+    //sigset_t mask;
 
     struct sigaction action = { sig_catcher, 0, 0, 0 };
     sigaction(SIGINT, &action, 0);
@@ -25,6 +26,12 @@ int main(void) {
             printf("PID %d ready\n", getpid());
             j = i - 1;
             pause(); // wait for signal
+        /*
+            sigprocmask(0, 0, &mask);
+            sigdelset(&mask, SIGINT);
+            int ret = sigsuspend(&mask);
+            printf("ret=%d\n", ret);
+        */
             exit(0); // end process (become a zombie)
         } else {
             cpid[i] = pid;

@@ -191,7 +191,7 @@ sys_kill()
     if (sig < 1 || sig >= NSIG)
         return -EINVAL;
 
-    debug("pid=%d, sig=%d", pid, sig);
+    trace("pid=%d, sig=%d", pid, sig);
 
     return kill(pid, sig);
 }
@@ -210,9 +210,7 @@ sys_rt_sigsuspend()
     if (argptr(0, (char **)&mask, sizeof(sigset_t)) < 0)
         return -EINVAL;
 
-    trace("mask=%lld", *mask);
-    if (!in_user(mask, sizeof(sigset_t)))
-        return -EFAULT;
+    trace("p.mask: 0x%llx, mask: 0x%llx", thisproc()->signal.mask, *mask);
 
     return sigsuspend(mask);
 }
@@ -240,12 +238,10 @@ sys_rt_sigpending()
 {
     sigset_t *pending;
 
-    if (argu64(0, (uint64_t *)&pending) < 0)
+    if (argptr(0, (char **)&pending, sizeof(sigset_t)) < 0)
         return -EINVAL;
 
-    trace("pendig=0x%llx", pending);
-    if (!in_user(pending, sizeof(sigset_t)))
-        return -EFAULT;
+    trace("pendig: 0x%p", pending);
 
     return sigpending(pending);
 }
@@ -257,11 +253,11 @@ sys_rt_sigprocmask()
     sigset_t *set, *oldset;
     size_t size;
 
-    if (argint(0, &how) < 0 || argu64(1, (uint64_t *)&set) < 0
-     || argu64(2, (uint64_t *)&oldset) < 0 || argu64(3, (uint64_t *)&size) < 0)
+    if (argint(0, &how) < 0 || argptr(1, (char **)&set, sizeof(sigset_t)) < 0
+     || argptr(2, (char **)&oldset, sizeof(sigset_t)) < 0 || argu64(3, (uint64_t *)&size) < 0)
         return -EINVAL;
 
-    trace("how=%d, *act=0x%llx, oldact=0x%llx, size=%lld", how, *set, oldset, size);
+    trace("how=%d, *set=0x%llx, oldset=0x%p, size=%lld", how, set ? *set : 0, oldset, size);
 
     return sigprocmask(how, set, oldset, size);
 }
@@ -283,7 +279,7 @@ long sys_ppoll() {
     if (argu64(1, &nfds) < 0
      || argptr(0, (char **)&fds, nfds * sizeof(struct pollfd)) < 0)
         return -EINVAL;
-
+    trace("fds: 0x%p, nfds: %lld", fds, nfds);
     return ppoll(fds, nfds);
 }
 
