@@ -254,6 +254,18 @@ xv6 mini 1.0.1 2022-06-26 (musl) AArch64 Elf
 root
 ```
 
+## date
+
+```
+# date
+Tue Jun 21 10:31:28 JST 2022
+# date 070214002022.23
+Sat Jul  2 14:00:23 JST 2022
+# date
+Sat Jul  2 14:00:52 JST 2022
+```
+
+
 ## mkdir
 
 ```

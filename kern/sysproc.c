@@ -223,18 +223,14 @@ sys_rt_sigaction()
     int sig;
     struct k_sigaction *act, *oldact;
 
-    if (argint(0, &sig) < 0 || argu64(1, (uint64_t *)&act) < 0
-     || argu64(2, (uint64_t *)&oldact) < 0)
+    if (argint(0, &sig) < 0 || argptr(1, (char **)&act, sizeof(struct k_sigaction)) < 0
+     || argptr(2, (char **)&oldact, sizeof(struct k_sigaction)) < 0)
         return -EINVAL;
 
     trace("sig=%d, act=0x%llx, oldact=0x%llx", sig, act, oldact);
 
     if (sig < 1 || sig >= NSIG || sig == SIGSTOP || sig == SIGKILL)
         return -EINVAL;
-
-    if ((act && !in_user(act, sizeof(struct k_sigaction)))
-     || (oldact && !in_user(oldact, sizeof(struct k_sigaction))))
-        return -EFAULT;
 
     return sigaction(sig, act, oldact);
 }

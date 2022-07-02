@@ -162,11 +162,9 @@ sys_nanosleep()
     struct timespec *req, *rem, t;
     uint64_t expire;
 
-    if (argu64(0, (uint64_t *)&req) < 0 || argu64(1, (uint64_t *)&rem) < 0)
+    if (argptr(0, (char **)&req, sizeof(struct timespec)) < 0
+     || argptr(1, (char **)&rem, sizeof(struct timespec)) < 0)
         return -EINVAL;
-
-    if (!in_user(req, sizeof(struct timespec)) || !in_user(rem, sizeof(struct timespec)))
-        return -EFAULT;
 
     memmove(&t, req, sizeof(struct timespec));
 
@@ -174,8 +172,14 @@ sys_nanosleep()
         return -EINVAL;
 
     expire = t.tv_sec * 1000000 + (t.tv_nsec + 999) / 1000;
-    trace("sec: %d, nsec: %d, expire: %d", t.tv_sec, t.tv_nsec, expire);
+    debug("sec: %d, nsec: %d, expire: %d", t.tv_sec, t.tv_nsec, expire);
     delayus(expire);
+
+    if (rem) {
+        rem->tv_sec = 0;
+        rem->tv_nsec = 0;
+    }
+
     return 0;
 }
 
@@ -185,11 +189,8 @@ sys_clock_gettime()
     clockid_t clk_id;
     struct timespec *tp;
 
-    if (argint(0, (clockid_t *)&clk_id) < 0 || argu64(1, (uint64_t *)&tp) < 0)
+    if (argint(0, (clockid_t *)&clk_id) < 0 || argptr(1, (char **)&tp, sizeof(struct timespec)) < 0)
         return -EINVAL;
-
-    if (!in_user(tp, sizeof(struct timespec)))
-        return -EFAULT;
 
     if (clk_id != CLOCK_REALTIME)
         return -EINVAL;
@@ -205,11 +206,8 @@ sys_clock_settime()
     clockid_t clk_id;
     struct timespec *tp;
 
-    if (argint(0, (clockid_t *)&clk_id) < 0 || argu64(1, (uint64_t *)&tp) < 0)
+    if (argint(0, (clockid_t *)&clk_id) < 0 || argptr(1, (char **)&tp, sizeof(struct timespec)) < 0)
         return -EINVAL;
-
-    if (!in_user(tp, sizeof(struct timespec)))
-        return -EFAULT;
 
     if (clk_id != CLOCK_REALTIME)
         return -EINVAL;
