@@ -100,7 +100,8 @@ sys_dup3()
 long
 sys_pipe2()
 {
-    int pipefd[2], flags;
+    int *pipefd;
+    int flags;
     struct file *rf, *wf;
     struct proc *p = thisproc();
     int fd0, fd1;
@@ -108,7 +109,7 @@ sys_pipe2()
     if (argptr(0, (char **)&pipefd, sizeof(int)*2) < 0 || argint(1, &flags) < 0)
         return -EINVAL;
 
-    debug("pipefd: 0x%p, flags=0x%x\n", pipefd, flags);
+    debug("pipefd: 0x%llx, flags: 0x%x", pipefd, flags);
 
     if (flags & ~PIPE2_FLAGS) {
         warn("invalid flags=%d", flags);
@@ -130,17 +131,15 @@ sys_pipe2()
         return -EMFILE;
     }
 
-    //memmove((void *)pipefd, &fd0, sizeof(int));
-    //memmove((void *)pipefd+sizeof(int), &fd1, sizeof(int));
-    pipefd[0] = fd0;
-    pipefd[1] = fd1;
+    memmove((void *)pipefd, &fd0, sizeof(int));
+    memmove((void *)pipefd+sizeof(int), &fd1, sizeof(int));
 
     if (flags & O_CLOEXEC) {
         bit_add(p->fdflag, fd0);
         bit_add(p->fdflag, fd1);
     }
 
-    debug("fd0=%d, fd1=%d, pipefd[%d, %d]", fd0, fd1, pipefd[0], pipefd[1]);
+    debug("fd0=%d, fd1=%d, pipefd[%d, %d]", fd0, fd1, *pipefd, *(pipefd+1));
     return 0;
 }
 

@@ -68,7 +68,7 @@ pipeclose(struct pipe *pi, int writable)
 ssize_t
 pipewrite(struct pipe *pi, char *addr, ssize_t n)
 {
-    ssize_t i;
+    ssize_t i = 0;
     struct proc *p = thisproc();
 
     acquire(&pi->lock);

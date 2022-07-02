@@ -637,7 +637,119 @@ total 495
 -rwxr-xr-x 1 0 0 17744 Jun 29  2022 utest
 ```
 
-## gdbが動かなかったのはmacのセキュリティ設定のためだった
+## pipeが動かない件
+
+```
+# cat test.txt | head -n 5
+[2]sys_pipe2: fd0=3, fd1=4, pipefd[3, 4]
+[1]sys_execve: path: /usr/bin/cat
+[1]sys_wait4: pid: -1
+[2]sys_execve: path: /usr/bin/head
+[3]sys_read: fd: 5
+[3]sys_write: fd: 1, p: 123
+111
+111
+123
+999
+あいうえお
+あいうえお
+999
+かきくけこ
+12345
+あいうえお
+, n: 94, f->type: 2
+123
+111
+111
+123
+999
+あいうえお
+あいうえお
+999
+かきくけこ
+12345
+あいうえお
+[3]sys_read: fd: 5
+[3]sys_close: fd: 5
+[3]sys_close: fd: 1
+[3]sys_close: fd: 2
+[3]sys_wait4: pid: -1
+[3]sys_read: fd: 0
+ls							// プロンプトは出ず
+ls							// pipeがcloseされていないっぽい
+[3]sys_read: fd: 0
+```
+
+## sys_pipe2()のバグだった
+
+- 間違い
+
+```c
+int pipefd[2];											// pipefd[2]がカーネル空間に作成され
+if (argptr(0, (char **)&pipefd, sizeof(int)*2) < 0)		// そこにfdが設定されのでユーザに返らない
+```
+
+- 修正
+
+```c
+int *pipefd;											// pipefd[2]はユーザ空間で作成され
+if (argptr(0, (char **)&pipefd, sizoef(int)*2) < 0)		// そこにfdを設定するのでユーザに返る
+```
+
+
+```
+# cat test.txt | head -n 5
+[3]sys_pipe2: pipefd: 0xffff00003bffde78, flags=0x0		// pipefdはカーネル空間アドレス
+[3]sys_pipe2: fd0=3, fd1=4, pipefd[3, 4]				// カーネル上は正しいが
+pipe: [-296, -1]										// 呼び出し元には正しいfdが帰っていない
+```
+
+- argu64で受けるように修正
+
+```
+(gdb) n
+117	    info("pipe_p: 0x%llx, flags: 0x%x", pipe_p, flags);
+(gdb) p/x pipe_p
+$1 = 0xfffffffffe78										// ユーザ空間アドレス
+```
+
+```
+# cat test.txt | head -n 5
+[2]sys_pipe2: fd0=3, fd1=4, pipefd[3, 4]
+pipe: [3, 4]											// 正しいfdが帰っている
+123
+111
+111
+123
+999
+# cat test.txt | uniq									// これも正しく動く
+pipe: [3, 4]
+123
+111
+123
+999
+あいうえお
+999
+かきくけこ
+12345
+あいうえお
+# sort test.txt | uniq									// sortはストール
+pipe: [3, 4]
+# sort test.txt											// sort単体は動く
+111
+111
+123
+123
+12345
+999
+999
+あいうえお
+あいうえお
+あいうえお
+かきくけこ
+```
+
+# gdbが動かなかったのはmacのセキュリティ設定のためだった
 
 [GDB Wiki: PermissionsDarwin](https://sourceware.org/gdb/wiki/PermissionsDarwin)の指示通りに処理したところ動くようになった。
 
