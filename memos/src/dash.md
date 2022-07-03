@@ -935,3 +935,25 @@ PID [83 caug]ht yielsdig:  2pid 11 to runable
 ```
 
 ### 子プロセスがpause()から戻らない
+
+- kernコンパイル時の最適化オプションを-O0にしたら動いた
+- -01, -02はだめ
+
+```
+# sigtest
+PID 8 ready
+PID 9 ready
+PID 10 ready
+PID 11 ready
+PID 12 ready
+PID 12 caught sig 2, j 3
+PID 11 caught sig 2, j 2
+12 is dead
+PID 10 caught sig 2, j 1
+11 is dead
+PID 9 caught sig 2, j 0
+10 is dead
+PID 8 caught sig 2, j -1
+9 is dead
+8 is dead
+```

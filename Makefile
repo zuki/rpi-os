@@ -2,7 +2,7 @@
 
 MUSL_INC = /Users/dspace/musl/include
 
-CFLAGS := -Wall -g -O2 \
+CFLAGS := -Wall -g -O0 \
           -fno-pie -fno-pic -fno-stack-protector \
           -fno-zero-initialized-in-bss \
           -static -fno-builtin -nostdlib -nostdinc -ffreestanding -nostartfiles \
