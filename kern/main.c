@@ -38,6 +38,7 @@ main()
         mm_init();
         clock_init();
         rand_init();
+        pagecache_init();
         proc_init();
         user_init();
         binit();
