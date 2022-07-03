@@ -957,3 +957,116 @@ PID 8 caught sig 2, j -1
 9 is dead
 8 is dead
 ```
+
+## mmaptest
+
+```
+# mmaptest
+mmap_testスタート
+- open mmap.dur (fd=3) READ ONLY
+[1] test mmap f
+- mmap fd=3 -> 2ページ分PROT_READ MAP_PRIVATEでマップ: addr=0x600000001000
+- munmmap 2PAGE: addr=0x600000001000
+[1] OK
+[2] test mmap private
+- mmap fd=3 -> 2ページ分をPAGE PROT_READ/WRITE, MAP_PRIVATEでマップ: addr=0x600000001000
+- closed 3
+- write 2PAGE = Z
+- p[1]=Z
+- munmmap 2PAGE: addr=0x600000001000
+[2] OK
+[3] test mmap read-only
+- open mmap.dur (3) RDONALY
+[1]sys_mmap: file is not writable
+- mmap 3 -> 3PAGE PROT_READ/WRITE MAP_SHARED: addr=0xffffffffffffffff
+- close 3
+[3] OK
+[4] test mmap read/write
+- open mmap.dur (3) RDWR
+- mmap 3 -> 3PAGE PROT_READ|WRITE MAP_SHARED: addr=0x600000001000
+- close 3
+- print 2PAGE = Z
+- munmmap 2PAGE: addr=0x600000001000
+[4] OK
+[5] test mmap dirty
+- open mmap.dur (3) RDWR
+- close 3
+[5] OK
+[6] test not-mapped unmap
+- munmmap PAGE: addr=0x600000003000
+[6] OK
+[7] test mmap two files
+- open mmap1 (3) RDWR/CREAT
+- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000001000
+- close 3
+- unlink mmap1
+- open mmap2 (3) RDWR/CREAT			// ここでストール
+```
+
+### logが満杯か?
+
+-- mmaptest内のprintf()で呼び出されるsys_writev()でストール
+-- test 1-6、test 7とforkテストの2つに分けて実行するとどちらも成功
+
+```
+# mmaptest
+mmap_testスタート
+- open mmap.dur (fd=3) READ ONLY
+[1] test mmap f
+- mmap fd=3 -> 2ページ分PROT_READ MAP_PRIVATEでマップ: addr=0x600000001000
+- munmmap 2PAGE: addr=0x600000001000
+[1] OK
+[2] test mmap private
+- mmap fd=3 -> 2ページ分をPAGE PROT_READ/WRITE, MAP_PRIVATEでマップ: addr=0x600000001000
+- closed 3
+- write 2PAGE = Z
+- p[1]=Z
+- munmmap 2PAGE: addr=0x600000001000
+[2] OK
+[3] test mmap read-only
+- open mmap.dur (3) RDONALY
+[3]sys_mmap: file is not writable
+- mmap 3 -> 3PAGE PROT_READ/WRITE MAP_SHARED: addr=0xffffffffffffffff
+- close 3
+[3] OK
+[4] test mmap read/write
+- open mmap.dur (3) RDWR
+- mmap 3 -> 3PAGE PROT_READ|WRITE MAP_SHARED: addr=0x600000001000
+- close 3
+- print 2PAGE = Z
+- munmmap 2PAGE: addr=0x600000001000
+[4] OK
+[5] test mmap dirty
+- open mmap.dur (3) RDWR
+- close 3
+[5] OK
+[6] test not-mapped unmap
+- munmmap PAGE: addr=0x600000003000
+[6] OK
+mmap_test: Total: 6, OK: 6, NG: 0
+mmaptest: all tests succeeded
+
+# mmaptest
+mmap_testスタート
+[7] test mmap two files
+- open mmap1 (3) RDWR/CREAT
+- write 3: 12345
+- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000001000
+- close 3
+- unlink mmap1
+- open mmap2 (3) RDWR/CREAT
+- write 3: 67890
+- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000002000
+- close 3
+- unlink mmap2
+- munmap PAGE: addr=0x600000001000
+- munmap PAGE: addr=0x600000002000
+[7] OK
+mmap_test: Total: 1, OK: 1, NG: 0
+
+fork_test starting
+p1[PGSIZE]=A
+p2[PGSIZE]=A
+fork_test OK
+mmaptest: all tests succeeded
+```
