@@ -69,7 +69,7 @@ delete_mmap_node(struct proc *p, struct mmap_region *node)
 /*
  * struct mmap_regionリンクリスト全体をクリアする。
  * ユーザ空間にあるメモリページをすべて開放しなければ
- * ならない時にexit, proc_destroyの中から呼び出される
+ * ならない時にexecから呼び出される
  */
 void
 free_mmap_list(struct proc *p)
@@ -79,25 +79,19 @@ free_mmap_list(struct proc *p)
 
     while (region) {
         temp = region;
-        if (region->f) {
-            fileclose(region->f);
+        if (!(region->flags & MAP_SHARED)) {
+            if (region->f) {
+                fileclose(region->f);
+            }
+            delete_mmap_node(p, region);
+            p->nregions -= 1;
         }
-        //cprintf("fml[%d]: ref=%d\n", p->pid, region->original);
-    /*
-        if (region->original) {
-            cprintf("fml[%d]: addr=0x%p, org\n", p->pid, region->addr);
-        } else {
-            cprintf("fml[%d]: addr=0x%p, copied\n", p->pid, region->addr);
-        }
-    */
-        delete_mmap_node(p, region);
-        p->nregions -= 1;
         region = temp->next;
     }
 }
 
 // srcからdestにmmap_regionをコピー
-static long
+void
 copy_mmap_region(struct mmap_region *dest, struct mmap_region *src)
 {
     dest->addr          = src->addr;
@@ -113,8 +107,6 @@ copy_mmap_region(struct mmap_region *dest, struct mmap_region *src)
     } else {
         dest->f = NULL;
     }
-
-    return 0;
 }
 
 // 指定されたprotectionからpermを作成する
@@ -293,6 +285,7 @@ mmap_load_pages(void *addr, size_t length, int prot, int flags, struct file *f, 
 
     uint64_t perm = get_perm(prot, flags);
     if ((flags & MAP_PRIVATE) && !(flags & MAP_POPULATE)) perm |= PTE_RO;
+    if (flags & MAP_SHARED) perm &= ~PTE_RO;
 
     if (flags & MAP_ANONYMOUS) {
         if ((ret = map_anon_pages(addr, length, perm)) < 0) {
@@ -323,14 +316,14 @@ mmap(void *addr, size_t length, int prot, int flags, struct file *f, off_t offse
         // upper_addr: addr + sizeがMMAPTOPを超えないかチェックするための変数
         void *upper_addr = (void *)ROUNDUP(ROUNDUP((uint64_t)addr, PGSIZE) + length, PGSIZE);
         if (upper_addr > (void *)USERTOP) {
-            debug("addr 0x%p over USERTOP", addr);
+            warn("addr 0x%p over USERTOP", addr);
             return EINVAL;
         }
         // 1.1.2 MAP_FIXEDが指定されている場合
         if (flags & MAP_FIXED) {
             // 1.1.2.1 アドレスはページ境界にあること
             if (NOT_PAGEALIGN(addr)) {
-                debug("fixed address should be page align: 0x%p", addr);
+                warn("fixed address should be page align: 0x%p", addr);
                 return -EINVAL;
             }
             if (prot == PROT_NONE) {
@@ -351,7 +344,13 @@ mmap(void *addr, size_t length, int prot, int flags, struct file *f, off_t offse
                 }
             } else {
                 // 1.1.2.2 指定されたアドレスが使用可能なこと
+                struct mmap_region *tmp = find_mmap_region(addr);
+                if (tmp && addr == tmp->addr) {
+                    warn("addr is used");
+                    return -EINVAL;
+                }
                 if (check_mmap_region(addr, length) == 0) {
+                    warn("addr is not available");
                     return -EINVAL;
                 }
             }
@@ -359,6 +358,7 @@ mmap(void *addr, size_t length, int prot, int flags, struct file *f, off_t offse
         } else {
             if (NOT_PAGEALIGN(addr))
                 addr = ROUNDDOWN(addr, PGSIZE);
+            goto select_addr;
         }
     // 1.2. アドレスが指定されていない場合
     } else {
@@ -367,7 +367,7 @@ mmap(void *addr, size_t length, int prot, int flags, struct file *f, off_t offse
             addr = p->regions->addr;
         else
             addr = (void *)MMAPBASE;
-
+select_addr:
         struct mmap_region *node = p->regions;
         while (node) {
             trace("- addr=0x%p, node->addr=0x%p, node->next->addr=0x%p", addr, node->addr, node->next ? node->next->addr : NULL);
@@ -392,7 +392,8 @@ mmap(void *addr, size_t length, int prot, int flags, struct file *f, off_t offse
     if (addr + ROUNDUP(length, PGSIZE) > (void *)USERTOP)
         return -EINVAL;
 
-    // 1.4 MAX_FIXEDですでにマッピングがある場合、置き換える
+    // 1.4 MAX_FIXEDですでにマッピングがある場合、エラーとする
+/*
     struct mmap_region *tmp = find_mmap_region(addr);
     if (tmp) {
         if (addr == tmp->addr) {
@@ -407,7 +408,7 @@ mmap(void *addr, size_t length, int prot, int flags, struct file *f, off_t offse
         if (error != 0) return error;
         return mmap(addr, length, prot, flags, f, offset);
     }
-
+*/
     // 2. 新規mmap_regionを作成する
 
     // 2.1 mmap_regionのためのメモリを割り当てる
@@ -500,16 +501,17 @@ munmap(void *addr, size_t length)
     // lengthは境界になくてもよいが、処理は境界に合わせる
     length = ROUNDUP(length, PGSIZE);
 
-    debug("addr=0x%p, length=0x%llx", addr, length);
+    trace("addr=0x%p, length=0x%llx", addr, length);
 
     struct mmap_region *region = find_mmap_region(addr);
     if (region == NULL) return 0;
 
     debug("found: addr=0x%p\n", region->addr);
-    int anon = region->flags & MAP_ANONYMOUS;
-    int shared = region->flags & MAP_SHARED;
+    //int anon = region->flags & MAP_ANONYMOUS;
+    //int shared = region->flags & MAP_SHARED;
     // ファイルが背後にある共有マップは書き戻し
-    if (shared && !anon && region->f && (region->prot & PROT_WRITE)) {
+    //if (shared && !anon && region->f && (region->prot & PROT_WRITE)) {
+    if ((region->flags & MAP_SHARED) && region->f && (region->prot & PROT_WRITE)) {
         begin_op();
         error = writei(region->f->ip, region->addr, region->offset, region->length);
         end_op();
@@ -607,16 +609,22 @@ msync(void *addr, size_t length, int flags)
     struct mmap_region *region = p->regions;
     while (region) {
         if (region->addr == addr) {
-            if (!(region->flags & MAP_ANONYMOUS) && region->prot & PROT_WRITE && region->f) {
-                if (region->length < length) length = region->length;
-                if ((error = readi(region->f->ip, region->addr, region->offset, length)) < 0)
+            if ((region->flags & MAP_SHARED) && (region->prot & PROT_WRITE) && region->f) {
+                size_t len = region->length < length ? region->length : length;
+                begin_op();
+                error = writei(region->f->ip, region->addr, region->offset, len);
+                end_op();
+                if (error < 0)
                     return error;
+                addr += len;
+                length -= len;
+                if (length <= 0) break;
             }
-            return 0;
+
         }
         region = region->next;
     }
-    return -EINVAL;
+    return 0;
 }
 
 
@@ -651,30 +659,7 @@ copy_mmap_list(struct proc *parent, struct proc *child)
         struct mmap_region *region = (struct mmap_region *)kmalloc(sizeof(struct mmap_region));
         if (region == (struct mmap_region *)0)
             return -ENOMEM;
-
-        if ((error = copy_mmap_region(region, node)) < 0) {
-            kmfree(region);
-            return error;
-        }
-/* uvm_copy()でマッピングはコピー済み
-        void *start  = node->addr;
-        for (; start < node->addr + node->length; start += PGSIZE) {
-            pte = pgdir_walk(parent->pgdir, start, 0);
-            if (!pte) {
-                //cprintf("cml: addr=0x%p does not map to the page and ignore\n", start);
-                continue;
-            }
-            uint64_t pa = PTE_ADDR(*pte);
-            uint64_t perm = PTE_FLAGS(*pte);
-            // MAP_PRIVATEの場合は、READ ONLYで割り当て
-            if (node->flags & MAP_PRIVATE)
-                perm |= PTE_RO;
-            // childプロセスに割り当て
-            debug("map_region: [%d] -> [%d]: addr=0x%p, pa=0x%llx\n", parent->pid, child->pid, start, pa);
-            if ((error = uvm_map(child->pgdir, start, PGSIZE, pa)) < 0)
-                goto bad;
-        }
-    */
+        copy_mmap_region(region, node);
         if (cnode == 0)
             cnode = region;
         else
@@ -684,9 +669,7 @@ copy_mmap_list(struct proc *parent, struct proc *child)
         node = node->next;
     }
 
-
     child->regions = cnode;
-
     child->nregions = parent->nregions;
     debug("child nregions=%d, regions=0x%p\n", child->nregions, child->regions);
     //print_mmap_list(parent, parent->name);
@@ -695,10 +678,6 @@ copy_mmap_list(struct proc *parent, struct proc *child)
     uvm_switch(child->pgdir);
     uvm_switch(parent->pgdir);
     return 0;
-
-bad:
-    free_mmap_list(child);
-    return error;
 }
 
 // Copy on Write機能を実装（trap.cでFLT_PERMISSIONの場合に呼び出される）

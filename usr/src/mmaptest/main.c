@@ -110,7 +110,7 @@ mmap_test(void)
     const char * const f = "mmap.dur";
     printf("mmap_testスタート\n");
     testname = "mmap_test";
-
+/*
     //
     // 1: 既知のコンテンツを持つファイルを作成
     // 2: それをメモリにマッピング
@@ -381,7 +381,7 @@ test6:
     }
     total++;
     error = 0;
-
+*/
     printf("[7] test mmap two files\n");
     //
     // mmap two files at the same time.

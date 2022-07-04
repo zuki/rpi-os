@@ -83,11 +83,11 @@ static struct cached_page *get_page(struct inode *ip, off_t offset)
 
 long copy_page(struct inode *ip, off_t offset, char *dest, size_t size, off_t dest_offset)
 {
-    debug("copy_page: inum=%d, offset=%d, dest=0x%p, size=0x%x, dest_offset=%ld",
+    trace("copy_page: inum=%d, offset=%d, dest=0x%p, size=0x%x, dest_offset=%ld",
             ip->inum, offset, dest, size, dest_offset);
     struct cached_page *page = get_page(ip, offset);
     if (page == (struct cached_page *)-1) {
-        cprintf("copy_page: get_page failed\n");
+        warn("get_page failed");
         return -ENOMEM;
     }
     if (!holdingsleep(&page->lock))

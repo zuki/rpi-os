@@ -13,7 +13,7 @@
 #define NDEV            10                  // Maximum major device number
 #define MAXBDEV         4                   // maximum numbers of block devices
 #define NINODE          1024                // Maximum number of active i-nodes
-#define MAXOPBLOCKS     30                  // Max # of blocks any FS op writes
+#define MAXOPBLOCKS     42                  // Max # of blocks any FS op writes
 #define NBUF            (MAXOPBLOCKS*3)     // Size of disk block cache
 #define MAXVFSSIZE      4                   // maximum number of vfs fils systems
 #define SDMAJOR         0                   // SD card major block device

@@ -9,6 +9,7 @@
 #include "proc.h"
 #include "mm.h"
 #include "memlayout.h"
+#include "mmap.h"
 #include "syscall1.h"
 
 static uint64_t auxv[][2] = { { AT_PAGESZ, PGSIZE } };
@@ -19,20 +20,18 @@ static void flush_old_exec(void)
     struct proc *p = thisproc();
 
     // (1) mmapのクリア
-    // TODO: mmapの実装をすること
+    // TODO: コメントアウトするとuvm_unmapでpanic("pgdir_walk")発生
     //trace("call fml [%d]", p->pid);
     //free_mmap_list(p);
     // (2) signalのflush
     flush_signal_handlers(p);
     // (3) close_on_execのfileのclose
-    /* TODO: fdflagの実装をすること
     for (int i = 0; i < NOFILE; i++) {
         if (p->ofile[i] && bit_test(p->fdflag, i)) {
             fileclose(p->ofile[i]);
             p->ofile[i] = 0;
         }
     }
-    */
 }
 
 int

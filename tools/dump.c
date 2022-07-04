@@ -44,7 +44,7 @@ struct dinode {
 
 #define BUFSIZE         4096
 
-#define MAXOPBLOCKS     30
+#define MAXOPBLOCKS     42
 #define NINODE          1024
 #define FSSIZE          800000
 #define BSIZE           512

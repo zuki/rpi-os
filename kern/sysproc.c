@@ -88,7 +88,7 @@ sys_mmap()
         argint(3, &flags) < 0 || argint(4, &fd) < 0 || argu64(5, &offset) < 0)
         return -EINVAL;
 
-    debug("addr=0x%llx, length=0x%lld, prot=0x%x, flags=0x%x, offset=0x%lld", addr, length, prot, flags, offset);
+    trace("addr=0x%llx, length=0x%lld, prot=0x%x, flags=0x%x, offset=0x%lld", addr, length, prot, flags, offset);
 
     if (flags & MAP_ANONYMOUS) {
         if (fd != -1) return -EINVAL;
@@ -103,11 +103,10 @@ sys_mmap()
         return -EINVAL;
     }
 
-    if ((ssize_t)length < 0 || (ssize_t)offset < 0) {
+    if ((ssize_t)length <= 0 || (ssize_t)offset < 0) {
         warn("invalid length: %lld or offset: %lld", length, offset);
         return -EINVAL;
     }
-    if (length == 0) length = 4096;       // FIXME: これは?
 
     // MAP_FIXEDの場合、addrが指定されていなければならない
     if ((flags & MAP_FIXED) && addr == NULL) {
@@ -127,10 +126,10 @@ sys_mmap()
         warn("file is not writable");
         return -EACCES;
     }
-
+/*  たぶん、不要
     if (flags & MAP_ANONYMOUS)
         length = ROUNDUP(length, PGSIZE);
-
+*/
     return mmap(addr, length, prot, flags, f, offset);
 }
 
@@ -148,7 +147,20 @@ sys_munmap()
     return munmap(addr, length);
 }
 
+long
+sys_msync()
+{
+    void *addr;
+    size_t length;
+    int flags;
 
+    if (argu64(0, (uint64_t *)&addr) < 0 || argu64(1, &length) < 0
+     || argint(2, &flags) < 0)
+        return -EINVAL;
+
+    return msync(addr, length, flags);
+
+}
 
 long
 sys_clone()

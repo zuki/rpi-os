@@ -1070,3 +1070,336 @@ p2[PGSIZE]=A
 fork_test OK
 mmaptest: all tests succeeded
 ```
+
+## mmaptest2
+
+```
+# mmaptest2
+[F-01] 不正なfdを指定した場合のテスト
+ error: Bad file descriptor
+ error: Bad file descriptor
+ error: Bad file descriptor
+[F-01] ok
+
+[F-02] 不正なフラグを指定した場合のテスト
+[3]sys_mmap: invalid flags: 0x0
+ error: Invalid argument
+[F-02] ok
+
+[F-03] readonlyファイルにPROT_WRITEな共有マッピングをした場合のテスト
+[0]sys_mmap: file is not writable
+ error: Permission denied
+[F-03] ok
+
+[F-04] readonlyファイルにPROT_READのみの共有マッピングをした場合のテスト
+[F-04] ok
+
+[F-05] PROT指定の異なるプライベートマッピンのテスト
+[F-05] ok
+
+[F-06] MMAPTOPを超えるサイズをマッピングした場合のテスト
+[2]get_page: get_page readi failed: n=-1, offset=4096, size=4096
+copy_page: get_page failed
+[2]map_file_page: map_pagecache_page: copy_page failed
+ error: Out of memory
+[F-06] ok
+
+[F-07] 連続したマッピングを行うテスト			// ここでストール（mmaptestと同じ現象か?)
+```
+
+### F-07からテストスタート
+
+```
+# mmaptest2
+
+[F-07] 連続したマッピングを行うテスト
+[F-07] ok
+
+[F-08] 空のファイルを共有マッピングした場合のテスト
+[F-08] ok
+
+[F-09] ファイルが背後にあるプライベートマッピング
+[F-09] ok
+
+[F-10] ファイルが背後にある共有マッピングのテスト
+[F-10] ok
+
+[F-11] file backed mapping pagecache coherency test
+[F-11] ok
+
+[F-12] file backed private mapping with fork test
+[F-12] ok
+
+[F-13] file backed shared mapping with fork test
+[F-13] failed at strcmp parent: ret2[0]=a, buf[0]=a
+
+[F-14] オフセットを指定したプライベートマッピングのテスト
+[F-14] ok
+
+[F-15] file backed valid provided address test
+[F-15] ok
+
+[F-16] file backed invalid provided address test
+[F-16] failed
+
+[F-17] 指定されたアドレスが既存のマッピングアドレスと重なる場合
+[F-17] failed: at second mmap
+
+[F-18] ２つのマッピングの間のアドレスを指定したマッピングのテスト
+ret=0x600000001000
+ret2=0x600000003000
+not mapped
+kern/console.c:283: kernel panic at cpu 2.
+
+[F-19] ２つのマッピングの間に不可能なアドレスを指定した場合
+not mapped
+kern/console.c:283: kernel panic at cpu 1.
+```
+
+### anonymous_test()
+
+```
+# mmaptest2
+
+[A-01] anonymous private mapping test
+p[0]=0, p[2499]=2499
+[A-01] ok
+
+[A-02] anonymous shared mapping test						// 結果が出ていない
+
+[A-03] anonymous private mapping with fork test
+[A-03] ok
+
+[A-04] anonymous shared mapping with multiple forks test
+[3]exit: exit: pid 12, name , err 1
+[0]exit: exit: pid 11, name , err 1
+[1]exit: exit: pid 10, name , err 1
+[A-04] failed at strcmp fork 1 parent
+
+[A-05] anonymous private & shared mapping together with fork test
+[0]exit: exit: pid 13, name , err 1
+[A-05] failed at strcmp share
+
+[A-06] anonymous missing flags test
+[3]sys_mmap: invalid flags: 0x20
+[A-06] ok
+
+[A-07] anonymous exceed mapping count test
+[A-07] ok
+
+[A-08] anonymous exceed mapping size test			// ここでストール.[A-08]は単独でもストール
+```
+
+### [A-09]から実行
+
+```
+[A-09] anonymous zero size mapping test
+[A-09] failed
+
+[A-10] anonymous valid provided address test
+[A-10] ok
+
+[A-11] anonymous invalid provided address test
+[A-11] failed at mmap
+
+[A-12] anonymous overlapping provided address test
+[A-12] failed at second mmap
+
+[A-13] anonymous intermediate provided address test
+not mapped
+kern/console.c:283: kernel panic at cpu 2.
+```
+
+### other_test
+
+```
+# mmaptest2
+
+[O-01] munmap only partial size test
+[O-01] ok
+
+[O-02] write on read only mapping test
+[O-02] ok
+
+[O-03] none permission on mapping test
+[O-03] ok
+
+[O-04] mmap valid address map fixed flag test
+[O-04] ok
+
+[O-05] mmap invalid address map fixed flag test
+[O-05] failed at mmap 1
+```
+
+###  7/4
+
+- MAP_FIXEDで指定したアドレスが存在する場合はエラーに変更
+- MAP_SHAREDの場合は、free_mmap_list()しない
+- sys_msyncを実装
+- MAXOPBLOCKSを42に変更
+- mmaptestはF-19がregression
+
+```
+# mmaptest2
+[F-01] 不正なfdを指定した場合のテスト
+ error: Bad file descriptor
+ error: Bad file descriptor
+ error: Bad file descriptor
+[F-01] ok
+
+[F-02] 不正なフラグを指定した場合のテスト
+[0]sys_mmap: invalid flags: 0x0
+ error: Invalid argument
+[F-02] ok
+
+[F-03] readonlyファイルにPROT_WRITEな共有マッピングをした場合のテスト
+[3]sys_mmap: file is not writable
+ error: Permission denied
+[F-03] ok
+
+[F-04] readonlyファイルにPROT_READのみの共有マッピングをした場合のテスト
+[F-04] ok
+
+[F-05] PROT指定の異なるプライベートマッピンのテスト
+[F-05] ok
+
+[F-06] MMAPTOPを超えるサイズをマッピングした場合のテスト
+[1]get_page: get_page readi failed: n=-1, offset=4096, size=4096
+[1]copy_page: get_page failed
+[1]map_file_page: map_pagecache_page: copy_page failed
+ error: Out of memory
+[F-06] ok
+
+[F-07] 連続したマッピングを行うテスト
+[0]uvm_map: remap: p=0x600000001000, *pte=0x3bb3c647
+
+ error: Invalid argument
+[F-07] failed at 1 total mappings
+
+[F-08] 空のファイルを共有マッピングした場合のテスト
+[F-08] ok
+
+[F-09] ファイルが背後にあるプライベートマッピング
+```
+
+```
+[F-09] ファイルが背後にあるプライベートマッピング
+[F-09] ok
+
+[F-10] ファイルが背後にある共有マッピングのテスト
+[F-10] ok
+
+[F-11] file backed mapping pagecache coherency test
+[F-11] ok
+
+[F-12] file backed private mapping with fork test
+[F-12] ok
+
+[F-13] file backed shared mapping with fork test
+[F-13] failed at strcmp parent: ret2[0]=a, buf[0]=a
+
+[F-14] オフセットを指定したプライベートマッピングのテスト
+[F-14] ok
+
+[F-15] file backed valid provided address test
+[F-15] ok
+
+[F-16] file backed invalid provided address test
+[F-16] ok
+
+[F-17] 指定されたアドレスが既存のマッピングアドレスと重なる場合
+[F-17] ok
+
+[F-18] ２つのマッピングの間のアドレスを指定したマッピングのテスト
+[F-18] ok
+
+[F-19] ２つのマッピングの間に不可能なアドレスを指定した場合
+ret =0x600000001000
+ret2=0x600000003000
+[2]get_page: get_page readi failed: n=-1, offset=8192, size=4096
+[2]copy_page: get_page failed
+[2]map_file_page: map_pagecache_page: copy_page failed
+ret3=0xffffffffffffffff
+[F-19] failed at third mmap
+
+[F-20] 共有マッピングでファイル容量より大きなサイズを指定した場合
+[F-20] ok
+
+[F-21] write onlyファイルへのREAD/WRITE共有マッピングのテスト
+[0]sys_mmap: file is not readable
+[F-21] ok
+```
+
+```
+# mmaptest2
+
+[A-01] anonymous private mapping test
+p[0]=0, p[2499]=2499
+[A-01] ok
+
+[A-02] anonymous shared mapping test						// MAP_ANON + MAP_SHARE + fork()が絡むとエラー
+[A-02] p1[1]: 0 != 1
+
+[A-03] anonymous private mapping with fork test
+[A-03] ok
+
+[A-04] anonymous shared mapping with multiple forks test
+[2]exit: exit: pid 12, name , err 1
+[3]exit: exit: pid 11, name , err 1
+[3]exit: exit: pid 10, name , err 1
+[A-04] failed at strcmp fork 1 parent
+
+[A-05] anonymous private & shared mapping together with fork test
+[1]exit: exit: pid 13, name , err 1
+[A-05] failed at strcmp share
+
+[A-06] anonymous missing flags test
+[0]sys_mmap: invalid flags: 0x20
+[A-06] ok
+
+[A-07] anonymous exceed mapping count test
+[A-07] ok
+
+[A-08] anonymous exceed mapping size test
+[A-08] ok
+
+[A-09] anonymous zero size mapping test
+[0]sys_mmap: invalid length: 0 or offset: 0
+[A-09] ok
+
+[A-10] anonymous valid provided address test
+[A-10] ok
+
+[A-11] anonymous invalid provided address test
+[A-11] ok: not running because of an invalid test
+
+[A-12] anonymous overlapping provided address test
+[A-12] ok
+
+[A-13] anonymous intermediate provided address test
+[A-13] ok
+
+[A-14] anonymous intermediate provided address not possible test
+[A-14] ok
+
+[O-01] munmap only partial size test
+[O-01] ok
+
+[O-02] write on read only mapping test
+[O-02] ok
+
+[O-03] none permission on mapping test
+[O-03] ok
+
+[O-04] mmap valid address map fixed flag test
+[O-04] ok
+
+[O-05] mmap invalid address map fixed flag test
+[0]mmap: fixed address should be page align: 0x600000000100
+[0]mmap: addr is used
+[O-05] test ok
+
+file_test:  ok: 0, ng: 0
+anon_test:  ok: 10, ng: 3
+other_test: ok: 5, ng: 0
+```

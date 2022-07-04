@@ -249,8 +249,15 @@ filewrite(struct file *f, char *addr, ssize_t n)
          * and 2 blocks of slop for non-aligned writes.
          * This really belongs lower down, since writei()
          * might be writing a device like the console.
+         * i-node、間接ブロック、アロケーションブロック、
+         * 非アライン書き込み用の2ブロックのスロップを含む
+         * 最大ログトランザクションサイズを超えないように、
+         * 一度に数ブロックずつ書き込みます
+         *
+         * writei() はコンソールのようなデバイスに書き込む
+         * 場合もあるのでこれは本当に最下層のことです。
          */
-        ssize_t max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * 512;
+        ssize_t max = ((MAXOPBLOCKS - 1 - 2 - 2) / 2) * 512;
         ssize_t i = 0;
         while (i < n) {
             ssize_t n1 = MIN(max, n - i);

@@ -6,7 +6,7 @@
 #define MAXBDEV     4                   // maximum numbers of block devices
 #define ROOTDEV     1                   // device number of file system root disk
 #define MAXARG      32                  // maximu number of exec arguments
-#define MAXOPBLOCKS 30                  // maximum number of blocks any FS op writes
+#define MAXOPBLOCKS 42                  // maximum number of blocks any FS op writes
 #define NBUF        (MAXOPBLOCKS*3)     // size of disk block cache
 #define FSSIZE      800000              // size of file system in blocks 400MB
 #define MAXVFSSIZE  4                   // maximum number of vfs fils systems
