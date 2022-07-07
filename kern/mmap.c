@@ -174,7 +174,7 @@ check_mmap_region(void *addr, size_t length)
         cursor = cursor->next;
     }
 
-    return 1;
+    return 0;
 }
 
 /*
@@ -201,7 +201,7 @@ map_file_page(void *addr, size_t length, uint64_t perm, struct file *f, off_t of
         size_t cursize = (PGSIZE - curoff) > tempsize ? tempsize : (PGSIZE - curoff);
         //cprintf("- tempsize=0x%x, curoff=0x%x, cursize=0x%x, ip-size=0x%x\n", tempsize, curoff, cursize, f->ip->size);
         if (curoff > f->ip->size) {
-            //cprintf("- curoff > ip->seze\n");
+            //cprintf("- curoff > ip->size\n");
             break;
         }
         if ((error = copy_page(f->ip, offset + PGSIZE * i, (mem + length - tempsize), cursize, curoff)) < 0) {
@@ -394,6 +394,7 @@ select_addr:
 
     // 1.4 MAX_FIXEDですでにマッピングがある場合、エラーとする
 /*
+    // MAX_FIXEDですでにマッピングがある場合は書き換える
     struct mmap_region *tmp = find_mmap_region(addr);
     if (tmp) {
         if (addr == tmp->addr) {
@@ -434,7 +435,7 @@ select_addr:
     } else {
         region->f = NULL;
     }
-    // 2.3 オリジナルフラグを設定
+    // 2.3 オリジナルフラグを設定: FIXME このフラグの必要性は?
     region->original = 1;
 
     // 3. p->regionsに作成したmmap_regionを追加する
@@ -445,7 +446,7 @@ select_addr:
         goto load_pages;
     }
 
-    // 3.2 そうでない場合は適切な位置に追加して、p->regionsを再設定する
+    // 3.2 そうでない場合は適切な位置に追加して、p->regionsを更新する
     struct mmap_region *node = p->regions;
     struct mmap_region *prev = p->regions;
     while (node) {
@@ -469,7 +470,6 @@ select_addr:
 
 load_pages:
     // 4. ページにマッピングする
-    //cprintf("- call mmap_load_pages: addr=0x%p, length=0x%llx, ref=%d\n", addr, length, region->original);
     if ((error = mmap_load_pages(addr, length, prot, flags, f, offset)) < 0)
         goto out;
     //uvm_switch(p->pgdir);
@@ -527,7 +527,7 @@ munmap(void *addr, size_t length)
         delete_mmap_node(p, region);
         p->nregions -= 1;
     } else {
-        uvm_unmap(p->pgdir, (uint64_t)addr, length / PGSIZE, 1);
+        uvm_unmap(p->pgdir, (uint64_t)addr, length / PGSIZE, 1);    // FIXME: length < PGSIZEだと0ページだがそれで良いのか
         region->addr += length;
         region->length -= length;
         debug("new region: addr=0x%p, length=0x%llx", region->addr, region->length);
@@ -649,7 +649,7 @@ print_mmap_list(struct proc *p, const char *title)
 long
 copy_mmap_list(struct proc *parent, struct proc *child)
 {
-    uint64_t *pte;
+    uint64_t *ptep, *ptec;
     long error;
 
     struct mmap_region *node = parent->regions;
@@ -660,6 +660,18 @@ copy_mmap_list(struct proc *parent, struct proc *child)
         if (region == (struct mmap_region *)0)
             return -ENOMEM;
         copy_mmap_region(region, node);
+        if (node->flags & MAP_SHARED) {
+            ptep = pgdir_walk(parent->pgdir, node->addr, 0);
+            if (!ptep) panic("parent pgdir not pte: va=0x%p\n", region->addr);
+            ptec = pgdir_walk(child->pgdir, region->addr, 0);
+            if (!ptec) panic("child  pgdir not pte: va=0x%p\n", region->addr);
+            uint64_t pa = PTE_ADDR(*ptec);
+            kfree(P2V(pa));
+            *ptec = *ptep;
+            debug("*ptec[0]=0x%llx", *(uint64_t *)P2V(PTE_ADDR(*ptec)));
+            debug("ptep=0x%llx, *ptep=0x%llx", ptep, *ptep);
+            debug("ptec=0x%llx, *ptec=0x%llx", ptec, *ptec);
+        }
         if (cnode == 0)
             cnode = region;
         else
@@ -674,7 +686,6 @@ copy_mmap_list(struct proc *parent, struct proc *child)
     debug("child nregions=%d, regions=0x%p\n", child->nregions, child->regions);
     //print_mmap_list(parent, parent->name);
     //print_mmap_list(child, "child");
-
     uvm_switch(child->pgdir);
     uvm_switch(parent->pgdir);
     return 0;
@@ -700,19 +711,7 @@ copy_mmap_pages(void *addr, size_t length, uint64_t perm)
     return 0;
 }
 
-struct mmap_region *
-is_mapped(uint64_t addr)
-{
-    struct proc *p = thisproc();
-    struct mmap_region *region = p->regions;
 
-    while (region) {
-        if (region->addr <= (void *)addr && (void *)addr < (region->addr + region->length))
-            return region;
-        region = region->next;
-    }
-    return 0;
-}
 
 /* nextとしてstartから始まるregionを追加可能なregionを探す */
 struct mmap_region *

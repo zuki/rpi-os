@@ -62,7 +62,7 @@ void mmap_invalid_map_fixed_test();
 void write_readme(int n);
 
 void file_tests() {
-    //write_readme(8192);
+    write_readme(8192);
 /*
     file_invalid_fd_test();
     file_invalid_flags_test();
@@ -72,12 +72,14 @@ void file_tests() {
     file_exceed_size_test();
     file_exceed_count_test();
     file_empty_file_size_test();  // FIXME: n > 32
-*/
+
     file_private_test();
     file_shared_test();
     file_pagecache_coherency_test();
     file_private_with_fork_test();
+*/
     file_shared_with_fork_test();
+/*
     file_mapping_with_offset_test();
     file_given_addr_test();
     file_invalid_addr_test();
@@ -86,6 +88,7 @@ void file_tests() {
     file_intermediate_given_addr_not_possible_test();
     file_exceeds_file_size_test();
     file_mapping_on_wo_file_test();
+*/
 }
 
 void anonymous_tests() {
@@ -967,12 +970,16 @@ void file_shared_with_fork_test() {
             printf("[F-13] failed at strcmp child: ret2[0]=%c, buf[0]=%c\n", ret2[0], buf[0]);
             ng = 1;
         }
+        //printf("child : ret2[0, 1, 49, 50]=[%c, %c, %c, %c], buf=[%c, %c, %c, %c]\n",
+        //        ret2[0], ret2[1], ret2[49], ret2[50], buf[0], buf[1], buf[49], buf[50]);
         exit(0);
     } else {
         wait(&status);
+        // printf("parent: ret2[0, 1, 49, 50]=[%c, %c, %c, %c], buf=[%c, %c, %c, %c]\n",
+        //        ret2[0], ret2[1], ret2[49], ret2[50], buf[0], buf[1], buf[49], buf[50]);
         // The data written in child process should persist here
         if (my_strcmp(ret2, buf, size) == 0) {
-            printf("[F-13] failed at strcmp parent: ret2[0]=%c, buf[0]=%c\n", ret2[0], buf[0]);
+            printf("[F-13] strcmp parent\n");
             file_ng++;
             munmap(ret2, size);
             return;
@@ -995,8 +1002,10 @@ void file_shared_with_fork_test() {
             file_ng++;
             return;
         }
+        printf("buf2[0]=0x%lx\n", *(uint64_t *)buf2);
         if (my_strcmp(buf2, buf, size) != 0) {
-            printf("[F-13] failed at strcmp 3\n");
+            printf("[F-13] failed at strcmp 3: buf2[0, 49, 50]=[%c, %c, %c], buf=[%c, %c, %c]\n",
+                buf2[0], buf2[49], buf2[50], buf[0], buf[49], buf[50]);
             file_ng++;
             return;
         }
@@ -1189,7 +1198,7 @@ void file_intermediate_given_addr_test() {
 void file_intermediate_given_addr_not_possible_test() {
     printf(
         "\n[F-19] ２つのマッピングの間に不可能なアドレスを指定した場合\n");
-    write_readme(4296);
+    write_readme(8192);
     int fd = open(filename, O_RDWR);
     if (fd == -1) {
         printf("[F-19] failed at open file\n");
@@ -1198,7 +1207,7 @@ void file_intermediate_given_addr_not_possible_test() {
     }
     char *ret = (char *)mmap((void *)0, 1000, PROT_READ | PROT_WRITE,
                              MAP_PRIVATE, fd, 0);
-    printf("ret =%p\n", ret);
+    //printf("ret =%p\n", ret);
     if (ret == MAP_FAILED) {
         printf("[F-19]failed at first mmap\n");
         file_ng++;
@@ -1206,7 +1215,7 @@ void file_intermediate_given_addr_not_possible_test() {
     }
     char *ret2 = (char *)mmap((void *)(MMAPBASE + 0x3000), 200, PROT_READ | PROT_WRITE,
                               MAP_PRIVATE, fd, 0);
-    printf("ret2=%p\n", ret2);
+    //printf("ret2=%p\n", ret2);
     if (ret2 == MAP_FAILED) {
         printf("[F-19] failed at second mmap\n");
         file_ng++;
@@ -1215,7 +1224,7 @@ void file_intermediate_given_addr_not_possible_test() {
     }
     char *ret3 = (char *)mmap((void *)(MMAPBASE + 0x100), 10000, PROT_READ | PROT_WRITE,
                               MAP_PRIVATE, fd, 0);
-    printf("ret3=%p\n", ret3);
+    //printf("ret3=%p\n", ret3);
     if (ret3 == MAP_FAILED) {
         printf("[F-19] failed at third mmap\n");
         file_ng++;

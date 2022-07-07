@@ -2,6 +2,21 @@
 #define INC_MMU_H
 
 /*
+ * A virtual address 'va' has a four-part structure as follows:
+ * +-----9-----+-----9-----+-----9-----+-----9-----+---------12---------+
+ * |  Level 0  |  Level 1  |  Level 2  |  Level 3  | Offset within Page |
+ * |   Index   |   Index   |   Index   |   Index   |                    |
+ * +-----------+-----------+-----------+-----------+--------------------+
+ *  \PTX(0, va)/\PTX(1, va)/\PTX(2, va)/\PTX(3, va)/
+ */
+
+#define VA_BITS 48      /* 256TB */
+#define L0SHIFT 39      /* 512GB   1個 */
+#define L1SHIFT 30      /*   1GB   max 512個 */
+#define L2SHIFT 21      /*   2MB   max 512^2個  */
+#define L3SHIFT 12      /*   4KB   max 512^3個  */
+
+/*
  * See Chapter 12 of ARM Cortex-A Series Programmer's Guide for ARMv8-A
  * and Chapter D5 of Arm Architecture Reference Manual Armv8, for Armv8-A architecture profile.
  */

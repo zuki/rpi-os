@@ -324,6 +324,7 @@ fork()
 
     if (cp->nregions != 0) {
         if ((error = copy_mmap_list(cp, np)) < 0) {
+            vm_free(np->pgdir);
             kfree(np->kstack);
             acquire(&ptable.lock);
             np->state = UNUSED;

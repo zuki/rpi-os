@@ -41,6 +41,7 @@ pgdir_walk(uint64_t * pgdir, void *vap, int alloc)
             if (alloc && (p = kalloc())) {
                 memset(p, 0, PGSIZE);
                 pgt[idx] = V2P(p) | PTE_TABLE;
+                //info("alloc: pgt%d=0x%llx", i, P2V(PTE_ADDR(pgt[idx])));
             } else {
                 warn("failed");
                 return 0;
@@ -63,14 +64,17 @@ uvm_copy(uint64_t * pgdir)
         if (pgdir[i] & PTE_VALID) {
             assert(pgdir[i] & PTE_TABLE);
             uint64_t *pgt1 = P2V(PTE_ADDR(pgdir[i]));
+            //info("pgdir[0x%llx] pgt1=0x%llx", (uint64_t)i << L0SHIFT, pgt1);
             for (int i1 = 0; i1 < 512; i1++)
                 if (pgt1[i1] & PTE_VALID) {
                     assert(pgt1[i1] & PTE_TABLE);
                     uint64_t *pgt2 = P2V(PTE_ADDR(pgt1[i1]));
+                    //info("pgdir[0x%llx] pgt2=0x%llx", (uint64_t)i << L0SHIFT | (uint64_t)i1 << L1SHIFT, pgt2);
                     for (int i2 = 0; i2 < 512; i2++)
                         if (pgt2[i2] & PTE_VALID) {
                             assert(pgt2[i2] & PTE_TABLE);
                             uint64_t *pgt3 = P2V(PTE_ADDR(pgt2[i2]));
+                            //info("pgdir[0x%llx] pgt3=0x%llx", (uint64_t)i << L0SHIFT | (uint64_t)i1 << L1SHIFT | (uint64_t)i2 << L2SHIFT, pgt3);
                             for (int i3 = 0; i3 < 512; i3++)
                                 if (pgt3[i3] & PTE_VALID) {
 
@@ -81,21 +85,17 @@ uvm_copy(uint64_t * pgdir)
                                     assert(PTE_ADDR(pgt3[i3]) < KERNBASE);
 
                                     uint64_t pa = PTE_ADDR(pgt3[i3]);
-                                    uint64_t va =
-                                        (uint64_t) i << (12 +
-                                                         9 *
-                                                         3) | (uint64_t) i1
-                                        << (12 +
-                                            9 * 2) | (uint64_t) i2 << (12 +
-                                                                       9) |
-                                        i3 << 12;
-
+                                    uint64_t va = (uint64_t) i  << (L0SHIFT)
+                                                | (uint64_t) i1 << (L1SHIFT)
+                                                | (uint64_t) i2 << (L2SHIFT)
+                                                | i3 << L3SHIFT;
                                     void *np = kalloc();
                                     if (np == 0) {
                                         vm_free(newpgdir);
                                         warn("kalloc failed");
                                         return 0;
                                     }
+                                    //info("pgdir[0x%llx] pte=0x%llx, np=0x%llx", va, P2V(PTE_ADDR(pgt3[i3])), np);
                                     memmove(np, P2V(pa), PGSIZE);
                                     // disb();
                                     // Flush to memory to sync with icache.
