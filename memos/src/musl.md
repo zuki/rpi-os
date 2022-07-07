@@ -515,7 +515,7 @@ $ make clean
 $ export CROSS_COMPILE=aarch64-elf- && ./configure --target=aarch64 --prefix=/Users/dspace/musl --syslibdir=/Users/dspace/musl/lib
 $ make
 $ make install
-$ make lib/lib/musl-gcc.specs
+$ make lib/musl-gcc.specs
 $ make obj/musl-gcc
 $ ./tools/install.sh -D -m 644 lib/musl-gcc.specs $HOME/musl/lib/musl-gcc.specs
 $ ./tools/install.sh -D obj/musl-gcc $HOME/musl/bin/musl-gcc
@@ -581,4 +581,131 @@ $ diff -uw musl-gcc.specs.org musl-gcc.specs
 
  *link:
  -dynamic-linker /Users/dspace/musl/lib/ld-musl-aarch64.so.1 -nostdlib %{shared:-shared} %{static:-static} %{rdynamic:-export-dynamic}
+```
+
+## usrで-gが指定できない
+
+```
+$ ~/musl/bin/musl-gcc -o hello_musl -g hello.c
+/usr/local/opt/aarch64-elf-binutils/bin/aarch64-elf-ld: cannot find -lg: No such file or directory
+collect2: error: ld returned 1 exit status
+```
+
+### debugを有効にするオプションがあった
+
+- `--enable-debug          build with debugging information [disabled]`
+
+### muslを再構築
+
+```
+$ cd musl
+$ make clean
+$ export CROSS_COMPILE=aarch64-elf- && ./configure --target=aarch64 --prefix=$(HOME)/musl --syslibdir=$(HOME)/musl/lib --enable-debug
+$ make
+$ make install
+$ make lib/musl-gcc.specs
+$ diff -uw $(HOME)/musl/lib/musl-gcc.specs musl-gcc.specs
+--- /Users/dspace/musl/lib/musl-gcc.specs	2022-06-14 19:03:00.000000000 +0900
++++ musl-gcc.specs	2022-07-07 09:58:16.000000000 +0900
+@@ -13,10 +13,10 @@
+ libgcc.a%s %:if-exists(libgcc_eh.a%s)
+
+ *startfile:
+-%{!shared: /Users/dspace/musl/lib/Scrt1.o} /Users/dspace/musl/lib/crti.o
++%{!shared: /Users/dspace/musl/lib/Scrt1.o} /Users/dspace/musl/lib/crti.o crtbeginS.o%s
+
+ *endfile:
+-/Users/dspace/musl/lib/crtn.o
++crtendS.o%s /Users/dspace/musl/lib/crtn.o
+
+ *link:
+ -dynamic-linker /Users/dspace/musl/lib/ld-musl-aarch64.so.1 -nostdlib %{shared:-shared} %{static:-static} %{rdynamic:-export-dynamic}
+$ touch $(HOME)/musl/lib/musl-gcc.specs
+$ make obj/musl-gcc
+$ diff -uw musl-gcc ~/musl/bin/musl-gcc
+$ touch $(HOME)/musl/bin/musl-gcc
+```
+
+### coreutils, dash, xv6を再構築
+
+```
+$ cd $COREUTILS
+$ make clean
+$ CC=$HOME/musl/bin/musl-gcc ./configure --host=aarch64-elf CFLAGS="-std=gnu99 -O3 -MMD -MP -static -fno-plt -fno-pic -fpie -z max-page-size=4096"
+$ make
+$ cd src
+$ file ls
+ls: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, with debug_info, not stripped
+$ find . -type f -perm +0111 -not -name 'make-prime-list' -not -name '*.so' -exec cp {} ../../usr/bin \;
+
+$ cd $DASH
+$ make clean
+$ CC=/Users/dspace/musl/bin/musl-gcc ./configure --host=aarch64-elf --enable-static CFLAGS="-std=gnu99 -O3 -MMD -MP -static -fno-plt -fno-pic -fpie -z max-page-size=4096 -Isrc"
+$ make
+$ cp src/dash ../usr/bin
+
+$ cd $XV6
+$ rm -rf obj
+$ make
+```
+
+libcのコードにデバッグ情報を追加するものでmusl-gccが`-g`に対応できるようにするものではなかったので、戻した。
+
+```
+$ ~/musl/bin/musl-gcc -static -g -o hello-musl hello.c
+/usr/local/opt/aarch64-elf-binutils/bin/aarch64-elf-ld: cannot find -lg: No such file or directory
+collect2: error: ld returned 1 exit status
+$ ~/musl/bin/musl-gcc -static -o hello-musl hello.c
+$ file hello-musl
+hello-musl: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, with debug_info, not stripped
+$ aarch64-elf-objdump -S -d hello-musl
+...
+0000000000400050 <_start_c>:
+    void (*)(), void(*)(), void(*)());
+
+void _start_c(long *p)
+{
+    int argc = p[0];
+    char **argv = (void *)(p+1);
+  400050:   aa0003e2    mov x2, x0
+    __libc_start_main(main, argc, argv, _init, _fini, 0);
+  400054:   b0000084    adrp    x4, 411000 <__stdio_ofl_lockptr+0xfdb8>
+  400058:   b0000083    adrp    x3, 411000 <__stdio_ofl_lockptr+0xfdb8>
+  40005c:   b0000080    adrp    x0, 411000 <__stdio_ofl_lockptr+0xfdb8>
+  400060:   f9413484    ldr x4, [x4, #616]
+  400064:   d2800005    mov x5, #0x0                    // #0
+  400068:   f9412c63    ldr x3, [x3, #600]
+  40006c:   f9413000    ldr x0, [x0, #608]
+    int argc = p[0];
+  400070:   f8408441    ldr x1, [x2], #8
+    __libc_start_main(main, argc, argv, _init, _fini, 0);
+  400074:   14000093    b   4002c0 <__libc_start_main>
+
+0000000000400078 <main>:
+  400078:   a9bf7bfd    stp x29, x30, [sp, #-16]!
+  40007c:   910003fd    mov x29, sp
+  400080:   b0000000    adrp    x0, 401000 <__stdio_write+0x90>
+  400084:   91080000    add x0, x0, #0x200
+  400088:   940000b3    bl  400354 <puts>
+  40008c:   52800000    mov w0, #0x0                    // #0
+  400090:   a8c17bfd    ldp x29, x30, [sp], #16
+  400094:   d65f03c0    ret
+```
+
+### ファイルの大きさ
+
+- `--enable-debug`
+
+```
+$ ls -l usr/bin/dash usr/bin/ls
+-rwxr-xr-x 1 dspace staff 765184  7  7 10:13 usr/bin/dash
+-rwxr-xr-x 1 dspace staff 901112  7  7 10:10 usr/bin/ls
+```
+
+- `--disable-debug`
+
+```
+$ ls -l usr/bin/ls usr/bin/dash
+-rwxr-xr-x 1 dspace staff 332056  7  7 16:01 usr/bin/dash
+-rwxr-xr-x 1 dspace staff 439864  7  7 16:03 usr/bin/ls
 ```

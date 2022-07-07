@@ -161,3 +161,132 @@ $ exit
 exec ?exit failed
 $
 ```
+
+## [https://musl.cc/]{https://musl.cc/}版のgcc+musl環境を使用
+
+ユーザプログラムをデバッグモーでコンパイルできるようなので試してみた
+
+### aarch64-linux-musl-crossをインストール
+
+```
+$ wget https://musl.cc/aarch64-linux-musl-cross.tgz
+$ tar xf aarch64-linux-musl-cross.tgz
+$ vi .bashrc
+export PATH="/home/vagrant/aarch64-linux-musl-cross/bin":$PATH
+$ source .bashrc
+```
+
+### coreutilsとdashを再コンパイル
+
+```
+$ cd $COREUTILS
+$ make clean
+$ CC=aarch64-linux-musl-gcc ./configure --host=aarch64-linux-musl CFLAGS="-std=gnu99 -g -O3 -MMD -MP -static -fno-plt -fno-pic -fpie -z max-page-size=4096"
+$ make
+$ file src/ls
+src/ls: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), static-pie linked, with debug_info, not stripped
+$ aarch64-linux-musl-objdump -d -S coreutils-8.32/src/ls
+0000000000003160 <main>:
+...
+int
+main (int argc, char **argv)
+{
+    3160:	a9b37bfd 	stp	x29, x30, [sp, #-208]!
+    3164:	910003fd 	mov	x29, sp
+    3168:	a9046bf9 	stp	x25, x26, [sp, #64]
+  int i;
+  struct pending *thispend;
+  int n_files;
+
+  initialize_main (&argc, &argv);
+  set_program_name (argv[0]);
+    316c:	9000023a 	adrp	x26, 47000 <long_options+0x2c8>
+{
+    3170:	a90153f3 	stp	x19, x20, [sp, #16]
+    3174:	aa0103f3 	mov	x19, x1
+    3178:	2a0003f4 	mov	w20, w0
+  set_program_name (argv[0]);
+    317c:	f9400020 	ldr	x0, [x1]
+$ cd src && find . -type f -executable -not -name '*.so' -exec cp {} ../../usr/bin/ \;
+
+$ cd $DASH
+$ make clean
+$ CC=aarch64-linux-musl-gcc ./configure --host=aarch64-linux-musl --enable-static CFLAGS="-std=gnu99 -g -O3 -MMD -MP -static -fno-plt -fno-pic -fpie -z max-page-size=4096 -Isrc"
+$ make
+$ file src/dash
+src/dash: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), static-pie linked, with debug_info, not stripped
+$ aarch64-linux-musl-objdump -S -d src/dash
+0000000000003970 <main>:
+...
+int
+main(int argc, char **argv)
+{
+    3970:	a9b77bfd 	stp	x29, x30, [sp, #-144]!
+    3974:	910003fd 	mov	x29, sp
+    3978:	a90153f3 	stp	x19, x20, [sp, #16]
+
+#if PROFILE
+	monitor(4, etext, profile_buf, sizeof profile_buf, 50);
+#endif
+	state = 0;
+	if (unlikely(setjmp(main_handler.loc))) {
+    397c:	f0000194 	adrp	x20, 36000 <signal_names+0x1d0>
+{
+    3980:	f90027e1 	str	x1, [sp, #72]
+$ cp src/dash ../usr/bin/
+```
+
+
+
+3. developブランチににmacブランチをマージ
+
+```
+$ cd $XV6
+$ git checkout develop
+$ git fetch origin mac
+$ git merge origin/mac
+$ コンフリクトを修正
+$ git add .
+$ git commit -m "merge mac branch"
+$ vi Makefile
+-MUSL_INC = /Users/dspace/musl/include
++MUSL := /home/vagrant/aarch64-linux-musl-cross/aarch64-linux-musl
++MUSL_INC = $(MUSL)/include
+$ vi config.mk
+-CROSS := aarch64-elf-
++CROSS := aarch64-linux-musl-
+$ vi mksd.mk
+- mformat -F -c 1 -i $@ ::
++ mkfs.vfat -F 32 -s 1 $@
+$ vi usr/Makefile
+-MUSL = /Users/dspace/musl
+-LIBC_A = $(MUSL)/libc/lib/libc.a
+-LIBC_SPEC = $(MUSL)/lib/musl-gcc.specs
++MUSL = /home/vagrant/aarch64-linux-musl-cross/aarch64-linux-musl
++LIBC_A = $(MUSL)/lib/libc.a
++# LIBC_SPEC = $(MUSL)/lib/musl-gcc.specs
+
+-USR_CC := $(MUSL)/bin/musl-gcc
++USR_CC := $(CC)
+
+-CFLAGS = -std=gnu99 -O3 -MMD -MP -static -z max-page-size=4096 \
+-  -fno-omit-frame-pointer -Iinc/
++CFLAGS = -std=gnu99 -g -O3 -MMD -MP -static -z max-page-size=4096 \
++  -fno-omit-frame-pointer -Iinc
+
++LIBS_DEPS:
++       touch LIBC_BUILT
++
+-$(OBJ)/%.c.o: %.c $(LIBC_DEPS)
++$(OBJ)/%.c.o: %.c
+
+$ make
+$ make qemu                     // すごい遅いが動く
+# mmaptest2
+
+[F-13] file backed shared mapping with fork test
+buf2[0]=0xffff00003bb2c000
+[F-13] failed at strcmp 3: buf2[0, 49, 50]=[, o, a], buf=[o, o, a]      // 結果は同じ
+
+file_test:  ok: 0, ng: 1
+```
