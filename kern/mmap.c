@@ -79,13 +79,13 @@ free_mmap_list(struct proc *p)
 
     while (region) {
         temp = region;
-        if (!(region->flags & MAP_SHARED)) {
+        //if (!(region->flags & MAP_SHARED)) {
             if (region->f) {
                 fileclose(region->f);
             }
             delete_mmap_node(p, region);
             p->nregions -= 1;
-        }
+        //}
         region = temp->next;
     }
 }
@@ -144,8 +144,12 @@ scale_mmap_region(struct mmap_region *region, uint64_t size)
     if (region->length < size) { // 拡大
         if ((error = mmap_load_pages(region->addr + region->length, size - region->length, region->prot, region->flags, region->f, region->offset)) < 0)
             return error;
-    } else {                         // 縮小
-        uvm_unmap(thisproc()->pgdir, (uint64_t)region->addr + size, (region->length - size) / PGSIZE, 1);
+    } else {                        // 縮小
+        uint64_t dstart = ROUNDDOWN((uint64_t)region->addr + region->length, PGSIZE);
+        uint64_t dpages = (region->length - dstart + PGSIZE - 1) / PGSIZE;
+        if ((uint64_t)region->addr + size <= dstart && dpages > 0) {
+            uvm_unmap(thisproc()->pgdir, dstart, dpages, 1);
+        }
     }
     region->length = size;
 
@@ -157,7 +161,7 @@ scale_mmap_region(struct mmap_region *region, uint64_t size)
  * できる: 1, できない: 0
  */
 static int
-check_mmap_region(void *addr, size_t length)
+is_usable(void *addr, size_t length)
 {
     struct proc *p = thisproc();
 
@@ -206,6 +210,7 @@ map_file_page(void *addr, size_t length, uint64_t perm, struct file *f, off_t of
         }
         if ((error = copy_page(f->ip, offset + PGSIZE * i, (mem + length - tempsize), cursize, curoff)) < 0) {
             warn("map_pagecache_page: copy_page failed");
+            kfree(mem);
             return error;
         }
         tempsize -= cursize;
@@ -214,9 +219,9 @@ map_file_page(void *addr, size_t length, uint64_t perm, struct file *f, off_t of
     }
     // ページをユーザプロセスにマッピング
     //cprintf("- map_region: addr=0x%p, mem=0x%p\n", (void *)addr, mem);
-    uint64_t pa = V2P(mem);
-    if ((error = uvm_map(p->pgdir, (void *)addr, PGSIZE, pa)) < 0) {
+    if ((error = uvm_map(p->pgdir, (void *)addr, PGSIZE, V2P(mem), perm)) < 0) {
         //cprintf("map_pagecache_page: map_region failed\n");
+        kfree(mem);
         return error;
     }
 
@@ -233,8 +238,11 @@ map_file_pages(void *addr, size_t length, uint64_t perm, struct file *f, off_t o
     //cprintf("map_file_pages: addr=%p, length=0x%llx, perm=0x%llx, f=%d\n", addr, length, perm, f->ip->inum);
     for (uint64_t cur = 0; cur < length; cur += PGSIZE) {
         mapsize = PGSIZE > size ? size : PGSIZE;
-        if ((error = map_file_page(addr + cur, mapsize, perm, f, offset + cur)) < 0)
+        if ((error = map_file_page(addr + cur, mapsize, perm, f, offset + cur)) < 0) {
+            if (cur != 0)
+                uvm_unmap(thisproc()->pgdir, addr, cur/PGSIZE, 1);
             return error;
+        }
         size -= mapsize;
     }
     return 0;
@@ -252,12 +260,9 @@ map_anon_page(void *addr, uint64_t perm)
         return -ENOMEM;
     }
     memset(page, 0, PGSIZE);
-    uint64_t pa = V2P(page);
     //cprintf("map_anon_page: map addr=0x%llx, page=0x%p\n", addr, V2P(page));
     //if (map_region(p->pgdir, addr, PGSIZE, V2P(page), perm) < 0) {
-    if (uvm_map(p->pgdir, addr, PGSIZE, pa) < 0) {
-        //cprintf("map_anon_page: map_region failed\n");
-        uvm_dealloc(p->pgdir, p->base, (uint64_t)addr - PGSIZE, (uint64_t)addr);
+    if (uvm_map(p->pgdir, addr, PGSIZE, V2P(page), perm) < 0) {
         kfree(page);
         return -EINVAL;
     }
@@ -271,8 +276,12 @@ map_anon_pages(void *addr, size_t length, uint64_t perm)
     long ret;
     //cprintf("map_file_pages: addr=%p, length=0x%llx, perm=0x%llx\n", addr, length, perm);
     for (uint64_t cur = 0; cur < length; cur += PGSIZE) {
-        if ((ret = map_anon_page(addr + cur, perm)) < 0)
+        if ((ret = map_anon_page(addr + cur, perm)) < 0) {
+            if (cur != 0)
+                uvm_unmap(thisproc()->pgdir, addr, cur/PGSIZE, 1);
             return ret;
+        }
+
     }
     return 0;
 }
@@ -281,22 +290,14 @@ map_anon_pages(void *addr, size_t length, uint64_t perm)
 long
 mmap_load_pages(void *addr, size_t length, int prot, int flags, struct file *f, off_t offset)
 {
-    long ret;
-
     uint64_t perm = get_perm(prot, flags);
     if ((flags & MAP_PRIVATE) && !(flags & MAP_POPULATE)) perm |= PTE_RO;
     if (flags & MAP_SHARED) perm &= ~PTE_RO;
 
-    if (flags & MAP_ANONYMOUS) {
-        if ((ret = map_anon_pages(addr, length, perm)) < 0) {
-            return ret;
-        }
-    } else {
-        if ((ret = map_file_pages(addr, length, perm, f, offset)) < 0) {
-            return ret;
-        }
-    }
-    return 0;
+    if (flags & MAP_ANONYMOUS)
+        return map_anon_pages(addr, length, perm);
+    else
+        return map_file_pages(addr, length, perm, f, offset);
 }
 
 // sys_mmapのメイン関数
@@ -343,13 +344,14 @@ mmap(void *addr, size_t length, int prot, int flags, struct file *f, off_t offse
                     return -EINVAL;
                 }
             } else {
-                // 1.1.2.2 指定されたアドレスが使用可能なこと
+                // 1.1.2.2 指定されたアドレスが使用されていないこと
                 struct mmap_region *tmp = find_mmap_region(addr);
                 if (tmp && addr == tmp->addr) {
                     warn("addr is used");
                     return -EINVAL;
                 }
-                if (check_mmap_region(addr, length) == 0) {
+                // 1.1.2.3 指定されたアドレスが使用可能なこと
+                if (!is_usable(addr, length)) {
                     warn("addr is not available");
                     return -EINVAL;
                 }
@@ -371,14 +373,10 @@ select_addr:
         struct mmap_region *node = p->regions;
         while (node) {
             trace("- addr=0x%p, node->addr=0x%p, node->next->addr=0x%p", addr, node->addr, node->next ? node->next->addr : NULL);
-            // 1.2.2 アドレスがユーザ最大アドレス以上になったらエラー
-            if (addr >= (void*)USERTOP) {
-                return -ENOMEM;
-            }
-            // 1.2.3 作成マッピングが現在のノードアドレスより小さい場合はこの候補を使用する
+            // 1.2.31 作成マッピングが現在のノードアドレスより小さい場合はこの候補を使用する
             if (addr + ROUNDUP(length, PGSIZE) <= node->addr)
                 break;
-            // 1.2.4 次のマッピングがない、または次のマッピングとの間における場合はこの候補を使用する
+            // 1.2.2 次のマッピングがない、または次のマッピングとの間における場合はこの候補を使用する
             if (node->addr + node->length <= addr && (node->next == 0 || addr + ROUNDUP(length, PGSIZE) <= node->next->addr))
                 break;
             // 1.2.5 それ以外は、現在のマッピングの右端をアドレス候補とする
@@ -390,10 +388,10 @@ select_addr:
     }
     // 1.3 決定したアドレスがマップ範囲に含まれていることをチェックする
     if (addr + ROUNDUP(length, PGSIZE) > (void *)USERTOP)
-        return -EINVAL;
+        return -ENOMEM;
 
     // 1.4 MAX_FIXEDですでにマッピングがある場合、エラーとする
-/*
+/* FIXME: 必要か検討
     // MAX_FIXEDですでにマッピングがある場合は書き換える
     struct mmap_region *tmp = find_mmap_region(addr);
     if (tmp) {
@@ -414,7 +412,7 @@ select_addr:
 
     // 2.1 mmap_regionのためのメモリを割り当てる
     struct mmap_region *region = (struct mmap_region*)kmalloc(sizeof(struct mmap_region));
-    if (region == (struct mmap_region*)0)
+    if (region == NULL)
         return -ENOMEM;
     // 2.2 mmap_regionにデータを設定する
     region->addr   = addr;
@@ -689,6 +687,57 @@ copy_mmap_list(struct proc *parent, struct proc *child)
     uvm_switch(child->pgdir);
     uvm_switch(parent->pgdir);
     return 0;
+}
+
+long
+copy_mmap_list2(struct proc *parent, struct proc *child)
+{
+    void *start;
+    uint64_t *pte;
+    uint64_t pa, perm;
+    long error;
+
+    struct mmap_region *node = parent->regions;
+    struct mmap_region *cnode = 0, *tail = 0;
+
+    while (node) {
+        struct mmap_region *region = (struct mmap_region *)kmalloc(sizeof(struct mmap_region));
+        if (region == (struct mmap_region *)0)
+            return -ENOMEM;
+        copy_mmap_region(region, node);
+
+        start = node->addr;
+        for (; start < node->addr + node->length; start += PGSIZE) {
+            pte = pgdir_walk(parent->pgdir, start, 0);
+            if (!pte) panic("parent pgdir not pte: va=0x%p\n", start);
+            pa = PTE_ADDR(*pte);
+            perm = PTE_FLAGS(*pte);
+            // MAP_PRIVATEの場合は、READ ONLYで割り当て
+            if (node->flags & MAP_PRIVATE)
+                perm |= PTE_RO;
+            if ((error = uvm_map(child->pgdir, start, PGSIZE, pa, perm)) < 0)
+                goto bad;
+        }
+        if (cnode == 0)
+            cnode = region;
+        else
+            tail->next = region;
+
+        tail = region;
+        node = node->next;
+    }
+
+    child->regions = cnode;
+    child->nregions = parent->nregions;
+    debug("child nregions=%d, regions=0x%p\n", child->nregions, child->regions);
+    //print_mmap_list(parent, parent->name);
+    //print_mmap_list(child, "child");
+    uvm_switch(child->pgdir);
+    uvm_switch(parent->pgdir);
+    return 0;
+bad:
+    free_mmap_list(child);
+    return error;
 }
 
 // Copy on Write機能を実装（trap.cでFLT_PERMISSIONの場合に呼び出される）

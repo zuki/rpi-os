@@ -153,7 +153,7 @@ int main(int args, char *argv[]) {
     printf("anon_test:  ok: %d, ng: %d\n", anon_ok, anon_ng);
     printf("other_test: ok: %d, ng: %d\n", other_ok, other_ng);
 
-    remove("README");
+    unlink(filename);
 
     return 0;
 }

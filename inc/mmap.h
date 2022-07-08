@@ -17,6 +17,7 @@ void free_mmap_list(struct proc *);
 long mmap_load_pages(void *, size_t, int, int, struct file*, off_t);
 void print_mmap_list(struct proc *, const char *);
 long copy_mmap_list(struct proc *, struct proc *);
+long copy_mmap_list2(struct proc *, struct proc *);
 long copy_mmap_pages(void *, size_t, uint64_t);
 void print_vmas(struct proc *);
 struct mmap_region *find_available_region(void *);

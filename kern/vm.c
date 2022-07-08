@@ -52,7 +52,71 @@ pgdir_walk(uint64_t * pgdir, void *vap, int alloc)
     return &pgt[(va >> 12) & 0x1FF];
 }
 
-/* Fork a process's page table. */
+/* Fork: code, data領域のコピー   */
+/*       スタック領域はコピーせず */
+uint64_t *
+uvm_copy2(struct proc *p)
+{
+    uint64_t i, base, sz, stksz, pa, perm;
+    uint64_t *pte, *newpgdir;
+    char *mem;
+
+    base = p->base;
+    sz = p->sz;
+    stksz = USERTOP - p->stksz;
+
+    newpgdir = vm_init();
+    if (!newpgdir)
+        return 0;
+    // code, data領域のコピー
+    for (i = base; i < sz; i += PGSIZE) {
+        if ((pte = pgdir_walk(p->pgdir, (void *)i, 0)) == 0)
+            panic("pte shuld exist: addr=0x%llx\n", i);
+        if (!(*pte & (PTE_PAGE | PTE_VALID)))
+            panic("page not present\n");
+        pa = PTE_ADDR(*pte);
+        perm = PTE_FLAGS(*pte);
+        perm &= ~PTE_RO;
+        if ((mem = kalloc()) == 0) {
+            warn("no memory\n");
+            goto bad;
+        }
+        memmove(mem, (char *)(P2V(pa)), PGSIZE);
+        if (uvm_map(newpgdir, (void *)i, PGSIZE, V2P(mem), perm) < 0) {
+            kfree(mem);
+            cprintf("uvm_copy: map_region failed\n");
+            goto bad;
+        }
+    }
+    // スタック領域のコピー
+    for (i = stksz; i < USERTOP; i += PGSIZE) {       // baseはpage align
+        if ((pte = pgdir_walk(p->pgdir, (void *)i, 0)) == 0)
+            panic("pte shuld exist: addr=0x%llx\n", i);
+        if (!(*pte & (PTE_PAGE | PTE_VALID)))
+            panic("page not present\n");
+        pa = PTE_ADDR(*pte);
+        perm = PTE_FLAGS(*pte);
+        perm &= ~PTE_RO;
+        if ((mem = kalloc()) == 0) {
+            warn("no memory\n");
+            goto bad;
+        }
+        memmove(mem, (char *)(P2V(pa)), PGSIZE);
+        if (uvm_map(newpgdir, (void *)i, PGSIZE, V2P(mem), perm) < 0) {
+            kfree(mem);
+            cprintf("uvm_copy: map_region failed\n");
+            goto bad;
+        }
+    }
+
+    return newpgdir;
+
+bad:
+    vm_free(newpgdir);
+    kfree((char *)newpgdir);
+    return 0;
+}
+
 uint64_t *
 uvm_copy(uint64_t * pgdir)
 {
@@ -103,7 +167,7 @@ uvm_copy(uint64_t * pgdir)
                                     // disb();
                                     if (uvm_map
                                         (newpgdir, (void *)va, PGSIZE,
-                                         V2P((uint64_t) np)) < 0) {
+                                         V2P((uint64_t) np), PTE_UDATA) < 0) {
                                         vm_free(newpgdir);
                                         kfree(np);
                                         warn("uvm_map failed");
@@ -153,7 +217,7 @@ vm_free(uint64_t * pgdir)
  * Return -1 if failed else 0.
  */
 int
-uvm_map(uint64_t * pgdir, void *va, size_t sz, uint64_t pa)
+uvm_map(uint64_t * pgdir, void *va, size_t sz, uint64_t pa, uint64_t perm)
 {
     void *p = ROUNDDOWN(va, PGSIZE), *end = va + sz;
     assert(pa < USERTOP);
@@ -168,7 +232,7 @@ uvm_map(uint64_t * pgdir, void *va, size_t sz, uint64_t pa)
             warn("remap: p=0x%p, *pte=0x%llx\n", p, *pte);
             return -EINVAL;
         }
-        *pte = pa | PTE_UDATA;
+        *pte = pa | perm;
     }
     return 0;
 }
@@ -198,7 +262,7 @@ uvm_alloc(uint64_t * pgdir, size_t base, size_t stksz, size_t oldsz,
             uvm_dealloc(pgdir, base, newsz, oldsz);
             return 0;
         }
-        if (uvm_map(pgdir, (void *)a, PGSIZE, V2P((uint64_t) p)) < 0) {
+        if (uvm_map(pgdir, (void *)a, PGSIZE, V2P((uint64_t) p), PTE_UDATA) < 0) {
             warn("uvm_map failed: p=0x%llx, size=%d, pa=0x%llx", a, PGSIZE, V2P((uint64_t) p));
             kfree(p);
             uvm_dealloc(pgdir, base, newsz, oldsz);
@@ -350,14 +414,14 @@ vm_test()
     void *p = kalloc(), *p2 = kalloc(), *va = (void *)0x1000;
     memset(p, 0xAB, PGSIZE);
     memset(p2, 0xAC, PGSIZE);
-    uvm_map(pgdir, va, PGSIZE, V2P((uint64_t) p));
+    uvm_map(pgdir, va, PGSIZE, V2P((uint64_t) p), PTE_UDATA);
     uvm_switch(pgdir);
     for (char *i = va; (void *)i < va + PGSIZE; i++) {
         assert(*i == 0xAB);
     }
     uvm_dealloc(pgdir, (size_t)va, (size_t)va + PGSIZE, (size_t)va);
 
-    uvm_map(pgdir, va, PGSIZE, V2P((uint64_t) p2));
+    uvm_map(pgdir, va, PGSIZE, V2P((uint64_t) p2), PTE_UDATA);
     uvm_switch(pgdir);
     for (char *i = va; (void *)i < va + PGSIZE; i++) {
         assert(*i == 0xAC);

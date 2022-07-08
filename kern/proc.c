@@ -7,6 +7,7 @@
 #include "list.h"
 #include "console.h"
 #include "mm.h"
+#include "mmu.h"
 #include "vm.h"
 #include "spinlock.h"
 #include "mmap.h"
@@ -117,7 +118,7 @@ proc_initx(char *name, char *code, size_t len)
     p->pgdir = vm_init();
     assert(p->pgdir);
 
-    int ret = uvm_map(p->pgdir, 0, PGSIZE, V2P(va));
+    int ret = uvm_map(p->pgdir, 0, PGSIZE, V2P(va), PTE_UDATA);
     assert(ret == 0);
 
     memmove(va, code, len);
@@ -311,6 +312,7 @@ fork()
         return -ENOMEM;
     }
 
+    //if ((np->pgdir = uvm_copy2(cp)) == 0) {
     if ((np->pgdir = uvm_copy(cp->pgdir)) == 0) {
         kfree(np->kstack);
 
@@ -323,6 +325,7 @@ fork()
     }
 
     if (cp->nregions != 0) {
+        //if ((error = copy_mmap_list2(cp, np)) < 0) {
         if ((error = copy_mmap_list(cp, np)) < 0) {
             vm_free(np->pgdir);
             kfree(np->kstack);
