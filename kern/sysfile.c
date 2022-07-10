@@ -192,7 +192,7 @@ sys_ioctl()
     if (argfd(0, &fd, &f) < 0 || argu64(1, &req) < 0)
         return -EINVAL;
 
-    debug("fd: %d, req: 0x%llx, f->type: %d", fd, req, f->ip->type);
+    trace("fd: %d, req: 0x%llx, f->type: %d", fd, req, f->ip->type);
 
     if (f->ip->type != T_DEV) return -ENOTTY;
 

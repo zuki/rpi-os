@@ -522,8 +522,8 @@ fork_test(void)
         err("mmap p2");
 
     // read just 2nd page.
-    printf("p1[PGSIZE]=%c\n", *(p1+PGSIZE));
-    printf("p2[PGSIZE]=%c\n", *(p2+PGSIZE));
+    printf("p1: %p [%d]=%c\n", p1, p1+PGSIZE, *(p1+PGSIZE));
+    printf("p2: %p [%d]=%c\n", p2, p2+PGSIZE, *(p2+PGSIZE));
     if(*(p1+PGSIZE) != 'A')
         err("fork mismatch (1)");
 
@@ -534,6 +534,8 @@ fork_test(void)
     if (pid == 0) {
         if ((ret = _v1(p1)) < 0) {
             printf("- fork child v1(p1): ret: %d\n", ret);
+        } else {
+            printf("- fork child v1(p1) ok\n");
         }
         munmap((void *)p1, PGSIZE); // just the first page
         exit(0); // tell the parent that the mapping looks OK.
@@ -552,9 +554,13 @@ fork_test(void)
     // check that the parent's mappings are still there.
     if ((ret = _v1(p1)) < 0) {
         printf("- fork parent v1(p1): ret: %d\n", ret);
+    } else {
+        printf("- fork patent v1(p1) ok\n");
     }
     if ((ret = _v1(p2)) < 0) {
         printf("- fork parent v1(p2): ret: %d\n", ret);
+    } else {
+        printf("- fork patent v1(p2) ok\n");
     }
     munmap((void *)p1, 2*PGSIZE);
     munmap((void *)p2, 2*PGSIZE);

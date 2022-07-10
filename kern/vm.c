@@ -8,6 +8,8 @@
 #include "memlayout.h"
 #include "console.h"
 #include "mm.h"
+#include "mmap.h"
+#include "linux/mman.h"
 
 /* For simplicity, we only support 4k pages in user pgdir. */
 
@@ -52,71 +54,6 @@ pgdir_walk(uint64_t * pgdir, void *vap, int alloc)
     return &pgt[(va >> 12) & 0x1FF];
 }
 
-/* Fork: code, data領域のコピー   */
-/*       スタック領域はコピーせず */
-uint64_t *
-uvm_copy2(struct proc *p)
-{
-    uint64_t i, base, sz, stksz, pa, perm;
-    uint64_t *pte, *newpgdir;
-    char *mem;
-
-    base = p->base;
-    sz = p->sz;
-    stksz = USERTOP - p->stksz;
-
-    newpgdir = vm_init();
-    if (!newpgdir)
-        return 0;
-    // code, data領域のコピー
-    for (i = base; i < sz; i += PGSIZE) {
-        if ((pte = pgdir_walk(p->pgdir, (void *)i, 0)) == 0)
-            panic("pte shuld exist: addr=0x%llx\n", i);
-        if (!(*pte & (PTE_PAGE | PTE_VALID)))
-            panic("page not present\n");
-        pa = PTE_ADDR(*pte);
-        perm = PTE_FLAGS(*pte);
-        perm &= ~PTE_RO;
-        if ((mem = kalloc()) == 0) {
-            warn("no memory\n");
-            goto bad;
-        }
-        memmove(mem, (char *)(P2V(pa)), PGSIZE);
-        if (uvm_map(newpgdir, (void *)i, PGSIZE, V2P(mem), perm) < 0) {
-            kfree(mem);
-            cprintf("uvm_copy: map_region failed\n");
-            goto bad;
-        }
-    }
-    // スタック領域のコピー
-    for (i = stksz; i < USERTOP; i += PGSIZE) {       // baseはpage align
-        if ((pte = pgdir_walk(p->pgdir, (void *)i, 0)) == 0)
-            panic("pte shuld exist: addr=0x%llx\n", i);
-        if (!(*pte & (PTE_PAGE | PTE_VALID)))
-            panic("page not present\n");
-        pa = PTE_ADDR(*pte);
-        perm = PTE_FLAGS(*pte);
-        perm &= ~PTE_RO;
-        if ((mem = kalloc()) == 0) {
-            warn("no memory\n");
-            goto bad;
-        }
-        memmove(mem, (char *)(P2V(pa)), PGSIZE);
-        if (uvm_map(newpgdir, (void *)i, PGSIZE, V2P(mem), perm) < 0) {
-            kfree(mem);
-            cprintf("uvm_copy: map_region failed\n");
-            goto bad;
-        }
-    }
-
-    return newpgdir;
-
-bad:
-    vm_free(newpgdir);
-    kfree((char *)newpgdir);
-    return 0;
-}
-
 uint64_t *
 uvm_copy(uint64_t * pgdir)
 {
@@ -152,22 +89,25 @@ uvm_copy(uint64_t * pgdir)
                                     uint64_t va = (uint64_t) i  << (L0SHIFT)
                                                 | (uint64_t) i1 << (L1SHIFT)
                                                 | (uint64_t) i2 << (L2SHIFT)
-                                                | i3 << L3SHIFT;
-                                    void *np = kalloc();
-                                    if (np == 0) {
-                                        vm_free(newpgdir);
-                                        warn("kalloc failed");
-                                        return 0;
+                                                | (uint64_t) i3 << L3SHIFT;
+                                    // mmapされたアドレスでMAP_SHAREDの場合は親のpaをそのまま使用。
+                                    // それ以外は新規paに親のpaをコピーして使用
+                                    struct mmap_region *region = find_mmap_region((void *)va);
+                                    void *np;
+                                    if (region && region->flags & MAP_SHARED) {
+                                        np = P2V(pa);
+                                    } else {
+                                        np = kalloc();
+                                        if (np == 0) {
+                                            vm_free(newpgdir);
+                                            warn("kalloc failed");
+                                            return 0;
+                                        }
+                                        memmove(np, P2V(pa), PGSIZE);
                                     }
-                                    //info("pgdir[0x%llx] pte=0x%llx, np=0x%llx", va, P2V(PTE_ADDR(pgt3[i3])), np);
-                                    memmove(np, P2V(pa), PGSIZE);
-                                    // disb();
-                                    // Flush to memory to sync with icache.
-                                    // dccivac(P2V(pa), PGSIZE);
-                                    // disb();
                                     if (uvm_map
                                         (newpgdir, (void *)va, PGSIZE,
-                                         V2P((uint64_t) np), PTE_UDATA) < 0) {
+                                         V2P((uint64_t) np)) < 0) {
                                         vm_free(newpgdir);
                                         kfree(np);
                                         warn("uvm_map failed");
@@ -188,18 +128,26 @@ vm_free(uint64_t * pgdir)
         if (pgdir[i] & PTE_VALID) {
             assert(pgdir[i] & PTE_TABLE);
             uint64_t *pgt1 = P2V(PTE_ADDR(pgdir[i]));
-            for (int i = 0; i < 512; i++)
-                if (pgt1[i] & PTE_VALID) {
-                    assert(pgt1[i] & PTE_TABLE);
-                    uint64_t *pgt2 = P2V(PTE_ADDR(pgt1[i]));
-                    for (int i = 0; i < 512; i++)
-                        if (pgt2[i] & PTE_VALID) {
-                            assert(pgt2[i] & PTE_TABLE);
-                            uint64_t *pgt3 = P2V(PTE_ADDR(pgt2[i]));
-                            for (int i = 0; i < 512; i++)
-                                if (pgt3[i] & PTE_VALID) {
-                                    uint64_t *p = P2V(PTE_ADDR(pgt3[i]));
-                                    kfree(p);
+            for (int i1 = 0; i1 < 512; i1++)
+                if (pgt1[i1] & PTE_VALID) {
+                    assert(pgt1[i1] & PTE_TABLE);
+                    uint64_t *pgt2 = P2V(PTE_ADDR(pgt1[i1]));
+                    for (int i2 = 0; i2 < 512; i2++)
+                        if (pgt2[i2] & PTE_VALID) {
+                            assert(pgt2[i2] & PTE_TABLE);
+                            uint64_t *pgt3 = P2V(PTE_ADDR(pgt2[i2]));
+                            for (int i3 = 0; i3 < 512; i3++)
+                                if (pgt3[i3] & PTE_VALID) {
+                                    uint64_t va = (uint64_t) i << L0SHIFT
+                                                | (uint64_t) i1 << L1SHIFT
+                                                | (uint64_t) i2 << L2SHIFT
+                                                | (uint64_t) i3 << L3SHIFT;
+                                    struct mmap_region *region = find_mmap_region((void *)va);
+                                    if (!region || !(region->flags & MAP_SHARED)) {
+                                        uint64_t *p = P2V(PTE_ADDR(pgt3[i3]));
+                                        debug("free pte =0x%p", p);
+                                        kfree(p);
+                                    }
                                 }
                             kfree(pgt3);
                         }
@@ -217,7 +165,7 @@ vm_free(uint64_t * pgdir)
  * Return -1 if failed else 0.
  */
 int
-uvm_map(uint64_t * pgdir, void *va, size_t sz, uint64_t pa, uint64_t perm)
+uvm_map(uint64_t * pgdir, void *va, size_t sz, uint64_t pa)
 {
     void *p = ROUNDDOWN(va, PGSIZE), *end = va + sz;
     assert(pa < USERTOP);
@@ -232,7 +180,7 @@ uvm_map(uint64_t * pgdir, void *va, size_t sz, uint64_t pa, uint64_t perm)
             warn("remap: p=0x%p, *pte=0x%llx\n", p, *pte);
             return -EINVAL;
         }
-        *pte = pa | perm;
+        *pte = pa | PTE_UDATA;
     }
     return 0;
 }
@@ -262,7 +210,7 @@ uvm_alloc(uint64_t * pgdir, size_t base, size_t stksz, size_t oldsz,
             uvm_dealloc(pgdir, base, newsz, oldsz);
             return 0;
         }
-        if (uvm_map(pgdir, (void *)a, PGSIZE, V2P((uint64_t) p), PTE_UDATA) < 0) {
+        if (uvm_map(pgdir, (void *)a, PGSIZE, V2P((uint64_t) p)) < 0) {
             warn("uvm_map failed: p=0x%llx, size=%d, pa=0x%llx", a, PGSIZE, V2P((uint64_t) p));
             kfree(p);
             uvm_dealloc(pgdir, base, newsz, oldsz);
@@ -414,14 +362,14 @@ vm_test()
     void *p = kalloc(), *p2 = kalloc(), *va = (void *)0x1000;
     memset(p, 0xAB, PGSIZE);
     memset(p2, 0xAC, PGSIZE);
-    uvm_map(pgdir, va, PGSIZE, V2P((uint64_t) p), PTE_UDATA);
+    uvm_map(pgdir, va, PGSIZE, V2P((uint64_t) p));
     uvm_switch(pgdir);
     for (char *i = va; (void *)i < va + PGSIZE; i++) {
         assert(*i == 0xAB);
     }
     uvm_dealloc(pgdir, (size_t)va, (size_t)va + PGSIZE, (size_t)va);
 
-    uvm_map(pgdir, va, PGSIZE, V2P((uint64_t) p2), PTE_UDATA);
+    uvm_map(pgdir, va, PGSIZE, V2P((uint64_t) p2));
     uvm_switch(pgdir);
     for (char *i = va; (void *)i < va + PGSIZE; i++) {
         assert(*i == 0xAC);

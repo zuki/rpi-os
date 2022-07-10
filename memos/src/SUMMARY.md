@@ -13,3 +13,4 @@
 - [システムコール実装の追加](syscall.md)
 - [coreutilsを導入](coreutils.md)
 - [dashを導入](dash.md)
+- [kallocでストール](kalloc.md)

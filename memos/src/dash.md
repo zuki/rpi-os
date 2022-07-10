@@ -174,10 +174,10 @@ if (p==MAP_FAILED) {
 [3]sys_brk: name dash: 0x42f9e0 to 0x0                                          // [1]
 [1]sys_brk: name dash: 0x42f9e0 to 0x432000                                     // [2] ここで0x432000までmappingしているので
 [1]sys_mmap: addr=0x430000, length=0x4096, prot=0x0, flags=0x32, offset=0x0     // [3] sys_brk(432000)して、またsys_mmap(432000)するのは何故?(PROT_NONEで未使用領域にするためだった)
-[1]uvm_map: remap: p=0x430000, *pte =0x3bfbd647                                  // [4] 0x430000がremapなのは当然
+[1]uvm_map: remap: p=0x430000, *pte=0x3bfbd647                                  // [4] 0x430000がremapなのは当然
 
 [1]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0          // [5]
-[1]uvm_map: remap: p=0x431000, *pte =0x3bfc1647
+[1]uvm_map: remap: p=0x431000, *pte=0x3bfc1647
 
 [1]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0          // [6]
 [1]sys_munmap: addr: 0x432000, length: 0x1000                                   // [7]
@@ -489,7 +489,7 @@ int tcsetpgrp(int fd, pid_t pgrp)
 
 ```
 # /bin/ls
-[1]uvm_map: remap: p=0x600000000000, *pte =0x3bf2d647						// これが原因でforkに失敗
+[1]uvm_map: remap: p=0x600000000000, *pte=0x3bf2d647						// これが原因でforkに失敗
 
 /usr/bin/dash: 1: Cannot fork
 [2]sys_mmap: addr=0x0, length=0x4096, prot=0x3, flags=0x22, offset=0x0
@@ -1271,7 +1271,7 @@ kern/console.c:283: kernel panic at cpu 2.
 [F-06] ok
 
 [F-07] 連続したマッピングを行うテスト
-[0]uvm_map: remap: p=0x600000001000, *pte =0x3bb3c647
+[0]uvm_map: remap: p=0x600000001000, *pte=0x3bb3c647
 
  error: Invalid argument
 [F-07] failed at 1 total mappings
@@ -1404,656 +1404,1153 @@ anon_test:  ok: 10, ng: 3
 other_test: ok: 5, ng: 0
 ```
 
-### fudanではOK
+### free_mmap_listのMAP_SHAREDの処理を追加するとmmaptestの後にlsが実行できなくなる
 
 ```
+[0]iinit: sb: size 800000 nblocks 799419 ninodes 1024 nlog 126 logstart 2 inodestart 128 bmapstart 385
+[2]uvm_alloc: map: addr=0x400000, length=0x1000, pa=0x3bbe0000
+[2]uvm_alloc: map: addr=0x401000, length=0x1000, pa=0x3bbdc000
+[2]uvm_alloc: map: addr=0x402000, length=0x1000, pa=0x3bbdb000
+[2]uvm_alloc: map: addr=0x403000, length=0x1000, pa=0x3bbda000
+[2]uvm_alloc: map: addr=0x404000, length=0x1000, pa=0x3bbd9000
+[2]uvm_alloc: map: addr=0x405000, length=0x1000, pa=0x3bbd8000
+[2]uvm_alloc: map: addr=0x406000, length=0x1000, pa=0x3bbd7000
+[2]uvm_alloc: map: addr=0x407000, length=0x1000, pa=0x3bbd6000
+[2]uvm_alloc: map: addr=0x408000, length=0x1000, pa=0x3bbd5000
+[2]execve: vm_free
+[2]vm_free: free pte =0xffff00003bbfe000
+[2]vm_free: free pgt3=0xffff00003bbfa000
+[2]vm_free: free pgt2=0xffff00003bbfb000
+[2]vm_free: free pgt1=0xffff00003bbfc000
+[2]vm_free: free dir =0xffff00003bbfd000
+[2]vm_stat: va: 0x400000, pa: 0xffff00003bbe0000, pte: 0x3bbe0647, PTE_ADDR(pte): 0x3bbe0000
+[2]vm_stat: va: 0x401000, pa: 0xffff00003bbdc000, pte: 0x3bbdc647, PTE_ADDR(pte): 0x3bbdc000
+[2]vm_stat: va: 0x402000, pa: 0xffff00003bbdb000, pte: 0x3bbdb647, PTE_ADDR(pte): 0x3bbdb000
+[2]vm_stat: va: 0x403000, pa: 0xffff00003bbda000, pte: 0x3bbda647, PTE_ADDR(pte): 0x3bbda000
+[2]vm_stat: va: 0x404000, pa: 0xffff00003bbd9000, pte: 0x3bbd9647, PTE_ADDR(pte): 0x3bbd9000
+[2]vm_stat: va: 0x405000, pa: 0xffff00003bbd8000, pte: 0x3bbd8647, PTE_ADDR(pte): 0x3bbd8000
+[2]vm_stat: va: 0x406000, pa: 0xffff00003bbd7000, pte: 0x3bbd7647, PTE_ADDR(pte): 0x3bbd7000
+[2]vm_stat: va: 0x407000, pa: 0xffff00003bbd6000, pte: 0x3bbd6647, PTE_ADDR(pte): 0x3bbd6000
+[2]vm_stat: va: 0x408000, pa: 0xffff00003bbd5000, pte: 0x3bbd5647, PTE_ADDR(pte): 0x3bbd5000
+[2]vm_stat: va: 0xffffffff6000, pa: 0xffff00003bbd0000, pte: 0x3bbd0647, PTE_ADDR(pte): 0x3bbd0000
+[2]vm_stat: va: [0x400000 ~ 0x409000)
+[2]vm_stat: va: 0xffffffff7000, pa: 0xffff00003bbcf000, pte: 0x3bbcf647, PTE_ADDR(pte): 0x3bbcf000
+[2]vm_stat: va: 0xffffffff8000, pa: 0xffff00003bbce000, pte: 0x3bbce647, PTE_ADDR(pte): 0x3bbce000
+[2]vm_stat: va: 0xffffffff9000, pa: 0xffff00003bbcd000, pte: 0x3bbcd647, PTE_ADDR(pte): 0x3bbcd000
+[2]vm_stat: va: 0xffffffffa000, pa: 0xffff00003bbcc000, pte: 0x3bbcc647, PTE_ADDR(pte): 0x3bbcc000
+[2]vm_stat: va: 0xffffffffb000, pa: 0xffff00003bbcb000, pte: 0x3bbcb647, PTE_ADDR(pte): 0x3bbcb000
+[2]vm_stat: va: 0xffffffffc000, pa: 0xffff00003bbca000, pte: 0x3bbca647, PTE_ADDR(pte): 0x3bbca000
+[2]vm_stat: va: 0xffffffffd000, pa: 0xffff00003bbc9000, pte: 0x3bbc9647, PTE_ADDR(pte): 0x3bbc9000
+[2]vm_stat: va: 0xffffffffe000, pa: 0xffff00003bbc8000, pte: 0x3bbc8647, PTE_ADDR(pte): 0x3bbc8000
+[2]vm_stat: va: 0xfffffffff000, pa: 0xffff00003bbd1000, pte: 0x3bbd1647, PTE_ADDR(pte): 0x3bbd1000
+[2]vm_stat: va: [0xffffffff6000 ~ 0x1000000000000)
+init: starting sh
+[3]uvm_copy: map: addr=0x400000, length=0x1000, pa=0x3bbfb000
+[3]uvm_copy: map: addr=0x401000, length=0x1000, pa=0x3bbc6000
+[3]uvm_copy: map: addr=0x402000, length=0x1000, pa=0x3bbc5000
+[3]uvm_copy: map: addr=0x403000, length=0x1000, pa=0x3bbc4000
+[3]uvm_copy: map: addr=0x404000, length=0x1000, pa=0x3bbc3000
+[3]uvm_copy: map: addr=0x405000, length=0x1000, pa=0x3bbc2000
+[3]uvm_copy: map: addr=0x406000, length=0x1000, pa=0x3bbc1000
+[3]uvm_copy: map: addr=0x407000, length=0x1000, pa=0x3bbc0000
+[3]uvm_copy: map: addr=0x408000, length=0x1000, pa=0x3bbbf000
+[3]uvm_copy: map: addr=0xffffffff6000, length=0x1000, pa=0x3bbbe000
+[3]uvm_copy: map: addr=0xffffffff7000, length=0x1000, pa=0x3bbba000
+[3]uvm_copy: map: addr=0xffffffff8000, length=0x1000, pa=0x3bbb9000
+[3]uvm_copy: map: addr=0xffffffff9000, length=0x1000, pa=0x3bbb8000
+[3]uvm_copy: map: addr=0xffffffffa000, length=0x1000, pa=0x3bbb7000
+[3]uvm_copy: map: addr=0xffffffffb000, length=0x1000, pa=0x3bbb6000
+[3]uvm_copy: map: addr=0xffffffffc000, length=0x1000, pa=0x3bbb5000
+[3]uvm_copy: map: addr=0xffffffffd000, length=0x1000, pa=0x3bbb4000
+[3]uvm_copy: map: addr=0xffffffffe000, length=0x1000, pa=0x3bbb3000
+[3]uvm_copy: map: addr=0xfffffffff000, length=0x1000, pa=0x3bbb2000
+[0]uvm_alloc: map: addr=0x400000, length=0x1000, pa=0x3bbb0000
+[0]uvm_alloc: map: addr=0x401000, length=0x1000, pa=0x3bbac000
+[0]uvm_alloc: map: addr=0x402000, length=0x1000, pa=0x3bbab000
+[0]uvm_alloc: map: addr=0x403000, length=0x1000, pa=0x3bbaa000
+[0]uvm_alloc: map: addr=0x404000, length=0x1000, pa=0x3bba9000
+[0]uvm_alloc: map: addr=0x405000, length=0x1000, pa=0x3bba8000
+[0]uvm_alloc: map: addr=0x406000, length=0x1000, pa=0x3bba7000
+[0]uvm_alloc: map: addr=0x407000, length=0x1000, pa=0x3bba6000
+[0]uvm_alloc: map: addr=0x408000, length=0x1000, pa=0x3bba5000
+[0]uvm_alloc: map: addr=0x409000, length=0x1000, pa=0x3bba4000
+[0]uvm_alloc: map: addr=0x40a000, length=0x1000, pa=0x3bba3000
+[0]uvm_alloc: map: addr=0x40b000, length=0x1000, pa=0x3bba2000
+[0]uvm_alloc: map: addr=0x40c000, length=0x1000, pa=0x3bba1000
+[0]uvm_alloc: map: addr=0x40d000, length=0x1000, pa=0x3bba0000
+[0]uvm_alloc: map: addr=0x40e000, length=0x1000, pa=0x3bb9f000
+[0]uvm_alloc: map: addr=0x40f000, length=0x1000, pa=0x3bb9e000
+[0]uvm_alloc: map: addr=0x410000, length=0x1000, pa=0x3bb9d000
+[0]uvm_alloc: map: addr=0x411000, length=0x1000, pa=0x3bb9c000
+[0]uvm_alloc: map: addr=0x412000, length=0x1000, pa=0x3bb9b000
+[0]uvm_alloc: map: addr=0x413000, length=0x1000, pa=0x3bb9a000
+[0]uvm_alloc: map: addr=0x414000, length=0x1000, pa=0x3bb99000
+[0]uvm_alloc: map: addr=0x415000, length=0x1000, pa=0x3bb98000
+[0]uvm_alloc: map: addr=0x416000, length=0x1000, pa=0x3bb97000
+[0]uvm_alloc: map: addr=0x417000, length=0x1000, pa=0x3bb96000
+[0]uvm_alloc: map: addr=0x418000, length=0x1000, pa=0x3bb95000
+[0]uvm_alloc: map: addr=0x419000, length=0x1000, pa=0x3bb94000
+[0]uvm_alloc: map: addr=0x41a000, length=0x1000, pa=0x3bb93000
+[0]uvm_alloc: map: addr=0x41b000, length=0x1000, pa=0x3bb92000
+[0]uvm_alloc: map: addr=0x41c000, length=0x1000, pa=0x3bb91000
+[0]uvm_alloc: map: addr=0x41d000, length=0x1000, pa=0x3bb90000
+[0]uvm_alloc: map: addr=0x41e000, length=0x1000, pa=0x3bb8f000
+[0]uvm_alloc: map: addr=0x41f000, length=0x1000, pa=0x3bb8e000
+[0]uvm_alloc: map: addr=0x420000, length=0x1000, pa=0x3bb8d000
+[0]uvm_alloc: map: addr=0x421000, length=0x1000, pa=0x3bb8c000
+[0]uvm_alloc: map: addr=0x422000, length=0x1000, pa=0x3bb8b000
+[0]uvm_alloc: map: addr=0x423000, length=0x1000, pa=0x3bb8a000
+[0]uvm_alloc: map: addr=0x424000, length=0x1000, pa=0x3bb89000
+[0]uvm_alloc: map: addr=0x425000, length=0x1000, pa=0x3bb88000
+[0]uvm_alloc: map: addr=0x426000, length=0x1000, pa=0x3bb87000
+[0]uvm_alloc: map: addr=0x427000, length=0x1000, pa=0x3bb86000
+[0]uvm_alloc: map: addr=0x428000, length=0x1000, pa=0x3bb85000
+[0]uvm_alloc: map: addr=0x429000, length=0x1000, pa=0x3bb84000
+[0]uvm_alloc: map: addr=0x42a000, length=0x1000, pa=0x3bb83000
+[0]uvm_alloc: map: addr=0x42b000, length=0x1000, pa=0x3bb82000
+[0]uvm_alloc: map: addr=0x42c000, length=0x1000, pa=0x3bb81000
+[0]uvm_alloc: map: addr=0x42d000, length=0x1000, pa=0x3bb80000
+[0]uvm_alloc: map: addr=0x42e000, length=0x1000, pa=0x3bb7f000
+[0]uvm_alloc: map: addr=0x42f000, length=0x1000, pa=0x3bb7e000
+[0]execve: vm_free
+[0]vm_free: free pte =0xffff00003bbfb000
+[0]vm_free: free pte =0xffff00003bbc6000
+[0]vm_free: free pte =0xffff00003bbc5000
+[0]vm_free: free pte =0xffff00003bbc4000
+[0]vm_free: free pte =0xffff00003bbc3000
+[0]vm_free: free pte =0xffff00003bbc2000
+[0]vm_free: free pte =0xffff00003bbc1000
+[0]vm_free: free pte =0xffff00003bbc0000
+[0]vm_free: free pte =0xffff00003bbbf000
+[0]vm_free: free pgt3=0xffff00003bbc7000
+[0]vm_free: free pgt2=0xffff00003bbfe000
+[0]vm_free: free pgt1=0xffff00003bbfa000
+[0]vm_free: free pte =0xffff00003bbbe000
+[0]vm_free: free pte =0xffff00003bbba000
+[0]vm_free: free pte =0xffff00003bbb9000
+[0]vm_free: free pte =0xffff00003bbb8000
+[0]vm_free: free pte =0xffff00003bbb7000
+[0]vm_free: free pte =0xffff00003bbb6000
+[0]vm_free: free pte =0xffff00003bbb5000
+[0]vm_free: free pte =0xffff00003bbb4000
+[0]vm_free: free pte =0xffff00003bbb3000
+[0]vm_free: free pte =0xffff00003bbb2000
+[0]vm_free: free pgt3=0xffff00003bbbb000
+[0]vm_free: free pgt2=0xffff00003bbbc000
+[0]vm_free: free pgt1=0xffff00003bbbd000
+[0]vm_free: free dir =0xffff00003bbfc000
+[0]vm_stat: va: 0x400000, pa: 0xffff00003bbb0000, pte: 0x3bbb0647, PTE_ADDR(pte): 0x3bbb0000
+[0]vm_stat: va: 0x401000, pa: 0xffff00003bbac000, pte: 0x3bbac647, PTE_ADDR(pte): 0x3bbac000
+[0]vm_stat: va: 0x402000, pa: 0xffff00003bbab000, pte: 0x3bbab647, PTE_ADDR(pte): 0x3bbab000
+[0]vm_stat: va: 0x403000, pa: 0xffff00003bbaa000, pte: 0x3bbaa647, PTE_ADDR(pte): 0x3bbaa000
+[0]vm_stat: va: 0x404000, pa: 0xffff00003bba9000, pte: 0x3bba9647, PTE_ADDR(pte): 0x3bba9000
+[0]vm_stat: va: 0x405000, pa: 0xffff00003bba8000, pte: 0x3bba8647, PTE_ADDR(pte): 0x3bba8000
+[0]vm_stat: va: 0x406000, pa: 0xffff00003bba7000, pte: 0x3bba7647, PTE_ADDR(pte): 0x3bba7000
+[0]vm_stat: va: 0x407000, pa: 0xffff00003bba6000, pte: 0x3bba6647, PTE_ADDR(pte): 0x3bba6000
+[0]vm_stat: va: 0x408000, pa: 0xffff00003bba5000, pte: 0x3bba5647, PTE_ADDR(pte): 0x3bba5000
+[0]vm_stat: va: 0x409000, pa: 0xffff00003bba4000, pte: 0x3bba4647, PTE_ADDR(pte): 0x3bba4000
+[0]vm_stat: va: 0x40a000, pa: 0xffff00003bba3000, pte: 0x3bba3647, PTE_ADDR(pte): 0x3bba3000
+[0]vm_stat: va: 0x40b000, pa: 0xffff00003bba2000, pte: 0x3bba2647, PTE_ADDR(pte): 0x3bba2000
+[0]vm_stat: va: 0x40c000, pa: 0xffff00003bba1000, pte: 0x3bba1647, PTE_ADDR(pte): 0x3bba1000
+[0]vm_stat: va: 0x40d000, pa: 0xffff00003bba0000, pte: 0x3bba0647, PTE_ADDR(pte): 0x3bba0000
+[0]vm_stat: va: 0x40e000, pa: 0xffff00003bb9f000, pte: 0x3bb9f647, PTE_ADDR(pte): 0x3bb9f000
+[0]vm_stat: va: 0x40f000, pa: 0xffff00003bb9e000, pte: 0x3bb9e647, PTE_ADDR(pte): 0x3bb9e000
+[0]vm_stat: va: 0x410000, pa: 0xffff00003bb9d000, pte: 0x3bb9d647, PTE_ADDR(pte): 0x3bb9d000
+[0]vm_stat: va: 0x411000, pa: 0xffff00003bb9c000, pte: 0x3bb9c647, PTE_ADDR(pte): 0x3bb9c000
+[0]vm_stat: va: 0x412000, pa: 0xffff00003bb9b000, pte: 0x3bb9b647, PTE_ADDR(pte): 0x3bb9b000
+[0]vm_stat: va: 0x413000, pa: 0xffff00003bb9a000, pte: 0x3bb9a647, PTE_ADDR(pte): 0x3bb9a000
+[0]vm_stat: va: 0x414000, pa: 0xffff00003bb99000, pte: 0x3bb99647, PTE_ADDR(pte): 0x3bb99000
+[0]vm_stat: va: 0x415000, pa: 0xffff00003bb98000, pte: 0x3bb98647, PTE_ADDR(pte): 0x3bb98000
+[0]vm_stat: va: 0x416000, pa: 0xffff00003bb97000, pte: 0x3bb97647, PTE_ADDR(pte): 0x3bb97000
+[0]vm_stat: va: 0x417000, pa: 0xffff00003bb96000, pte: 0x3bb96647, PTE_ADDR(pte): 0x3bb96000
+[0]vm_stat: va: 0x418000, pa: 0xffff00003bb95000, pte: 0x3bb95647, PTE_ADDR(pte): 0x3bb95000
+[0]vm_stat: va: 0x419000, pa: 0xffff00003bb94000, pte: 0x3bb94647, PTE_ADDR(pte): 0x3bb94000
+[0]vm_stat: va: 0x41a000, pa: 0xffff00003bb93000, pte: 0x3bb93647, PTE_ADDR(pte): 0x3bb93000
+[0]vm_stat: va: 0x41b000, pa: 0xffff00003bb92000, pte: 0x3bb92647, PTE_ADDR(pte): 0x3bb92000
+[0]vm_stat: va: 0x41c000, pa: 0xffff00003bb91000, pte: 0x3bb91647, PTE_ADDR(pte): 0x3bb91000
+[0]vm_stat: va: 0x41d000, pa: 0xffff00003bb90000, pte: 0x3bb90647, PTE_ADDR(pte): 0x3bb90000
+[0]vm_stat: va: 0x41e000, pa: 0xffff00003bb8f000, pte: 0x3bb8f647, PTE_ADDR(pte): 0x3bb8f000
+[0]vm_stat: va: 0x41f000, pa: 0xffff00003bb8e000, pte: 0x3bb8e647, PTE_ADDR(pte): 0x3bb8e000
+[0]vm_stat: va: 0x420000, pa: 0xffff00003bb8d000, pte: 0x3bb8d647, PTE_ADDR(pte): 0x3bb8d000
+[0]vm_stat: va: 0x421000, pa: 0xffff00003bb8c000, pte: 0x3bb8c647, PTE_ADDR(pte): 0x3bb8c000
+[0]vm_stat: va: 0x422000, pa: 0xffff00003bb8b000, pte: 0x3bb8b647, PTE_ADDR(pte): 0x3bb8b000
+[0]vm_stat: va: 0x423000, pa: 0xffff00003bb8a000, pte: 0x3bb8a647, PTE_ADDR(pte): 0x3bb8a000
+[0]vm_stat: va: 0x424000, pa: 0xffff00003bb89000, pte: 0x3bb89647, PTE_ADDR(pte): 0x3bb89000
+[0]vm_stat: va: 0x425000, pa: 0xffff00003bb88000, pte: 0x3bb88647, PTE_ADDR(pte): 0x3bb88000
+[0]vm_stat: va: 0x426000, pa: 0xffff00003bb87000, pte: 0x3bb87647, PTE_ADDR(pte): 0x3bb87000
+[0]vm_stat: va: 0x427000, pa: 0xffff00003bb86000, pte: 0x3bb86647, PTE_ADDR(pte): 0x3bb86000
+[0]vm_stat: va: 0x428000, pa: 0xffff00003bb85000, pte: 0x3bb85647, PTE_ADDR(pte): 0x3bb85000
+[0]vm_stat: va: 0x429000, pa: 0xffff00003bb84000, pte: 0x3bb84647, PTE_ADDR(pte): 0x3bb84000
+[0]vm_stat: va: 0x42a000, pa: 0xffff00003bb83000, pte: 0x3bb83647, PTE_ADDR(pte): 0x3bb83000
+[0]vm_stat: va: 0x42b000, pa: 0xffff00003bb82000, pte: 0x3bb82647, PTE_ADDR(pte): 0x3bb82000
+[0]vm_stat: va: 0x42c000, pa: 0xffff00003bb81000, pte: 0x3bb81647, PTE_ADDR(pte): 0x3bb81000
+[0]vm_stat: va: 0x42d000, pa: 0xffff00003bb80000, pte: 0x3bb80647, PTE_ADDR(pte): 0x3bb80000
+[0]vm_stat: va: 0x42e000, pa: 0xffff00003bb7f000, pte: 0x3bb7f647, PTE_ADDR(pte): 0x3bb7f000
+[0]vm_stat: va: 0x42f000, pa: 0xffff00003bb7e000, pte: 0x3bb7e647, PTE_ADDR(pte): 0x3bb7e000
+[0]vm_stat: va: 0xffffffff6000, pa: 0xffff00003bb79000, pte: 0x3bb79647, PTE_ADDR(pte): 0x3bb79000
+[0]vm_stat: va: [0x400000 ~ 0x430000)
+[0]vm_stat: va: 0xffffffff7000, pa: 0xffff00003bb78000, pte: 0x3bb78647, PTE_ADDR(pte): 0x3bb78000
+[0]vm_stat: va: 0xffffffff8000, pa: 0xffff00003bb77000, pte: 0x3bb77647, PTE_ADDR(pte): 0x3bb77000
+[0]vm_stat: va: 0xffffffff9000, pa: 0xffff00003bb76000, pte: 0x3bb76647, PTE_ADDR(pte): 0x3bb76000
+[0]vm_stat: va: 0xffffffffa000, pa: 0xffff00003bb75000, pte: 0x3bb75647, PTE_ADDR(pte): 0x3bb75000
+[0]vm_stat: va: 0xffffffffb000, pa: 0xffff00003bb74000, pte: 0x3bb74647, PTE_ADDR(pte): 0x3bb74000
+[0]vm_stat: va: 0xffffffffc000, pa: 0xffff00003bb73000, pte: 0x3bb73647, PTE_ADDR(pte): 0x3bb73000
+[0]vm_stat: va: 0xffffffffd000, pa: 0xffff00003bb72000, pte: 0x3bb72647, PTE_ADDR(pte): 0x3bb72000
+[0]vm_stat: va: 0xffffffffe000, pa: 0xffff00003bb71000, pte: 0x3bb71647, PTE_ADDR(pte): 0x3bb71000
+[0]vm_stat: va: 0xfffffffff000, pa: 0xffff00003bb7a000, pte: 0x3bb7a647, PTE_ADDR(pte): 0x3bb7a000
+[0]vm_stat: va: [0xffffffff6000 ~ 0x1000000000000)
+[1]uvm_alloc: map: addr=0x430000, length=0x1000, pa=0x3bbfc000
+[1]uvm_alloc: map: addr=0x431000, length=0x1000, pa=0x3bbbd000
+[1]map_anon_page: map: addr=0x600000000000, length=0x1000, pa=0x3bbbb000
+# /bin/ls
+[0]uvm_copy: map: addr=0x400000, length=0x1000, pa=0x3bbb7000
+[0]uvm_copy: map: addr=0x401000, length=0x1000, pa=0x3bbbe000
+[0]uvm_copy: map: addr=0x402000, length=0x1000, pa=0x3bbfa000
+[0]uvm_copy: map: addr=0x403000, length=0x1000, pa=0x3bbfe000
+[0]uvm_copy: map: addr=0x404000, length=0x1000, pa=0x3bbc7000
+[0]uvm_copy: map: addr=0x405000, length=0x1000, pa=0x3bbbf000
+[0]uvm_copy: map: addr=0x406000, length=0x1000, pa=0x3bbc0000
+[0]uvm_copy: map: addr=0x407000, length=0x1000, pa=0x3bbc1000
+[0]uvm_copy: map: addr=0x408000, length=0x1000, pa=0x3bbc2000
+[0]uvm_copy: map: addr=0x409000, length=0x1000, pa=0x3bbc3000
+[0]uvm_copy: map: addr=0x40a000, length=0x1000, pa=0x3bbc4000
+[0]uvm_copy: map: addr=0x40b000, length=0x1000, pa=0x3bbc5000
+[0]uvm_copy: map: addr=0x40c000, length=0x1000, pa=0x3bbc6000
+[0]uvm_copy: map: addr=0x40d000, length=0x1000, pa=0x3bbfb000
+[0]uvm_copy: map: addr=0x40e000, length=0x1000, pa=0x3bb70000
+[0]uvm_copy: map: addr=0x40f000, length=0x1000, pa=0x3bb6f000
+[0]uvm_copy: map: addr=0x410000, length=0x1000, pa=0x3bb6e000
+[0]uvm_copy: map: addr=0x411000, length=0x1000, pa=0x3bb6d000
+[0]uvm_copy: map: addr=0x412000, length=0x1000, pa=0x3bb6c000
+[0]uvm_copy: map: addr=0x413000, length=0x1000, pa=0x3bb6b000
+[0]uvm_copy: map: addr=0x414000, length=0x1000, pa=0x3bb6a000
+[0]uvm_copy: map: addr=0x415000, length=0x1000, pa=0x3bb69000
+[0]uvm_copy: map: addr=0x416000, length=0x1000, pa=0x3bb68000
+[0]uvm_copy: map: addr=0x417000, length=0x1000, pa=0x3bb67000
+[0]uvm_copy: map: addr=0x418000, length=0x1000, pa=0x3bb66000
+[0]uvm_copy: map: addr=0x419000, length=0x1000, pa=0x3bb65000
+[0]uvm_copy: map: addr=0x41a000, length=0x1000, pa=0x3bb64000
+[0]uvm_copy: map: addr=0x41b000, length=0x1000, pa=0x3bb63000
+[0]uvm_copy: map: addr=0x41c000, length=0x1000, pa=0x3bb62000
+[0]uvm_copy: map: addr=0x41d000, length=0x1000, pa=0x3bb61000
+[0]uvm_copy: map: addr=0x41e000, length=0x1000, pa=0x3bb60000
+[0]uvm_copy: map: addr=0x41f000, length=0x1000, pa=0x3bb5f000
+[0]uvm_copy: map: addr=0x420000, length=0x1000, pa=0x3bb5e000
+[0]uvm_copy: map: addr=0x421000, length=0x1000, pa=0x3bb5d000
+[0]uvm_copy: map: addr=0x422000, length=0x1000, pa=0x3bb5c000
+[0]uvm_copy: map: addr=0x423000, length=0x1000, pa=0x3bb5b000
+[0]uvm_copy: map: addr=0x424000, length=0x1000, pa=0x3bb5a000
+[0]uvm_copy: map: addr=0x425000, length=0x1000, pa=0x3bb59000
+[0]uvm_copy: map: addr=0x426000, length=0x1000, pa=0x3bb58000
+[0]uvm_copy: map: addr=0x427000, length=0x1000, pa=0x3bb57000
+[0]uvm_copy: map: addr=0x428000, length=0x1000, pa=0x3bb56000
+[0]uvm_copy: map: addr=0x429000, length=0x1000, pa=0x3bb55000
+[0]uvm_copy: map: addr=0x42a000, length=0x1000, pa=0x3bb54000
+[0]uvm_copy: map: addr=0x42b000, length=0x1000, pa=0x3bb53000
+[0]uvm_copy: map: addr=0x42c000, length=0x1000, pa=0x3bb52000
+[0]uvm_copy: map: addr=0x42d000, length=0x1000, pa=0x3bb51000
+[0]uvm_copy: map: addr=0x42e000, length=0x1000, pa=0x3bb50000
+[0]uvm_copy: map: addr=0x42f000, length=0x1000, pa=0x3bb4f000
+[0]uvm_copy: map: addr=0x430000, length=0x1000, pa=0x3bb4e000
+[0]uvm_copy: map: addr=0x431000, length=0x1000, pa=0x3bb4d000
+[0]uvm_copy: map: addr=0x600000000000, length=0x1000, pa=0x3bb4c000
+[0]uvm_copy: map: addr=0xffffffff6000, length=0x1000, pa=0x3bb48000
+[0]uvm_copy: map: addr=0xffffffff7000, length=0x1000, pa=0x3bb44000
+[0]uvm_copy: map: addr=0xffffffff8000, length=0x1000, pa=0x3bb43000
+[0]uvm_copy: map: addr=0xffffffff9000, length=0x1000, pa=0x3bb42000
+[0]uvm_copy: map: addr=0xffffffffa000, length=0x1000, pa=0x3bb41000
+[0]uvm_copy: map: addr=0xffffffffb000, length=0x1000, pa=0x3bb40000
+[0]uvm_copy: map: addr=0xffffffffc000, length=0x1000, pa=0x3bb3f000
+[0]uvm_copy: map: addr=0xffffffffd000, length=0x1000, pa=0x3bb3e000
+[0]uvm_copy: map: addr=0xffffffffe000, length=0x1000, pa=0x3bb3d000
+[0]uvm_copy: map: addr=0xfffffffff000, length=0x1000, pa=0x3bb3c000
+[2]uvm_alloc: map: addr=0x400000, length=0x1000, pa=0x3bb3a000
+[2]uvm_alloc: map: addr=0x401000, length=0x1000, pa=0x3bb36000
+[2]uvm_alloc: map: addr=0x402000, length=0x1000, pa=0x3bb35000
+[2]uvm_alloc: map: addr=0x403000, length=0x1000, pa=0x3bb34000
+[2]uvm_alloc: map: addr=0x404000, length=0x1000, pa=0x3bb33000
+[2]uvm_alloc: map: addr=0x405000, length=0x1000, pa=0x3bb32000
+[2]uvm_alloc: map: addr=0x406000, length=0x1000, pa=0x3bb31000
+[2]uvm_alloc: map: addr=0x407000, length=0x1000, pa=0x3bb30000
+[2]uvm_alloc: map: addr=0x408000, length=0x1000, pa=0x3bb2f000
+[2]uvm_alloc: map: addr=0x409000, length=0x1000, pa=0x3bb2e000
+[2]uvm_alloc: map: addr=0x40a000, length=0x1000, pa=0x3bb2d000
+[2]execve: vm_free
+[2]vm_free: free pte =0xffff00003bbb7000
+[2]vm_free: free pte =0xffff00003bbbe000
+[2]vm_free: free pte =0xffff00003bbfa000
+[2]vm_free: free pte =0xffff00003bbfe000
+[2]vm_free: free pte =0xffff00003bbc7000
+[2]vm_free: free pte =0xffff00003bbbf000
+[2]vm_free: free pte =0xffff00003bbc0000
+[2]vm_free: free pte =0xffff00003bbc1000
+[2]vm_free: free pte =0xffff00003bbc2000
+[2]vm_free: free pte =0xffff00003bbc3000
+[2]vm_free: free pte =0xffff00003bbc4000
+[2]vm_free: free pte =0xffff00003bbc5000
+[2]vm_free: free pte =0xffff00003bbc6000
+[2]vm_free: free pte =0xffff00003bbfb000
+[2]vm_free: free pte =0xffff00003bb70000
+[2]vm_free: free pte =0xffff00003bb6f000
+[2]vm_free: free pte =0xffff00003bb6e000
+[2]vm_free: free pte =0xffff00003bb6d000
+[2]vm_free: free pte =0xffff00003bb6c000
+[2]vm_free: free pte =0xffff00003bb6b000
+[2]vm_free: free pte =0xffff00003bb6a000
+[2]vm_free: free pte =0xffff00003bb69000
+[2]vm_free: free pte =0xffff00003bb68000
+[2]vm_free: free pte =0xffff00003bb67000
+[2]vm_free: free pte =0xffff00003bb66000
+[2]vm_free: free pte =0xffff00003bb65000
+[2]vm_free: free pte =0xffff00003bb64000
+[2]vm_free: free pte =0xffff00003bb63000
+[2]vm_free: free pte =0xffff00003bb62000
+[2]vm_free: free pte =0xffff00003bb61000
+[2]vm_free: free pte =0xffff00003bb60000
+[2]vm_free: free pte =0xffff00003bb5f000
+[2]vm_free: free pte =0xffff00003bb5e000
+[2]vm_free: free pte =0xffff00003bb5d000
+[2]vm_free: free pte =0xffff00003bb5c000
+[2]vm_free: free pte =0xffff00003bb5b000
+[2]vm_free: free pte =0xffff00003bb5a000
+[2]vm_free: free pte =0xffff00003bb59000
+[2]vm_free: free pte =0xffff00003bb58000
+[2]vm_free: free pte =0xffff00003bb57000
+[2]vm_free: free pte =0xffff00003bb56000
+[2]vm_free: free pte =0xffff00003bb55000
+[2]vm_free: free pte =0xffff00003bb54000
+[2]vm_free: free pte =0xffff00003bb53000
+[2]vm_free: free pte =0xffff00003bb52000
+[2]vm_free: free pte =0xffff00003bb51000
+[2]vm_free: free pte =0xffff00003bb50000
+[2]vm_free: free pte =0xffff00003bb4f000
+[2]vm_free: free pte =0xffff00003bb4e000
+[2]vm_free: free pte =0xffff00003bb4d000
+[2]vm_free: free pgt3=0xffff00003bbba000
+[2]vm_free: free pgt2=0xffff00003bbb9000
+[2]vm_free: free pgt1=0xffff00003bbb8000
+[2]vm_free: free pte =0xffff00003bb4c000
+[2]vm_free: free pgt3=0xffff00003bb49000
+[2]vm_free: free pgt2=0xffff00003bb4a000
+[2]vm_free: free pgt1=0xffff00003bb4b000
+[2]vm_free: free pte =0xffff00003bb48000
+[2]vm_free: free pte =0xffff00003bb44000
+[2]vm_free: free pte =0xffff00003bb43000
+[2]vm_free: free pte =0xffff00003bb42000
+[2]vm_free: free pte =0xffff00003bb41000
+[2]vm_free: free pte =0xffff00003bb40000
+[2]vm_free: free pte =0xffff00003bb3f000
+[2]vm_free: free pte =0xffff00003bb3e000
+[2]vm_free: free pte =0xffff00003bb3d000
+[2]vm_free: free pte =0xffff00003bb3c000
+[2]vm_free: free pgt3=0xffff00003bb45000
+[2]vm_free: free pgt2=0xffff00003bb46000
+[2]vm_free: free pgt1=0xffff00003bb47000
+[2]vm_free: free dir =0xffff00003bbb6000
+[2]vm_stat: va: 0x400000, pa: 0xffff00003bb3a000, pte: 0x3bb3a647, PTE_ADDR(pte): 0x3bb3a000
+[2]vm_stat: va: 0x401000, pa: 0xffff00003bb36000, pte: 0x3bb36647, PTE_ADDR(pte): 0x3bb36000
+[2]vm_stat: va: 0x402000, pa: 0xffff00003bb35000, pte: 0x3bb35647, PTE_ADDR(pte): 0x3bb35000
+[2]vm_stat: va: 0x403000, pa: 0xffff00003bb34000, pte: 0x3bb34647, PTE_ADDR(pte): 0x3bb34000
+[2]vm_stat: va: 0x404000, pa: 0xffff00003bb33000, pte: 0x3bb33647, PTE_ADDR(pte): 0x3bb33000
+[2]vm_stat: va: 0x405000, pa: 0xffff00003bb32000, pte: 0x3bb32647, PTE_ADDR(pte): 0x3bb32000
+[2]vm_stat: va: 0x406000, pa: 0xffff00003bb31000, pte: 0x3bb31647, PTE_ADDR(pte): 0x3bb31000
+[2]vm_stat: va: 0x407000, pa: 0xffff00003bb30000, pte: 0x3bb30647, PTE_ADDR(pte): 0x3bb30000
+[2]vm_stat: va: 0x408000, pa: 0xffff00003bb2f000, pte: 0x3bb2f647, PTE_ADDR(pte): 0x3bb2f000
+[2]vm_stat: va: 0x409000, pa: 0xffff00003bb2e000, pte: 0x3bb2e647, PTE_ADDR(pte): 0x3bb2e000
+[2]vm_stat: va: 0x40a000, pa: 0xffff00003bb2d000, pte: 0x3bb2d647, PTE_ADDR(pte): 0x3bb2d000
+[2]vm_stat: va: 0xffffffff6000, pa: 0xffff00003bb28000, pte: 0x3bb28647, PTE_ADDR(pte): 0x3bb28000
+[2]vm_stat: va: [0x400000 ~ 0x40b000)
+[2]vm_stat: va: 0xffffffff7000, pa: 0xffff00003bb27000, pte: 0x3bb27647, PTE_ADDR(pte): 0x3bb27000
+[2]vm_stat: va: 0xffffffff8000, pa: 0xffff00003bb26000, pte: 0x3bb26647, PTE_ADDR(pte): 0x3bb26000
+[2]vm_stat: va: 0xffffffff9000, pa: 0xffff00003bb25000, pte: 0x3bb25647, PTE_ADDR(pte): 0x3bb25000
+[2]vm_stat: va: 0xffffffffa000, pa: 0xffff00003bb24000, pte: 0x3bb24647, PTE_ADDR(pte): 0x3bb24000
+[2]vm_stat: va: 0xffffffffb000, pa: 0xffff00003bb23000, pte: 0x3bb23647, PTE_ADDR(pte): 0x3bb23000
+[2]vm_stat: va: 0xffffffffc000, pa: 0xffff00003bb22000, pte: 0x3bb22647, PTE_ADDR(pte): 0x3bb22000
+[2]vm_stat: va: 0xffffffffd000, pa: 0xffff00003bb21000, pte: 0x3bb21647, PTE_ADDR(pte): 0x3bb21000
+[2]vm_stat: va: 0xffffffffe000, pa: 0xffff00003bb20000, pte: 0x3bb20647, PTE_ADDR(pte): 0x3bb20000
+[2]vm_stat: va: 0xfffffffff000, pa: 0xffff00003bb29000, pte: 0x3bb29647, PTE_ADDR(pte): 0x3bb29000
+[2]vm_stat: va: [0xffffffff6000 ~ 0x1000000000000)
+drwxrwxr-x    1 root wheel  1024  7  9 09:03 .
+drwxrwxr-x    1 root wheel  1024  7  9 09:03 ..
+drwxrwxr-x    2 root wheel  1024  7  9 09:03 bin
+drwxrwxr-x    3 root wheel   384  7  9 09:03 dev
+drwxrwxr-x    8 root wheel   256  7  9 09:03 etc
+drwxrwxrwx    9 root wheel   128  7  9 09:03 lib
+drwxrwxr-x   10 root wheel   192  7  9 09:03 home
+drwxrwxr-x   12 root wheel   256  7  9 09:03 usr
+-rwxr-xr-x   30 root wheel    94  7  9 09:03 test.txt
+[0]wait4: vm_free
+[0]vm_free: free pte =0xffff00003bb3a000
+[0]vm_free: free pte =0xffff00003bb36000
+[0]vm_free: free pte =0xffff00003bb35000
+[0]vm_free: free pte =0xffff00003bb34000
+[0]vm_free: free pte =0xffff00003bb33000
+[0]vm_free: free pte =0xffff00003bb32000
+[0]vm_free: free pte =0xffff00003bb31000
+[0]vm_free: free pte =0xffff00003bb30000
+[0]vm_free: free pte =0xffff00003bb2f000
+[0]vm_free: free pte =0xffff00003bb2e000
+[0]vm_free: free pte =0xffff00003bb2d000
+[0]vm_free: free pgt3=0xffff00003bb37000
+[0]vm_free: free pgt2=0xffff00003bb38000
+[0]vm_free: free pgt1=0xffff00003bb39000
+[0]vm_free: free pte =0xffff00003bb28000
+[0]vm_free: free pte =0xffff00003bb27000
+[0]vm_free: free pte =0xffff00003bb26000
+[0]vm_free: free pte =0xffff00003bb25000
+[0]vm_free: free pte =0xffff00003bb24000
+[0]vm_free: free pte =0xffff00003bb23000
+[0]vm_free: free pte =0xffff00003bb22000
+[0]vm_free: free pte =0xffff00003bb21000
+[0]vm_free: free pte =0xffff00003bb20000
+[0]vm_free: free pte =0xffff00003bb29000
+[0]vm_free: free pgt3=0xffff00003bb2a000
+[0]vm_free: free pgt2=0xffff00003bb2b000
+[0]vm_free: free pgt1=0xffff00003bb2c000
+[0]vm_free: free dir =0xffff00003bb3b000
+[0]map_anon_page: map: addr=0x600000001000, length=0x1000, pa=0x3bbb5000
+# [0]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[0]uvm_unmap: free va=0x600000001000, pa=0xffff00003bbb5000, *pte=0x3bbb5000
+mmaptest2
+[0]uvm_copy: map: addr=0x400000, length=0x1000, pa=0x3bb2c000
+[0]uvm_copy: map: addr=0x401000, length=0x1000, pa=0x3bb20000
+[0]uvm_copy: map: addr=0x402000, length=0x1000, pa=0x3bb21000
+[0]uvm_copy: map: addr=0x403000, length=0x1000, pa=0x3bb22000
+[0]uvm_copy: map: addr=0x404000, length=0x1000, pa=0x3bb23000
+[0]uvm_copy: map: addr=0x405000, length=0x1000, pa=0x3bb24000
+[0]uvm_copy: map: addr=0x406000, length=0x1000, pa=0x3bb25000
+[0]uvm_copy: map: addr=0x407000, length=0x1000, pa=0x3bb26000
+[0]uvm_copy: map: addr=0x408000, length=0x1000, pa=0x3bb27000
+[0]uvm_copy: map: addr=0x409000, length=0x1000, pa=0x3bb28000
+[0]uvm_copy: map: addr=0x40a000, length=0x1000, pa=0x3bb39000
+[0]uvm_copy: map: addr=0x40b000, length=0x1000, pa=0x3bb38000
+[0]uvm_copy: map: addr=0x40c000, length=0x1000, pa=0x3bb37000
+[0]uvm_copy: map: addr=0x40d000, length=0x1000, pa=0x3bb2d000
+[0]uvm_copy: map: addr=0x40e000, length=0x1000, pa=0x3bb2e000
+[0]uvm_copy: map: addr=0x40f000, length=0x1000, pa=0x3bb2f000
+[0]uvm_copy: map: addr=0x410000, length=0x1000, pa=0x3bb30000
+[0]uvm_copy: map: addr=0x411000, length=0x1000, pa=0x3bb31000
+[0]uvm_copy: map: addr=0x412000, length=0x1000, pa=0x3bb32000
+[0]uvm_copy: map: addr=0x413000, length=0x1000, pa=0x3bb33000
+[0]uvm_copy: map: addr=0x414000, length=0x1000, pa=0x3bb34000
+[0]uvm_copy: map: addr=0x415000, length=0x1000, pa=0x3bb35000
+[0]uvm_copy: map: addr=0x416000, length=0x1000, pa=0x3bb36000
+[0]uvm_copy: map: addr=0x417000, length=0x1000, pa=0x3bb3a000
+[0]uvm_copy: map: addr=0x418000, length=0x1000, pa=0x3bbb6000
+[0]uvm_copy: map: addr=0x419000, length=0x1000, pa=0x3bb47000
+[0]uvm_copy: map: addr=0x41a000, length=0x1000, pa=0x3bb46000
+[0]uvm_copy: map: addr=0x41b000, length=0x1000, pa=0x3bb45000
+[0]uvm_copy: map: addr=0x41c000, length=0x1000, pa=0x3bb3c000
+[0]uvm_copy: map: addr=0x41d000, length=0x1000, pa=0x3bb3d000
+[0]uvm_copy: map: addr=0x41e000, length=0x1000, pa=0x3bb3e000
+[0]uvm_copy: map: addr=0x41f000, length=0x1000, pa=0x3bb3f000
+[0]uvm_copy: map: addr=0x420000, length=0x1000, pa=0x3bb40000
+[0]uvm_copy: map: addr=0x421000, length=0x1000, pa=0x3bb41000
+[0]uvm_copy: map: addr=0x422000, length=0x1000, pa=0x3bb42000
+[0]uvm_copy: map: addr=0x423000, length=0x1000, pa=0x3bb43000
+[0]uvm_copy: map: addr=0x424000, length=0x1000, pa=0x3bb44000
+[0]uvm_copy: map: addr=0x425000, length=0x1000, pa=0x3bb48000
+[0]uvm_copy: map: addr=0x426000, length=0x1000, pa=0x3bb4b000
+[0]uvm_copy: map: addr=0x427000, length=0x1000, pa=0x3bb4a000
+[0]uvm_copy: map: addr=0x428000, length=0x1000, pa=0x3bb49000
+[0]uvm_copy: map: addr=0x429000, length=0x1000, pa=0x3bb4c000
+[0]uvm_copy: map: addr=0x42a000, length=0x1000, pa=0x3bbb8000
+[0]uvm_copy: map: addr=0x42b000, length=0x1000, pa=0x3bbb9000
+[0]uvm_copy: map: addr=0x42c000, length=0x1000, pa=0x3bbba000
+[0]uvm_copy: map: addr=0x42d000, length=0x1000, pa=0x3bb4d000
+[0]uvm_copy: map: addr=0x42e000, length=0x1000, pa=0x3bb4e000
+[0]uvm_copy: map: addr=0x42f000, length=0x1000, pa=0x3bb4f000
+[0]uvm_copy: map: addr=0x430000, length=0x1000, pa=0x3bb50000
+[0]uvm_copy: map: addr=0x431000, length=0x1000, pa=0x3bb51000
+[0]uvm_copy: map: addr=0x600000000000, length=0x1000, pa=0x3bb52000
+[0]uvm_copy: map: addr=0xffffffff6000, length=0x1000, pa=0x3bb56000
+[0]uvm_copy: map: addr=0xffffffff7000, length=0x1000, pa=0x3bb5a000
+[0]uvm_copy: map: addr=0xffffffff8000, length=0x1000, pa=0x3bb5b000
+[0]uvm_copy: map: addr=0xffffffff9000, length=0x1000, pa=0x3bb5c000
+[0]uvm_copy: map: addr=0xffffffffa000, length=0x1000, pa=0x3bb5d000
+[0]uvm_copy: map: addr=0xffffffffb000, length=0x1000, pa=0x3bb5e000
+[0]uvm_copy: map: addr=0xffffffffc000, length=0x1000, pa=0x3bb5f000
+[0]uvm_copy: map: addr=0xffffffffd000, length=0x1000, pa=0x3bb60000
+[0]uvm_copy: map: addr=0xffffffffe000, length=0x1000, pa=0x3bb61000
+[0]uvm_copy: map: addr=0xfffffffff000, length=0x1000, pa=0x3bb62000
+[0]uvm_alloc: map: addr=0x400000, length=0x1000, pa=0x3bb64000
+[0]uvm_alloc: map: addr=0x401000, length=0x1000, pa=0x3bb68000
+[0]uvm_alloc: map: addr=0x402000, length=0x1000, pa=0x3bb69000
+[0]uvm_alloc: map: addr=0x403000, length=0x1000, pa=0x3bb6a000
+[0]uvm_alloc: map: addr=0x404000, length=0x1000, pa=0x3bb6b000
+[0]uvm_alloc: map: addr=0x405000, length=0x1000, pa=0x3bb6c000
+[0]uvm_alloc: map: addr=0x406000, length=0x1000, pa=0x3bb6d000
+[0]uvm_alloc: map: addr=0x407000, length=0x1000, pa=0x3bb6e000
+[0]uvm_alloc: map: addr=0x408000, length=0x1000, pa=0x3bb6f000
+[0]uvm_alloc: map: addr=0x409000, length=0x1000, pa=0x3bb70000
+[0]uvm_alloc: map: addr=0x40a000, length=0x1000, pa=0x3bbfb000
+[0]uvm_alloc: map: addr=0x40b000, length=0x1000, pa=0x3bbc6000
+[0]uvm_alloc: map: addr=0x40c000, length=0x1000, pa=0x3bbc5000
+[0]uvm_alloc: map: addr=0x40d000, length=0x1000, pa=0x3bbc4000
+[0]uvm_alloc: map: addr=0x40e000, length=0x1000, pa=0x3bbc3000
+[0]uvm_alloc: map: addr=0x40f000, length=0x1000, pa=0x3bbc2000
+[0]uvm_alloc: map: addr=0x410000, length=0x1000, pa=0x3bbc1000
+[0]uvm_alloc: map: addr=0x411000, length=0x1000, pa=0x3bbc0000
+[0]uvm_alloc: map: addr=0x412000, length=0x1000, pa=0x3bbbf000
+[0]execve: vm_free
+[0]vm_free: free pte =0xffff00003bb2c000
+[0]vm_free: free pte =0xffff00003bb20000
+[0]vm_free: free pte =0xffff00003bb21000
+[0]vm_free: free pte =0xffff00003bb22000
+[0]vm_free: free pte =0xffff00003bb23000
+[0]vm_free: free pte =0xffff00003bb24000
+[0]vm_free: free pte =0xffff00003bb25000
+[0]vm_free: free pte =0xffff00003bb26000
+[0]vm_free: free pte =0xffff00003bb27000
+[0]vm_free: free pte =0xffff00003bb28000
+[0]vm_free: free pte =0xffff00003bb39000
+[0]vm_free: free pte =0xffff00003bb38000
+[0]vm_free: free pte =0xffff00003bb37000
+[0]vm_free: free pte =0xffff00003bb2d000
+[0]vm_free: free pte =0xffff00003bb2e000
+[0]vm_free: free pte =0xffff00003bb2f000
+[0]vm_free: free pte =0xffff00003bb30000
+[0]vm_free: free pte =0xffff00003bb31000
+[0]vm_free: free pte =0xffff00003bb32000
+[0]vm_free: free pte =0xffff00003bb33000
+[0]vm_free: free pte =0xffff00003bb34000
+[0]vm_free: free pte =0xffff00003bb35000
+[0]vm_free: free pte =0xffff00003bb36000
+[0]vm_free: free pte =0xffff00003bb3a000
+[0]vm_free: free pte =0xffff00003bbb6000
+[0]vm_free: free pte =0xffff00003bb47000
+[0]vm_free: free pte =0xffff00003bb46000
+[0]vm_free: free pte =0xffff00003bb45000
+[0]vm_free: free pte =0xffff00003bb3c000
+[0]vm_free: free pte =0xffff00003bb3d000
+[0]vm_free: free pte =0xffff00003bb3e000
+[0]vm_free: free pte =0xffff00003bb3f000
+[0]vm_free: free pte =0xffff00003bb40000
+[0]vm_free: free pte =0xffff00003bb41000
+[0]vm_free: free pte =0xffff00003bb42000
+[0]vm_free: free pte =0xffff00003bb43000
+[0]vm_free: free pte =0xffff00003bb44000
+[0]vm_free: free pte =0xffff00003bb48000
+[0]vm_free: free pte =0xffff00003bb4b000
+[0]vm_free: free pte =0xffff00003bb4a000
+[0]vm_free: free pte =0xffff00003bb49000
+[0]vm_free: free pte =0xffff00003bb4c000
+[0]vm_free: free pte =0xffff00003bbb8000
+[0]vm_free: free pte =0xffff00003bbb9000
+[0]vm_free: free pte =0xffff00003bbba000
+[0]vm_free: free pte =0xffff00003bb4d000
+[0]vm_free: free pte =0xffff00003bb4e000
+[0]vm_free: free pte =0xffff00003bb4f000
+[0]vm_free: free pte =0xffff00003bb50000
+[0]vm_free: free pte =0xffff00003bb51000
+[0]vm_free: free pgt3=0xffff00003bb29000
+[0]vm_free: free pgt2=0xffff00003bb2a000
+[0]vm_free: free pgt1=0xffff00003bb2b000
+[0]vm_free: free pte =0xffff00003bb52000
+[0]vm_free: free pgt3=0xffff00003bb55000
+[0]vm_free: free pgt2=0xffff00003bb54000
+[0]vm_free: free pgt1=0xffff00003bb53000
+[0]vm_free: free pte =0xffff00003bb56000
+[0]vm_free: free pte =0xffff00003bb5a000
+[0]vm_free: free pte =0xffff00003bb5b000
+[0]vm_free: free pte =0xffff00003bb5c000
+[0]vm_free: free pte =0xffff00003bb5d000
+[0]vm_free: free pte =0xffff00003bb5e000
+[0]vm_free: free pte =0xffff00003bb5f000
+[0]vm_free: free pte =0xffff00003bb60000
+[0]vm_free: free pte =0xffff00003bb61000
+[0]vm_free: free pte =0xffff00003bb62000
+[0]vm_free: free pgt3=0xffff00003bb59000
+[0]vm_free: free pgt2=0xffff00003bb58000
+[0]vm_free: free pgt1=0xffff00003bb57000
+[0]vm_free: free dir =0xffff00003bb3b000
+[0]vm_stat: va: 0x400000, pa: 0xffff00003bb64000, pte: 0x3bb64647, PTE_ADDR(pte): 0x3bb64000
+[0]vm_stat: va: 0x401000, pa: 0xffff00003bb68000, pte: 0x3bb68647, PTE_ADDR(pte): 0x3bb68000
+[0]vm_stat: va: 0x402000, pa: 0xffff00003bb69000, pte: 0x3bb69647, PTE_ADDR(pte): 0x3bb69000
+[0]vm_stat: va: 0x403000, pa: 0xffff00003bb6a000, pte: 0x3bb6a647, PTE_ADDR(pte): 0x3bb6a000
+[0]vm_stat: va: 0x404000, pa: 0xffff00003bb6b000, pte: 0x3bb6b647, PTE_ADDR(pte): 0x3bb6b000
+[0]vm_stat: va: 0x405000, pa: 0xffff00003bb6c000, pte: 0x3bb6c647, PTE_ADDR(pte): 0x3bb6c000
+[0]vm_stat: va: 0x406000, pa: 0xffff00003bb6d000, pte: 0x3bb6d647, PTE_ADDR(pte): 0x3bb6d000
+[0]vm_stat: va: 0x407000, pa: 0xffff00003bb6e000, pte: 0x3bb6e647, PTE_ADDR(pte): 0x3bb6e000
+[0]vm_stat: va: 0x408000, pa: 0xffff00003bb6f000, pte: 0x3bb6f647, PTE_ADDR(pte): 0x3bb6f000
+[0]vm_stat: va: 0x409000, pa: 0xffff00003bb70000, pte: 0x3bb70647, PTE_ADDR(pte): 0x3bb70000
+[0]vm_stat: va: 0x40a000, pa: 0xffff00003bbfb000, pte: 0x3bbfb647, PTE_ADDR(pte): 0x3bbfb000
+[0]vm_stat: va: 0x40b000, pa: 0xffff00003bbc6000, pte: 0x3bbc6647, PTE_ADDR(pte): 0x3bbc6000
+[0]vm_stat: va: 0x40c000, pa: 0xffff00003bbc5000, pte: 0x3bbc5647, PTE_ADDR(pte): 0x3bbc5000
+[0]vm_stat: va: 0x40d000, pa: 0xffff00003bbc4000, pte: 0x3bbc4647, PTE_ADDR(pte): 0x3bbc4000
+[0]vm_stat: va: 0x40e000, pa: 0xffff00003bbc3000, pte: 0x3bbc3647, PTE_ADDR(pte): 0x3bbc3000
+[0]vm_stat: va: 0x40f000, pa: 0xffff00003bbc2000, pte: 0x3bbc2647, PTE_ADDR(pte): 0x3bbc2000
+[0]vm_stat: va: 0x410000, pa: 0xffff00003bbc1000, pte: 0x3bbc1647, PTE_ADDR(pte): 0x3bbc1000
+[0]vm_stat: va: 0x411000, pa: 0xffff00003bbc0000, pte: 0x3bbc0647, PTE_ADDR(pte): 0x3bbc0000
+[0]vm_stat: va: 0x412000, pa: 0xffff00003bbbf000, pte: 0x3bbbf647, PTE_ADDR(pte): 0x3bbbf000
+[0]vm_stat: va: 0xffffffff6000, pa: 0xffff00003bbb7000, pte: 0x3bbb7647, PTE_ADDR(pte): 0x3bbb7000
+[0]vm_stat: va: [0x400000 ~ 0x413000)
+[0]vm_stat: va: 0xffffffff7000, pa: 0xffff00003bb1f000, pte: 0x3bb1f647, PTE_ADDR(pte): 0x3bb1f000
+[0]vm_stat: va: 0xffffffff8000, pa: 0xffff00003bb1e000, pte: 0x3bb1e647, PTE_ADDR(pte): 0x3bb1e000
+[0]vm_stat: va: 0xffffffff9000, pa: 0xffff00003bb1d000, pte: 0x3bb1d647, PTE_ADDR(pte): 0x3bb1d000
+[0]vm_stat: va: 0xffffffffa000, pa: 0xffff00003bb1c000, pte: 0x3bb1c647, PTE_ADDR(pte): 0x3bb1c000
+[0]vm_stat: va: 0xffffffffb000, pa: 0xffff00003bb1b000, pte: 0x3bb1b647, PTE_ADDR(pte): 0x3bb1b000
+[0]vm_stat: va: 0xffffffffc000, pa: 0xffff00003bb1a000, pte: 0x3bb1a647, PTE_ADDR(pte): 0x3bb1a000
+[0]vm_stat: va: 0xffffffffd000, pa: 0xffff00003bb19000, pte: 0x3bb19647, PTE_ADDR(pte): 0x3bb19000
+[0]vm_stat: va: 0xffffffffe000, pa: 0xffff00003bb18000, pte: 0x3bb18647, PTE_ADDR(pte): 0x3bb18000
+[0]vm_stat: va: 0xfffffffff000, pa: 0xffff00003bbbe000, pte: 0x3bbbe647, PTE_ADDR(pte): 0x3bbbe000
+[0]vm_stat: va: [0xffffffff6000 ~ 0x1000000000000)
+
+[F-09] ファイルが背後にあるプライベートマッピング
+[2]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb3b000
+[2]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[2]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb3b000, *pte=0x3bb3b000
+[F-09] ok
+
+[F-10] ファイルが背後にある共有マッピングのテスト
+[2]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb3b000
+[2]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[2]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb3b000, *pte=0x3bb3b000
+[F-10] ok
+
+[F-11] file backed mapping pagecache coherency test
+[2]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb3b000
+[3]map_file_page: map: addr=0x600000002000, length=0x1000, pa=0x3bb62000
+[3]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[3]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb3b000, *pte=0x3bb3b000
+[3]delete_mmap_node: unmap: addr=0x600000002000, page=1, free=1
+[3]uvm_unmap: free va=0x600000002000, pa=0xffff00003bb62000, *pte=0x3bb62000
+[F-11] ok
+
+[F-12] file backed private mapping with fork test
+[1]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb62000
+[1]uvm_copy: map: addr=0x400000, length=0x1000, pa=0x3bb60000
+[1]uvm_copy: map: addr=0x401000, length=0x1000, pa=0x3bb5c000
+[1]uvm_copy: map: addr=0x402000, length=0x1000, pa=0x3bb5b000
+[1]uvm_copy: map: addr=0x403000, length=0x1000, pa=0x3bb5a000
+[1]uvm_copy: map: addr=0x404000, length=0x1000, pa=0x3bb56000
+[1]uvm_copy: map: addr=0x405000, length=0x1000, pa=0x3bb53000
+[1]uvm_copy: map: addr=0x406000, length=0x1000, pa=0x3bb54000
+[1]uvm_copy: map: addr=0x407000, length=0x1000, pa=0x3bb55000
+[1]uvm_copy: map: addr=0x408000, length=0x1000, pa=0x3bb52000
+[1]uvm_copy: map: addr=0x409000, length=0x1000, pa=0x3bb2b000
+[1]uvm_copy: map: addr=0x40a000, length=0x1000, pa=0x3bb2a000
+[1]uvm_copy: map: addr=0x40b000, length=0x1000, pa=0x3bb29000
+[1]uvm_copy: map: addr=0x40c000, length=0x1000, pa=0x3bb51000
+[1]uvm_copy: map: addr=0x40d000, length=0x1000, pa=0x3bb50000
+[1]uvm_copy: map: addr=0x40e000, length=0x1000, pa=0x3bb4f000
+[1]uvm_copy: map: addr=0x40f000, length=0x1000, pa=0x3bb4e000
+[1]uvm_copy: map: addr=0x410000, length=0x1000, pa=0x3bb4d000
+[1]uvm_copy: map: addr=0x411000, length=0x1000, pa=0x3bbba000
+[1]uvm_copy: map: addr=0x412000, length=0x1000, pa=0x3bbb9000
+[1]uvm_copy: map: addr=0x600000001000, length=0x1000, pa=0x3bbb8000
+[1]uvm_copy: map: addr=0xffffffff6000, length=0x1000, pa=0x3bb4b000
+[1]uvm_copy: map: addr=0xffffffff7000, length=0x1000, pa=0x3bb42000
+[1]uvm_copy: map: addr=0xffffffff8000, length=0x1000, pa=0x3bb41000
+[1]uvm_copy: map: addr=0xffffffff9000, length=0x1000, pa=0x3bb40000
+[1]uvm_copy: map: addr=0xffffffffa000, length=0x1000, pa=0x3bb3f000
+[1]uvm_copy: map: addr=0xffffffffb000, length=0x1000, pa=0x3bb3e000
+[1]uvm_copy: map: addr=0xffffffffc000, length=0x1000, pa=0x3bb3d000
+[1]uvm_copy: map: addr=0xffffffffd000, length=0x1000, pa=0x3bb3c000
+[1]uvm_copy: map: addr=0xffffffffe000, length=0x1000, pa=0x3bb45000
+[1]uvm_copy: map: addr=0xfffffffff000, length=0x1000, pa=0x3bb46000
+[1]wait4: vm_free
+[1]vm_free: free pte =0xffff00003bb60000
+[1]vm_free: free pte =0xffff00003bb5c000
+[1]vm_free: free pte =0xffff00003bb5b000
+[1]vm_free: free pte =0xffff00003bb5a000
+[1]vm_free: free pte =0xffff00003bb56000
+[1]vm_free: free pte =0xffff00003bb53000
+[1]vm_free: free pte =0xffff00003bb54000
+[1]vm_free: free pte =0xffff00003bb55000
+[1]vm_free: free pte =0xffff00003bb52000
+[1]vm_free: free pte =0xffff00003bb2b000
+[1]vm_free: free pte =0xffff00003bb2a000
+[1]vm_free: free pte =0xffff00003bb29000
+[1]vm_free: free pte =0xffff00003bb51000
+[1]vm_free: free pte =0xffff00003bb50000
+[1]vm_free: free pte =0xffff00003bb4f000
+[1]vm_free: free pte =0xffff00003bb4e000
+[1]vm_free: free pte =0xffff00003bb4d000
+[1]vm_free: free pte =0xffff00003bbba000
+[1]vm_free: free pte =0xffff00003bbb9000
+[1]vm_free: free pgt3=0xffff00003bb5d000
+[1]vm_free: free pgt2=0xffff00003bb5e000
+[1]vm_free: free pgt1=0xffff00003bb5f000
+[1]vm_free: free pte =0xffff00003bbb8000
+[1]vm_free: free pgt3=0xffff00003bb4a000
+[1]vm_free: free pgt2=0xffff00003bb49000
+[1]vm_free: free pgt1=0xffff00003bb4c000
+[1]vm_free: free pte =0xffff00003bb4b000
+[1]vm_free: free pte =0xffff00003bb42000
+[1]vm_free: free pte =0xffff00003bb41000
+[1]vm_free: free pte =0xffff00003bb40000
+[1]vm_free: free pte =0xffff00003bb3f000
+[1]vm_free: free pte =0xffff00003bb3e000
+[1]vm_free: free pte =0xffff00003bb3d000
+[1]vm_free: free pte =0xffff00003bb3c000
+[1]vm_free: free pte =0xffff00003bb45000
+[1]vm_free: free pte =0xffff00003bb46000
+[1]vm_free: free pgt3=0xffff00003bb43000
+[1]vm_free: free pgt2=0xffff00003bb44000
+[1]vm_free: free pgt1=0xffff00003bb48000
+[1]vm_free: free dir =0xffff00003bb61000
+[1]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[1]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb62000, *pte=0x3bb62000
+[F-12] ok
+
 [F-13] file backed shared mapping with fork test
-child : ret2[0, 49, 50]=[o, o, a], buf=[a, a, a]
-parent: ret2[0, 49, 50]=[o, o, a], buf=[a, a, a]
+[0]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb62000
+[1]uvm_copy: map: addr=0x400000, length=0x1000, pa=0x3bb48000
+[1]uvm_copy: map: addr=0x401000, length=0x1000, pa=0x3bb45000
+[1]uvm_copy: map: addr=0x402000, length=0x1000, pa=0x3bb3c000
+[1]uvm_copy: map: addr=0x403000, length=0x1000, pa=0x3bb3d000
+[1]uvm_copy: map: addr=0x404000, length=0x1000, pa=0x3bb3e000
+[1]uvm_copy: map: addr=0x405000, length=0x1000, pa=0x3bb3f000
+[1]uvm_copy: map: addr=0x406000, length=0x1000, pa=0x3bb40000
+[1]uvm_copy: map: addr=0x407000, length=0x1000, pa=0x3bb41000
+[1]uvm_copy: map: addr=0x408000, length=0x1000, pa=0x3bb42000
+[1]uvm_copy: map: addr=0x409000, length=0x1000, pa=0x3bb4b000
+[1]uvm_copy: map: addr=0x40a000, length=0x1000, pa=0x3bb4c000
+[1]uvm_copy: map: addr=0x40b000, length=0x1000, pa=0x3bb49000
+[1]uvm_copy: map: addr=0x40c000, length=0x1000, pa=0x3bb4a000
+[1]uvm_copy: map: addr=0x40d000, length=0x1000, pa=0x3bbb8000
+[1]uvm_copy: map: addr=0x40e000, length=0x1000, pa=0x3bb5f000
+[1]uvm_copy: map: addr=0x40f000, length=0x1000, pa=0x3bb5e000
+[1]uvm_copy: map: addr=0x410000, length=0x1000, pa=0x3bb5d000
+[1]uvm_copy: map: addr=0x411000, length=0x1000, pa=0x3bbb9000
+[1]uvm_copy: map: addr=0x412000, length=0x1000, pa=0x3bbba000
+[1]uvm_copy: map: addr=0x600000001000, length=0x1000, pa=0x3bb4d000
+[1]uvm_copy: map: addr=0xffffffff6000, length=0x1000, pa=0x3bb51000
+[1]uvm_copy: map: addr=0xffffffff7000, length=0x1000, pa=0x3bb52000
+[1]uvm_copy: map: addr=0xffffffff8000, length=0x1000, pa=0x3bb55000
+[1]uvm_copy: map: addr=0xffffffff9000, length=0x1000, pa=0x3bb54000
+[1]uvm_copy: map: addr=0xffffffffa000, length=0x1000, pa=0x3bb53000
+[1]uvm_copy: map: addr=0xffffffffb000, length=0x1000, pa=0x3bb56000
+[1]uvm_copy: map: addr=0xffffffffc000, length=0x1000, pa=0x3bb5a000
+[1]uvm_copy: map: addr=0xffffffffd000, length=0x1000, pa=0x3bb5b000
+[1]uvm_copy: map: addr=0xffffffffe000, length=0x1000, pa=0x3bb5c000
+[1]uvm_copy: map: addr=0xfffffffff000, length=0x1000, pa=0x3bb60000
+[1]copy_mmap_list: *ptep: 0x3bb62647, *ptec: 0x3bb4d647
+[1]copy_mmap_list: unmap: addr=0x600000001000, page=1, free=1
+[1]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb4d000, *pte=0x3bb4d000
+[1]copy_mmap_list: map: addr=0x600000001000, length=0x1000, pa=0x3bb62000
+[3]wait4: vm_free
+[3]vm_free: free pte =0xffff00003bb48000
+[3]vm_free: free pte =0xffff00003bb45000
+[3]vm_free: free pte =0xffff00003bb3c000
+[3]vm_free: free pte =0xffff00003bb3d000
+[3]vm_free: free pte =0xffff00003bb3e000
+[3]vm_free: free pte =0xffff00003bb3f000
+[3]vm_free: free pte =0xffff00003bb40000
+[3]vm_free: free pte =0xffff00003bb41000
+[3]vm_free: free pte =0xffff00003bb42000
+[3]vm_free: free pte =0xffff00003bb4b000
+[3]vm_free: free pte =0xffff00003bb4c000
+[3]vm_free: free pte =0xffff00003bb49000
+[3]vm_free: free pte =0xffff00003bb4a000
+[3]vm_free: free pte =0xffff00003bbb8000
+[3]vm_free: free pte =0xffff00003bb5f000
+[3]vm_free: free pte =0xffff00003bb5e000
+[3]vm_free: free pte =0xffff00003bb5d000
+[3]vm_free: free pte =0xffff00003bbb9000
+[3]vm_free: free pte =0xffff00003bbba000
+[3]vm_free: free pgt3=0xffff00003bb46000
+[3]vm_free: free pgt2=0xffff00003bb43000
+[3]vm_free: free pgt1=0xffff00003bb44000		// <= ret2[0] =0xffff00003bb44000
+[3]vm_free: free pte =0xffff00003bb62000		// <= ret2(pa)=0xffff00003bb62000
+[3]vm_free: free pgt3=0xffff00003bb50000
+[3]vm_free: free pgt2=0xffff00003bb4f000
+[3]vm_free: free pgt1=0xffff00003bb4e000
+[3]vm_free: free pte =0xffff00003bb51000
+[3]vm_free: free pte =0xffff00003bb52000
+[3]vm_free: free pte =0xffff00003bb55000
+[3]vm_free: free pte =0xffff00003bb54000
+[3]vm_free: free pte =0xffff00003bb53000
+[3]vm_free: free pte =0xffff00003bb56000
+[3]vm_free: free pte =0xffff00003bb5a000
+[3]vm_free: free pte =0xffff00003bb5b000
+[3]vm_free: free pte =0xffff00003bb5c000
+[3]vm_free: free pte =0xffff00003bb60000
+[3]vm_free: free pgt3=0xffff00003bb2b000
+[3]vm_free: free pgt2=0xffff00003bb2a000
+[3]vm_free: free pgt1=0xffff00003bb29000
+[3]vm_free: free dir =0xffff00003bb61000
+ret2[0]=0xffff00003bb44000
+[2]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[2]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb62000, *pte=0x3bb62000
+[F-13] failed at strcmp 3
+
+[F-14] オフセットを指定したプライベートマッピングのテスト
+[1]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb62000
+[1]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[1]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb62000, *pte=0x3bb62000
+[F-14] ok
+
+[F-15] file backed valid provided address test
+[0]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb62000
+[2]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[2]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb62000, *pte=0x3bb62000
+[F-15] ok
+
+[F-16] file backed invalid provided address test
+[1]map_file_page: map: addr=0x5ffffffff000, length=0x1000, pa=0x3bb62000
+[F-16] ok
+[1]delete_mmap_node: unmap: addr=0x5ffffffff000, page=1, free=1
+[1]uvm_unmap: free va=0x5ffffffff000, pa=0xffff00003bb62000, *pte=0x3bb62000
+
+[F-17] 指定されたアドレスが既存のマッピングアドレスと重なる場合
+[0]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb62000
+[0]map_file_page: map: addr=0x600000002000, length=0x1000, pa=0x3bb2a000
+[0]map_file_page: map: addr=0x600000003000, length=0x1000, pa=0x3bb2b000
+[3]delete_mmap_node: unmap: addr=0x600000001000, page=2, free=1
+[3]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb62000, *pte=0x3bb62000
+[3]uvm_unmap: free va=0x600000002000, pa=0xffff00003bb2a000, *pte=0x3bb2a000
+[3]delete_mmap_node: unmap: addr=0x600000003000, page=1, free=1
+[3]uvm_unmap: free va=0x600000003000, pa=0xffff00003bb2b000, *pte=0x3bb2b000
+[F-17] ok
+
+[F-18] ２つのマッピングの間のアドレスを指定したマッピングのテスト
+[0]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb2b000
+[0]map_file_page: map: addr=0x600000003000, length=0x1000, pa=0x3bb2a000
+[0]map_file_page: map: addr=0x600000002000, length=0x1000, pa=0x3bb62000
+[0]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[0]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb2b000, *pte=0x3bb2b000
+[0]delete_mmap_node: unmap: addr=0x600000003000, page=1, free=1
+[0]uvm_unmap: free va=0x600000003000, pa=0xffff00003bb2a000, *pte=0x3bb2a000
+[0]delete_mmap_node: unmap: addr=0x600000002000, page=1, free=1
+[0]uvm_unmap: free va=0x600000002000, pa=0xffff00003bb62000, *pte=0x3bb62000
+[F-18] ok
+
+[F-19] ２つのマッピングの間に不可能なアドレスを指定した場合
+[2]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb62000
+ret =0x600000001000
+[2]map_file_page: map: addr=0x600000003000, length=0x1000, pa=0x3bb2a000
+ret2=0x600000003000
+[2]map_file_page: map: addr=0x600000004000, length=0x1000, pa=0x3bb2b000
+[2]map_file_page: map: addr=0x600000005000, length=0x1000, pa=0x3bb60000
+[2]get_page: get_page readi failed: n=-1, offset=8192, size=4096
+[2]copy_page: get_page failed
+[2]map_file_page: map_pagecache_page: copy_page failed
+ret3=0xffffffffffffffff
+[F-19] failed at third mmap
+[3]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[3]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb62000, *pte=0x3bb62000
+[3]delete_mmap_node: unmap: addr=0x600000003000, page=1, free=1
+[3]uvm_unmap: free va=0x600000003000, pa=0xffff00003bb2a000, *pte=0x3bb2a000
+
+[F-20] 共有マッピングでファイル容量より大きなサイズを指定した場合
+[1]map_file_page: map: addr=0x600000001000, length=0x1000, pa=0x3bb2a000
+[1]map_file_page: map: addr=0x600000002000, length=0x1000, pa=0x3bb62000
+[2]delete_mmap_node: unmap: addr=0x600000001000, page=2, free=1
+[2]uvm_unmap: free va=0x600000001000, pa=0xffff00003bb2a000, *pte=0x3bb2a000
+[2]uvm_unmap: free va=0x600000002000, pa=0xffff00003bb62000, *pte=0x3bb62000
+[F-20] ok
+
+[F-21] write onlyファイルへのREAD/WRITE共有マッピングのテスト
+[3]sys_mmap: file is not readable
+[F-21] ok
+
+file_test:  ok: 11, ng: 2
+anon_test:  ok: 0, ng: 0
+other_test: ok: 0, ng: 0
+[0]wait4: vm_free
+[0]vm_free: free pte =0xffff00003bb64000
+[0]vm_free: free pte =0xffff00003bb68000
+[0]vm_free: free pte =0xffff00003bb69000
+[0]vm_free: free pte =0xffff00003bb6a000
+[0]vm_free: free pte =0xffff00003bb6b000
+[0]vm_free: free pte =0xffff00003bb6c000
+[0]vm_free: free pte =0xffff00003bb6d000
+[0]vm_free: free pte =0xffff00003bb6e000
+[0]vm_free: free pte =0xffff00003bb6f000
+[0]vm_free: free pte =0xffff00003bb70000
+[0]vm_free: free pte =0xffff00003bbfb000
+[0]vm_free: free pte =0xffff00003bbc6000
+[0]vm_free: free pte =0xffff00003bbc5000
+[0]vm_free: free pte =0xffff00003bbc4000
+[0]vm_free: free pte =0xffff00003bbc3000
+[0]vm_free: free pte =0xffff00003bbc2000
+[0]vm_free: free pte =0xffff00003bbc1000
+[0]vm_free: free pte =0xffff00003bbc0000
+[0]vm_free: free pte =0xffff00003bbbf000
+[0]vm_free: free pgt3=0xffff00003bb67000
+[0]vm_free: free pgt2=0xffff00003bb66000
+[0]vm_free: free pgt1=0xffff00003bb65000
+[0]vm_free: free pgt3=0xffff00003bb29000
+[0]vm_free: free pgt2=0xffff00003bb61000
+[0]vm_free: free pgt1=0xffff00003bb3b000
+[0]vm_free: free pte =0xffff00003bb2b000
+[0]vm_free: free pte =0xffff00003bb60000
+[0]vm_free: free pgt3=0xffff00003bb59000
+[0]vm_free: free pgt2=0xffff00003bb58000
+[0]vm_free: free pgt1=0xffff00003bb57000
+[0]vm_free: free pte =0xffff00003bbb7000
+[0]vm_free: free pte =0xffff00003bb1f000
+[0]vm_free: free pte =0xffff00003bb1e000
+[0]vm_free: free pte =0xffff00003bb1d000
+[0]vm_free: free pte =0xffff00003bb1c000
+[0]vm_free: free pte =0xffff00003bb1b000
+[0]vm_free: free pte =0xffff00003bb1a000
+[0]vm_free: free pte =0xffff00003bb19000
+[0]vm_free: free pte =0xffff00003bb18000
+[0]vm_free: free pte =0xffff00003bbbe000
+[0]vm_free: free pgt3=0xffff00003bbfa000
+[0]vm_free: free pgt2=0xffff00003bbfe000
+[0]vm_free: free pgt1=0xffff00003bbc7000
+[0]vm_free: free dir =0xffff00003bb63000
+[0]map_anon_page: map: addr=0x600000001000, length=0x1000, pa=0x3bbb5000
+# [0]delete_mmap_node: unmap: addr=0x600000001000, page=1, free=1
+[0]uvm_unmap: free va=0x600000001000, pa=0xffff00003bbb5000, *pte=0x3bbb5000
+/bin/ls
+[2]uvm_copy: map: addr=0x400000, length=0x1000, pa=0x3bbc7000
+[2]uvm_copy: map: addr=0x401000, length=0x1000, pa=0x3bb18000
+[2]uvm_copy: map: addr=0x402000, length=0x1000, pa=0x3bb19000
+[2]uvm_copy: map: addr=0x403000, length=0x1000, pa=0x3bb1a000
+[2]uvm_copy: map: addr=0x404000, length=0x1000, pa=0x3bb1b000
+[2]uvm_copy: map: addr=0x405000, length=0x1000, pa=0x3bb1c000
+[2]uvm_copy: map: addr=0x406000, length=0x1000, pa=0x3bb1d000
+[2]uvm_copy: map: addr=0x407000, length=0x1000, pa=0x3bb1e000
+[2]uvm_copy: map: addr=0x408000, length=0x1000, pa=0x3bb1f000
+[2]uvm_copy: map: addr=0x409000, length=0x1000, pa=0x3bbb7000
+[2]uvm_copy: map: addr=0x40a000, length=0x1000, pa=0x3bb57000
+[2]uvm_copy: map: addr=0x40b000, length=0x1000, pa=0x3bb58000
+[2]uvm_copy: map: addr=0x40c000, length=0x1000, pa=0x3bb59000
+[2]uvm_copy: map: addr=0x40d000, length=0x1000, pa=0x3bb60000
+[2]uvm_copy: map: addr=0x40e000, length=0x1000, pa=0x3bb2b000
+[2]uvm_copy: map: addr=0x40f000, length=0x1000, pa=0x3bb3b000
+[2]uvm_copy: map: addr=0x410000, length=0x1000, pa=0x3bb61000
+[2]uvm_copy: map: addr=0x411000, length=0x1000, pa=0x3bb29000
+[2]uvm_copy: map: addr=0x412000, length=0x1000, pa=0x3bb65000
+[2]uvm_copy: map: addr=0x413000, length=0x1000, pa=0x3bb66000
+[2]uvm_copy: map: addr=0x414000, length=0x1000, pa=0x3bb67000
+[2]uvm_copy: map: addr=0x415000, length=0x1000, pa=0x3bbbf000
+[2]uvm_copy: map: addr=0x416000, length=0x1000, pa=0x3bbc0000
+[2]uvm_copy: map: addr=0x417000, length=0x1000, pa=0x3bbc1000
+[2]uvm_copy: map: addr=0x418000, length=0x1000, pa=0x3bbc2000
+[2]uvm_copy: map: addr=0x419000, length=0x1000, pa=0x3bbc3000
+[2]uvm_copy: map: addr=0x41a000, length=0x1000, pa=0x3bbc4000
+[2]uvm_copy: map: addr=0x41b000, length=0x1000, pa=0x3bbc5000
+[2]uvm_copy: map: addr=0x41c000, length=0x1000, pa=0x3bbc6000
+[2]uvm_copy: map: addr=0x41d000, length=0x1000, pa=0x3bbfb000
+[2]uvm_copy: map: addr=0x41e000, length=0x1000, pa=0x3bb70000
+[2]uvm_copy: map: addr=0x41f000, length=0x1000, pa=0x3bb6f000
+[2]uvm_copy: map: addr=0x420000, length=0x1000, pa=0x3bb6e000
+[2]uvm_copy: map: addr=0x421000, length=0x1000, pa=0x3bb6d000
+[2]uvm_copy: map: addr=0x422000, length=0x1000, pa=0x3bb6c000
+[2]uvm_copy: map: addr=0x423000, length=0x1000, pa=0x3bb6b000
+[2]uvm_copy: map: addr=0x424000, length=0x1000, pa=0x3bb6a000
+[2]uvm_copy: map: addr=0x425000, length=0x1000, pa=0x3bb69000
+[2]uvm_copy: map: addr=0x426000, length=0x1000, pa=0x3bb68000
+[2]uvm_copy: map: addr=0x427000, length=0x1000, pa=0x3bb64000
+[2]uvm_copy: map: addr=0x428000, length=0x1000, pa=0x3bb62000
+[2]uvm_copy: map: addr=0x429000, length=0x1000, pa=0x3bb2a000
+[2]uvm_copy: map: addr=0x42a000, length=0x1000, pa=0x3bb5b000
+[2]uvm_copy: map: addr=0x42b000, length=0x1000, pa=0x3bb5a000
+[2]uvm_copy: map: addr=0x42c000, length=0x1000, pa=0x3bb56000
+[2]uvm_copy: map: addr=0x42d000, length=0x1000, pa=0x3bb53000
+[2]uvm_copy: map: addr=0x42e000, length=0x1000, pa=0x3bb54000
+[2]uvm_copy: map: addr=0x42f000, length=0x1000, pa=0x3bb55000
+[2]uvm_copy: map: addr=0x430000, length=0x1000, pa=0x3bb52000
+[2]uvm_copy: map: addr=0x431000, length=0x1000, pa=0x3bb51000
+[2]uvm_copy: map: addr=0x600000000000, length=0x1000, pa=0x3bb4e000
+```
+
+### vm_freeでret2のpaを削除していたためだった
+
+- MAP_SHAREDの場合、fork時のuvm_copyで親のpaをそのまま子に設定するが
+- wait4で子の後始末をする際に、vm_freeでMAP_SHAREDのmmap_regionのpaも削除していたのが原因だった
+
+```
+# mmaptest2
+
+[F-13] file backed shared mapping with fork test
+ret2 0x600000001000: 0x6161616161616161
+pb: ret2[0]=0x6161616161616161
+cb: ret2[0]=0x6161616161616161
+ca: ret2[0]=0x6f6f6f6f6f6f6f6f
+[3]exit: 0x6f6f6f6f6f6f6f6f
+[1]wait4: (1) 0x6f6f6f6f6f6f6f6f
+[1]wait4: (2) 0x6f6f6f6f6f6f6f6f		// この後、vm_free()を実行
+[1]wait4: (3) 0xffff00003bb3f000		// ここでおかしな値となる
+pa: ret2[0]=0xffff00003bb3f000
 [F-13] ok
 ```
 
-### copy_mmap_listでMAP_SHAREDの場合にmap_file_pagesしようとした
-
-- ret2の親から子へのデータコピーは終わっている
-- map_file_pagesは無用
+## execve()のflush_old_exec()でfree_mmap_list()を実行した場合
 
 ```
-(gdb) x/16xg 0xffff00003bbb6000 	// ret2のアドレス
-0xffff00003bbb6000:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6010:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6020:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6030:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6040:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6050:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6060:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6070:	0x6161616161616161	0x6161616161616161
-(gdb)
-0xffff00003bbb6080:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6090:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb60a0:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb60b0:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb60c0:	0x6161616161616161	0x0000000000000000
-0xffff00003bbb60d0:	0x0000000000000000	0x0000000000000000
-0xffff00003bbb60e0:	0x0000000000000000	0x0000000000000000
-0xffff00003bbb60f0:	0x0000000000000000	0x0000000000000000
-(gdb) x/16xg page->page + dest_offset	// page cacheのアドレス
-0xffff00003bfff000:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff010:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff020:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff030:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff040:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff050:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff060:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff070:	0x6161616161616161	0x6161616161616161
-(gdb)
-0xffff00003bfff080:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff090:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff0a0:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff0b0:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff0c0:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff0d0:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff0e0:	0x6161616161616161	0x6161616161616161
-0xffff00003bfff0f0:	0x6161616161616161	0x6161616161616161
+$ /bin/ls
+...
+[1]uvm_copy: map: addr=0xfffffffff000, length=0x1000, pa=0x3bb3c000
+[1]delete_mmap_node: unmap: addr=0x600000000000, page=1, free=0
+[1]pgdir_walk: failed
+pgdir_walk
 ```
 
-### MAP_SHAREDの場合
-
-- copy_mmap_list()でpteのpaを付け替え
+- 以下の通り、free_mmap_listは不要
 
 ```c
-if (node->flags & MAP_SHARED) {
-	ptep = pgdir_walk(parent->pgdir, node->addr, 0);
-	if (!ptep) panic("parent pgdir not pte: va=0x%p\n", region->addr);
-	ptec = pgdir_walk(child->pgdir, region->addr, 0);
-	if (!ptec) panic("child  pgdir not pte: va=0x%p\n", region->addr);
-	uint64_t pac = PTE_ADDR(*ptec);
-	kfree(P2V(pac));
-	*ptec = *ptep;
-}
+void *oldpgdir = curproc->pgdir, *pgdir = vm_init();
+...
+curproc->pgdir = pgdir;     // この段階でcurpoc->pgdir はカラなのでメモリ関係は開放不要
+
+flush_old_exec();   // 親から受け継いだ不要な資源を開放
 ```
 
-```
-[F-13] file backed shared mapping with fork test
-child : ret2[0, 1, 49, 50]=[o, o, o, a], buf=[a, a, a, a]
+## 現状
 
-00f0b33b0000ffff6f6f6f6f6f6f6f6f
-6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f
-6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f
-6f6f61
-[F-13] failed at strcmp 3: buf2[0, 49, 50]=[, o, a], buf[0, 49, 50]=[o, o, a]
-```
-
-- debug
+- F系列で2つ失敗
+- 一気通貫テストはできない（途中でストールする）
 
 ```
-(gdb) c
-Continuing.
-[Switching to Thread 1.3]
+[F-01] 不正なfdを指定した場合のテスト
+ error: Bad file descriptor
+ error: Bad file descriptor
+ error: Bad file descriptor
+[F-01] ok
 
-Thread 3 hit Breakpoint 1, copy_mmap_list (parent=0xffff0000000e3318 <ptable+9408>, child=0xffff0000000e3938 <ptable+10976>) at kern/mmap.c:664
-664	            ptep = pgdir_walk(parent->pgdir, node->addr, 0);
-(gdb) b exit
-Breakpoint 2 at 0xffff000000095e60: file kern/proc.c, line 439.
-(gdb) b wait4
-Breakpoint 3 at 0xffff000000095c38: file kern/proc.c, line 388.
-(gdb) x/16gx 0xffff00003bb3f000
-0xffff00003bb3f000:	0x000000003bb40003	0x0000000000000000
-0xffff00003bb3f010:	0x0000000000000000	0x0000000000000000
-0xffff00003bb3f020:	0x0000000000000000	0x0000000000000000
-0xffff00003bb3f030:	0x0000000000000000	0x0000000000000000
-0xffff00003bb3f040:	0x0000000000000000	0x0000000000000000
-0xffff00003bb3f050:	0x0000000000000000	0x0000000000000000
-0xffff00003bb3f060:	0x0000000000000000	0x0000000000000000
-0xffff00003bb3f070:	0x0000000000000000	0x0000000000000000
-(gdb) n
-665	            if (!ptep) panic("parent pgdir not pte: va=0x%p\n", region->addr);
-(gdb)
-666	            ptec = pgdir_walk(child->pgdir, region->addr, 0);
-(gdb)
-667	            if (!ptec) panic("child  pgdir not pte: va=0x%p\n", region->addr);
-(gdb)
-668	            uint64_t pac = PTE_ADDR(*ptec);
-(gdb) p/x ptep
-$1 = 0xffff00003bb45008
-(gdb) p/x *ptep
-$2 = 0x3bbb6647
-(gdb) p/x ptec
-$3 = 0xffff00003bb58008
-(gdb) p/x *ptec
-$4 = 0x3bb55647
-(gdb) x/16gx ptep
-0xffff00003bb45008:	0x000000003bbb6647	0x0000000000000000
-0xffff00003bb45018:	0x0000000000000000	0x0000000000000000
-0xffff00003bb45028:	0x0000000000000000	0x0000000000000000
-0xffff00003bb45038:	0x0000000000000000	0x0000000000000000
-0xffff00003bb45048:	0x0000000000000000	0x0000000000000000
-0xffff00003bb45058:	0x0000000000000000	0x0000000000000000
-0xffff00003bb45068:	0x0000000000000000	0x0000000000000000
-0xffff00003bb45078:	0x0000000000000000	0x0000000000000000
-(gdb) x/16gx ptec
-0xffff00003bb58008:	0x000000003bb55647	0x0000000000000000
-0xffff00003bb58018:	0x0000000000000000	0x0000000000000000
-0xffff00003bb58028:	0x0000000000000000	0x0000000000000000
-0xffff00003bb58038:	0x0000000000000000	0x0000000000000000
-0xffff00003bb58048:	0x0000000000000000	0x0000000000000000
-0xffff00003bb58058:	0x0000000000000000	0x0000000000000000
-0xffff00003bb58068:	0x0000000000000000	0x0000000000000000
-0xffff00003bb58078:	0x0000000000000000	0x0000000000000000
-(gdb) x/16gx 0xffff00003bbb6000
-0xffff00003bbb6000:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6010:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6020:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6030:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6040:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6050:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6060:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6070:	0x6161616161616161	0x6161616161616161
-(gdb) x/16gx 0xffff00003bb55000
-0xffff00003bb55000:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55010:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55020:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55030:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55040:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55050:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55060:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55070:	0x6161616161616161	0x6161616161616161
-(gdb) n
-669	            kfree(P2V(pac));
-(gdb) p/x pac
-$5 = 0x3bb55000
-(gdb) n
-670	            *ptec = PTE_ADDR(*ptep) | get_perm(region->prot, region->flags);
-(gdb) x/16gx 0xffff00003bb55000
-0xffff00003bb55000:	0xffff00003bb66000	0x6161616161616161
-0xffff00003bb55010:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55020:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55030:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55040:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55050:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55060:	0x6161616161616161	0x6161616161616161
-0xffff00003bb55070:	0x6161616161616161	0x6161616161616161
-(gdb) n
-672	        if (cnode == 0)
-(gdb) p/x ptec
-$6 = 0xffff00003bb58008
-(gdb) p/x *ptec
-$7 = 0x6000003bbb6747
-(gdb) x/16gx 0xffff00003bbb6000
-0xffff00003bbb6000:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6010:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6020:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6030:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6040:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6050:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6060:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6070:	0x6161616161616161	0x6161616161616161
-(gdb) n
-675	            tail->next = region;
-(gdb) c
-Continuing.
+[F-02] 不正なフラグを指定した場合のテスト
+[3]sys_mmap: invalid flags: 0x0
+ error: Invalid argument
+[F-02] ok
 
-Thread 3 hit Breakpoint 3, wait4 (pid=-1, status=0xfffffffffdac, options=0, ru=0x0) at kern/proc.c:388
-388	    struct proc *cp = thisproc();
-(gdb) c
-Continuing.
-[Switching to Thread 1.1]
+[F-03] readonlyファイルにPROT_WRITEな共有マッピングをした場合のテスト
+[0]sys_mmap: file is not writable
+ error: Permission denied
+[F-03] ok
 
-Thread 1 hit Breakpoint 2, exit (err=0) at kern/proc.c:439
-439	    struct proc *cp = thisproc();
-(gdb) c
-Continuing.
-[Switching to Thread 1.2]
+[F-04] readonlyファイルにPROT_READのみの共有マッピングをした場合のテスト
+[F-04] ok
 
-Thread 2 hit Breakpoint 2, exit (err=0) at kern/proc.c:439
-439	    struct proc *cp = thisproc();
-(gdb) c
-Continuing.
-[Switching to Thread 1.1]
+[F-05] PROT指定の異なるプライベートマッピンのテスト
+[F-05] ok
 
-Thread 1 hit Breakpoint 3, wait4 (pid=-1, status=0xfffffffffc6c, options=3, ru=0x0) at kern/proc.c:388
-388	    struct proc *cp = thisproc();
-(gdb) x/16gx 0xffff00003bbb6000
-0xffff00003bbb6000:	0xffff00003bb3d000	0x6f6f6f6f6f6f6f6f
-0xffff00003bbb6010:	0x6f6f6f6f6f6f6f6f	0x6f6f6f6f6f6f6f6f
-0xffff00003bbb6020:	0x6f6f6f6f6f6f6f6f	0x6f6f6f6f6f6f6f6f
-0xffff00003bbb6030:	0x6161616161616f6f	0x6161616161616161
-0xffff00003bbb6040:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6050:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6060:	0x6161616161616161	0x6161616161616161
-0xffff00003bbb6070:	0x6161616161616161	0x6161616161616161
-(gdb) c
-Continuing.
-[Inferior 1 (process 1) exited normally]
-(gdb) q
-```
+[F-06] MMAPTOPを超えるサイズをマッピングした場合のテスト
+[0]get_page: get_page readi failed: n=-1, offset=4096, size=4096
+[0]copy_page: get_page failed
+[0]map_file_page: map_pagecache_page: copy_page failed
+ error: Out of memory
+[F-06] ok
 
-- pgdir
+[F-07] 連続したマッピングを行うテスト
+[0]uvm_map: remap: p=0x600000001000, *pte=0x3bb3c647
 
-```
-# mmaptest2
+ error: Invalid argument
+[F-07] failed at 1 total mappings
 
-[3]uvm_copy: pgdir[0x0] pgt1=0xffff00003bbaf000								// dash -> mmaptest2のforkのuvm_copy
-[3]uvm_copy: pgdir[0x0] pgt2=0xffff00003bbae000
-[3]uvm_copy: pgdir[0x400000] pgt3=0xffff00003bbad000
-[3]uvm_copy: pgdir[0x400000] pte=0xffff00003bbb0000, np=0xffff00003bbb7000
-[3]uvm_copy: pgdir[0x401000] pte=0xffff00003bbac000, np=0xffff00003bbbe000
-[3]uvm_copy: pgdir[0x402000] pte=0xffff00003bbab000, np=0xffff00003bbfa000
-[3]uvm_copy: pgdir[0x403000] pte=0xffff00003bbaa000, np=0xffff00003bbfe000
-[3]uvm_copy: pgdir[0x404000] pte=0xffff00003bba9000, np=0xffff00003bbc7000
-[3]uvm_copy: pgdir[0x405000] pte=0xffff00003bba8000, np=0xffff00003bbbf000
-[3]uvm_copy: pgdir[0x406000] pte=0xffff00003bba7000, np=0xffff00003bbc0000
-[3]uvm_copy: pgdir[0x407000] pte=0xffff00003bba6000, np=0xffff00003bbc1000
-[3]uvm_copy: pgdir[0x408000] pte=0xffff00003bba5000, np=0xffff00003bbc2000
-[3]uvm_copy: pgdir[0x409000] pte=0xffff00003bba4000, np=0xffff00003bbc3000
-[3]uvm_copy: pgdir[0x40a000] pte=0xffff00003bba3000, np=0xffff00003bbc4000
-[3]uvm_copy: pgdir[0x40b000] pte=0xffff00003bba2000, np=0xffff00003bbc5000
-[3]uvm_copy: pgdir[0x40c000] pte=0xffff00003bba1000, np=0xffff00003bbc6000
-[3]uvm_copy: pgdir[0x40d000] pte=0xffff00003bba0000, np=0xffff00003bbfb000
-[3]uvm_copy: pgdir[0x40e000] pte=0xffff00003bb9f000, np=0xffff00003bb70000
-[3]uvm_copy: pgdir[0x40f000] pte=0xffff00003bb9e000, np=0xffff00003bb6f000
-[3]uvm_copy: pgdir[0x410000] pte=0xffff00003bb9d000, np=0xffff00003bb6e000
-[3]uvm_copy: pgdir[0x411000] pte=0xffff00003bb9c000, np=0xffff00003bb6d000
-[3]uvm_copy: pgdir[0x412000] pte=0xffff00003bb9b000, np=0xffff00003bb6c000
-[3]uvm_copy: pgdir[0x413000] pte=0xffff00003bb9a000, np=0xffff00003bb6b000
-[3]uvm_copy: pgdir[0x414000] pte=0xffff00003bb99000, np=0xffff00003bb6a000
-[3]uvm_copy: pgdir[0x415000] pte=0xffff00003bb98000, np=0xffff00003bb69000
-[3]uvm_copy: pgdir[0x416000] pte=0xffff00003bb97000, np=0xffff00003bb68000
-[3]uvm_copy: pgdir[0x417000] pte=0xffff00003bb96000, np=0xffff00003bb67000
-[3]uvm_copy: pgdir[0x418000] pte=0xffff00003bb95000, np=0xffff00003bb66000
-[3]uvm_copy: pgdir[0x419000] pte=0xffff00003bb94000, np=0xffff00003bb65000
-[3]uvm_copy: pgdir[0x41a000] pte=0xffff00003bb93000, np=0xffff00003bb64000
-[3]uvm_copy: pgdir[0x41b000] pte=0xffff00003bb92000, np=0xffff00003bb63000
-[3]uvm_copy: pgdir[0x41c000] pte=0xffff00003bb91000, np=0xffff00003bb62000
-[3]uvm_copy: pgdir[0x41d000] pte=0xffff00003bb90000, np=0xffff00003bb61000
-[3]uvm_copy: pgdir[0x41e000] pte=0xffff00003bb8f000, np=0xffff00003bb60000
-[3]uvm_copy: pgdir[0x41f000] pte=0xffff00003bb8e000, np=0xffff00003bb5f000
-[3]uvm_copy: pgdir[0x420000] pte=0xffff00003bb8d000, np=0xffff00003bb5e000
-[3]uvm_copy: pgdir[0x421000] pte=0xffff00003bb8c000, np=0xffff00003bb5d000
-[3]uvm_copy: pgdir[0x422000] pte=0xffff00003bb8b000, np=0xffff00003bb5c000
-[3]uvm_copy: pgdir[0x423000] pte=0xffff00003bb8a000, np=0xffff00003bb5b000
-[3]uvm_copy: pgdir[0x424000] pte=0xffff00003bb89000, np=0xffff00003bb5a000
-[3]uvm_copy: pgdir[0x425000] pte=0xffff00003bb88000, np=0xffff00003bb59000
-[3]uvm_copy: pgdir[0x426000] pte=0xffff00003bb87000, np=0xffff00003bb58000
-[3]uvm_copy: pgdir[0x427000] pte=0xffff00003bb86000, np=0xffff00003bb57000
-[3]uvm_copy: pgdir[0x428000] pte=0xffff00003bb85000, np=0xffff00003bb56000
-[3]uvm_copy: pgdir[0x429000] pte=0xffff00003bb84000, np=0xffff00003bb55000
-[3]uvm_copy: pgdir[0x42a000] pte=0xffff00003bb83000, np=0xffff00003bb54000
-[3]uvm_copy: pgdir[0x42b000] pte=0xffff00003bb82000, np=0xffff00003bb53000
-[3]uvm_copy: pgdir[0x42c000] pte=0xffff00003bb81000, np=0xffff00003bb52000
-[3]uvm_copy: pgdir[0x42d000] pte=0xffff00003bb80000, np=0xffff00003bb51000
-[3]uvm_copy: pgdir[0x42e000] pte=0xffff00003bb7f000, np=0xffff00003bb50000
-[3]uvm_copy: pgdir[0x42f000] pte=0xffff00003bb7e000, np=0xffff00003bb4f000
-[3]uvm_copy: pgdir[0x430000] pte=0xffff00003bbfc000, np=0xffff00003bb4e000
-[3]uvm_copy: pgdir[0x431000] pte=0xffff00003bbbd000, np=0xffff00003bb4d000
-[3]uvm_copy: pgdir[0x600000000000] pgt1=0xffff00003bbb2000
-[3]uvm_copy: pgdir[0x600000000000] pgt2=0xffff00003bbb3000
-[3]uvm_copy: pgdir[0x600000000000] pgt3=0xffff00003bbb4000
-[3]uvm_copy: pgdir[0x600000000000] pte=0xffff00003bbbb000, np=0xffff00003bb4c000
-[3]uvm_copy: pgdir[0xff8000000000] pgt1=0xffff00003bb7d000
-[3]uvm_copy: pgdir[0xffffc0000000] pgt2=0xffff00003bb7c000
-[3]uvm_copy: pgdir[0xffffffe00000] pgt3=0xffff00003bb7b000
-[3]uvm_copy: pgdir[0xffffffff6000] pte=0xffff00003bb79000, np=0xffff00003bb48000
-[3]uvm_copy: pgdir[0xffffffff7000] pte=0xffff00003bb78000, np=0xffff00003bb44000
-[3]uvm_copy: pgdir[0xffffffff8000] pte=0xffff00003bb77000, np=0xffff00003bb43000
-[3]uvm_copy: pgdir[0xffffffff9000] pte=0xffff00003bb76000, np=0xffff00003bb42000
-[3]uvm_copy: pgdir[0xffffffffa000] pte=0xffff00003bb75000, np=0xffff00003bb41000
-[3]uvm_copy: pgdir[0xffffffffb000] pte=0xffff00003bb74000, np=0xffff00003bb40000
-[3]uvm_copy: pgdir[0xffffffffc000] pte=0xffff00003bb73000, np=0xffff00003bb3f000	// このnpのアドレスがret2の先頭に設定されている
-[3]uvm_copy: pgdir[0xffffffffd000] pte=0xffff00003bb72000, np=0xffff00003bb3e000
-[3]uvm_copy: pgdir[0xffffffffe000] pte=0xffff00003bb71000, np=0xffff00003bb3d000
-[3]uvm_copy: pgdir[0xfffffffff000] pte=0xffff00003bb7a000, np=0xffff00003bb3c000
+[F-08] 空のファイルを共有マッピングした場合のテスト
+[F-08] ok
+
+[F-09] ファイルが背後にあるプライベートマッピング
+[F-09] ok
+
+[F-10] ファイルが背後にある共有マッピングのテスト
+[F-10] ok
+
+[F-11] file backed mapping pagecache coherency test
+[F-11] ok
+
+[F-12] file backed private mapping with fork test
+[F-12] ok
 
 [F-13] file backed shared mapping with fork test
-																			// F-13内のforkのuvm_copy
-[0]uvm_copy: pgdir[0x0] pgt1=0xffff00003bb39000								// 1: ここはheap領域(sys_brkで拡張した部分)
-[0]uvm_copy: pgdir[0x0] pgt2=0xffff00003bb38000
-[0]uvm_copy: pgdir[0x400000] pgt3=0xffff00003bb37000
-[0]uvm_copy: pgdir[0x400000] pte=0xffff00003bb3a000, np=0xffff00003bb3e000
-[0]uvm_copy: pgdir[0x401000] pte=0xffff00003bb36000, np=0xffff00003bb42000
-[0]uvm_copy: pgdir[0x402000] pte=0xffff00003bb35000, np=0xffff00003bb43000
-[0]uvm_copy: pgdir[0x403000] pte=0xffff00003bb34000, np=0xffff00003bb44000
-[0]uvm_copy: pgdir[0x404000] pte=0xffff00003bb33000, np=0xffff00003bb48000
-[0]uvm_copy: pgdir[0x405000] pte=0xffff00003bb32000, np=0xffff00003bb4b000
-[0]uvm_copy: pgdir[0x406000] pte=0xffff00003bb31000, np=0xffff00003bb4a000
-[0]uvm_copy: pgdir[0x407000] pte=0xffff00003bb30000, np=0xffff00003bb49000
-[0]uvm_copy: pgdir[0x408000] pte=0xffff00003bb2f000, np=0xffff00003bb4c000
-[0]uvm_copy: pgdir[0x409000] pte=0xffff00003bb2e000, np=0xffff00003bbb8000
-[0]uvm_copy: pgdir[0x40a000] pte=0xffff00003bb2d000, np=0xffff00003bbb9000
-[0]uvm_copy: pgdir[0x40b000] pte=0xffff00003bb2c000, np=0xffff00003bbba000
-[0]uvm_copy: pgdir[0x40c000] pte=0xffff00003bb2b000, np=0xffff00003bb4d000
-[0]uvm_copy: pgdir[0x40d000] pte=0xffff00003bb2a000, np=0xffff00003bb4e000
-[0]uvm_copy: pgdir[0x40e000] pte=0xffff00003bb29000, np=0xffff00003bb4f000
-[0]uvm_copy: pgdir[0x40f000] pte=0xffff00003bb28000, np=0xffff00003bb50000
-[0]uvm_copy: pgdir[0x410000] pte=0xffff00003bb27000, np=0xffff00003bb51000
-[0]uvm_copy: pgdir[0x411000] pte=0xffff00003bb26000, np=0xffff00003bb52000
-[0]uvm_copy: pgdir[0x412000] pte=0xffff00003bb25000, np=0xffff00003bb53000
-[0]uvm_copy: pgdir[0x413000] pte=0xffff00003bb24000, np=0xffff00003bb54000
+[F-13] ok
 
-[0]uvm_copy: pgdir[0x600000000000] pgt1=0xffff00003bb47000					// 2: ここがret2 = mmap()の部分
-[0]uvm_copy: pgdir[0x600000000000] pgt2=0xffff00003bb46000
-[0]uvm_copy: pgdir[0x600000000000] pgt3=0xffff00003bb45000
-[0]uvm_copy: pgdir[0x600000001000] pte=0xffff00003bbb6000, np=0xffff00003bb55000	// pteは4, npは5
+[F-14] オフセットを指定したプライベートマッピングのテスト
+[F-14] ok
 
-[0]uvm_copy: pgdir[0xff8000000000] pgt1=0xffff00003bb23000					// 3: ここはスタック部分
-[0]uvm_copy: pgdir[0xffffc0000000] pgt2=0xffff00003bb22000
-[0]uvm_copy: pgdir[0xffffffe00000] pgt3=0xffff00003bb21000
-[0]uvm_copy: pgdir[0xffffffff6000] pte=0xffff00003bb1f000, np=0xffff00003bb59000
-[0]uvm_copy: pgdir[0xffffffff7000] pte=0xffff00003bb1e000, np=0xffff00003bb5d000
-[0]uvm_copy: pgdir[0xffffffff8000] pte=0xffff00003bb1d000, np=0xffff00003bb5e000
-[0]uvm_copy: pgdir[0xffffffff9000] pte=0xffff00003bb1c000, np=0xffff00003bb5f000
-[0]uvm_copy: pgdir[0xffffffffa000] pte=0xffff00003bb1b000, np=0xffff00003bb60000
-[0]uvm_copy: pgdir[0xffffffffb000] pte=0xffff00003bb1a000, np=0xffff00003bb61000
-[0]uvm_copy: pgdir[0xffffffffc000] pte=0xffff00003bb19000, np=0xffff00003bb62000
-[0]uvm_copy: pgdir[0xffffffffd000] pte=0xffff00003bb18000, np=0xffff00003bb63000
-[0]uvm_copy: pgdir[0xffffffffe000] pte=0xffff00003bb17000, np=0xffff00003bb64000
-[0]uvm_copy: pgdir[0xfffffffff000] pte=0xffff00003bb20000, np=0xffff00003bb65000
+[F-15] file backed valid provided address test
+[F-15] ok
 
-[0]copy_mmap_list: ptep=0xffff00003bb45008, *ptep=0x3bbb6647				// 4: 親のpteと*pte
-[0]copy_mmap_list: ptec=0xffff00003bb58008, *ptec=0x3bb55647				// 5: 子のpteと*pte
-child : ret2[0, 1, 49, 50]=[o, o, o, a], buf=[a, a, a, a]
+[F-16] file backed invalid provided address test
+[F-16] ok
 
-00f0b33b0000ffff6f6f6f6f6f6f6f6f
-6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f
-6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f
-6f6f61
-[F-13] failed at strcmp 3: buf2[0, 49, 50]=[, o, a], buf[0, 49, 50]=[o, o, a]
+[F-17] 指定されたアドレスが既存のマッピングアドレスと重なる場合
+[F-17] ok
+
+[F-18] ２つのマッピングの間のアドレスを指定したマッピングのテスト
+[F-18] ok
+
+[F-19] ２つのマッピングの間に不可能なアドレスを指定した場合
+ret =0x600000001000
+ret2=0x600000003000
+[2]get_page: get_page readi failed: n=-1, offset=8192, size=4096
+[2]copy_page: get_page failed
+[2]map_file_page: map_pagecache_page: copy_page failed
+ret3=0xffffffffffffffff
+[F-19] failed at third mmap
+
+[F-20] 共有マッピングでファイル容量より大きなサイズを指定した場合
+[F-20] ok
+
+[F-21] write onlyファイルへのREAD/WRITE共有マッピングのテスト
+[1]sys_mmap: file is not readable
+[F-21] ok
+
+[A-01] anonymous private mapping test
+p[0]=0, p[2499]=2499
+[A-01] ok
+
+[A-02] anonymous shared mapping test
+[A-02] ok
+
+[A-03] anonymous private mapping with fork test
+[A-03] ok
+
+[A-04] anonymous shared mapping with multiple forks test
+[2]exit: exit: pid 12, name , err 1
+[1]exit: exit: pid 11, name , err 1
+[3]exit: exit: pid 10, name , err 1
+[A-04] ok
+
+[A-05] anonymous private & shared mapping together with fork test
+[0]exit: exit: pid 13, name , err 1
+[A-05] ok
+
+[A-06] anonymous missing flags test
+[0]sys_mmap: invalid flags: 0x20
+[A-06] ok
+
+[A-07] anonymous exceed mapping count test
+[A-07] ok
+
+[A-08] anonymous exceed mapping size test
+[A-08] ok
+
+[A-09] anonymous zero size mapping test
+[0]sys_mmap: invalid length: 0 or offset: 0
+[A-09] ok
+
+[A-10] anonymous valid provided address test
+[A-10] ok
+
+[A-11] anonymous invalid provided address test
+[A-11] ok: not running because of an invalid test
+
+[A-12] anonymous overlapping provided address test
+[A-12] ok
+
+[A-13] anonymous intermediate provided address test
+[A-13] ok
+
+[A-14] anonymous intermediate provided address not possible test
+[A-14] ok
+
+[O-01] munmap only partial size test
+[O-01] ok
+
+[O-02] write on read only mapping test
+[O-02] ok
+
+[O-03] none permission on mapping test
+[O-03] ok
+
+[O-04] mmap valid address map fixed flag test
+[O-04] ok
+
+[O-05] mmap invalid address map fixed flag test
+[1]mmap: fixed address should be page align: 0x600000000100
+[1]mmap: addr is used
+[O-05] test ok
 ```
 
-- uvm_copyでpteをuvm_mapする際のpgtの作成部分も出力
-
-```
-[F-13] file backed shared mapping with fork test
-
-[0]uvm_copy: pgdir[0x600000000000] pgt1=0xffff00003bb47000
-[0]uvm_copy: pgdir[0x600000000000] pgt2=0xffff00003bb46000
-[0]uvm_copy: pgdir[0x600000000000] pgt3=0xffff00003bb45000
-[0]uvm_copy: pgdir[0x600000001000] pte=0xffff00003bbb6000, np=0xffff00003bb55000
-[0]pgdir_walk: alloc: pgt0=0xffff00003bb56000
-[0]pgdir_walk: alloc: pgt1=0xffff00003bb57000
-[0]pgdir_walk: alloc: pgt2=0xffff00003bb58000
-
-[0]copy_mmap_list: ptep=0xffff00003bb45008, *ptep=0x3bbb6647
-[0]copy_mmap_list: ptec=0xffff00003bb58008, *ptec=0x3bb55647
-
-child : ret2[0, 1, 49, 50]=[o, o, o, a], buf=[a, a, a, a]
-
-00f0b33b0000ffff6f6f6f6f6f6f6f6f
-6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f
-6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f
-6f6f61
-[F-13] failed at strcmp 3: buf2[0, 49, 50]=[, o, a], buf[0, 49, 50]=[o, o, a]
-```
-
-- F-13のディスアセンブル
-
-```
-0000000000401cd4 <file_shared_with_fork_test>:
-  401cd4:	a9a37bfd 	stp	x29, x30, [sp, #-464]!
-  401cd8:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401cdc:	911c6000 	add	x0, x0, #0x718
-  401ce0:	910003fd 	mov	x29, sp
-  401ce4:	f90013f5 	str	x21, [sp, #32]
-  401ce8:	b0000075 	adrp	x21, 40e000 <__stdio_ofl_lockptr+0xa68>
-  401cec:	94000bd8 	bl	404c4c <puts>
-  401cf0:	f942eea0 	ldr	x0, [x21, #1496]
-  401cf4:	52800041 	mov	w1, #0x2                   	// #2
-  401cf8:	94000a78 	bl	4046d8 <open>
-  401cfc:	3100041f 	cmn	w0, #0x1
-  401d00:	54000680 	b.eq	401dd0 <file_shared_with_fork_test+0xfc>  // b.none
-  401d04:	910103e1 	add	x1, sp, #0x40
-  401d08:	d2801902 	mov	x2, #0xc8                  	// #200
-  401d0c:	a90153f3 	stp	x19, x20, [sp, #16]
-  401d10:	2a0003f3 	mov	w19, w0			# w19 = fd
-  401d14:	94001416 	bl	406d6c <read>
-  401d18:	aa0003e1 	mov	x1, x0			# x1 = size
-  401d1c:	f103201f 	cmp	x0, #0xc8
-  401d20:	54000401 	b.ne	401da0 <file_shared_with_fork_test+0xcc>  // b.any
-  401d24:	2a1303e4 	mov	w4, w19						// fd
-  401d28:	d2800005 	mov	x5, #0x0                   	// #0
-  401d2c:	52800023 	mov	w3, #0x1                   	// #1 MAP_SHARED
-  401d30:	52800062 	mov	w2, #0x3                   	// #3 PROT_READ/WRITE
-  401d34:	d2800000 	mov	x0, #0x0                   	// #0
-  401d38:	94000a9f 	bl	4047b4 <__mmap>
-  401d3c:	aa0003f4 	mov	x20, x0			# x20 = ret2
-  401d40:	94000aea 	bl	4048e8 <fork>
-  401d44:	350005c0 	cbnz	w0, 401dfc <file_shared_with_fork_test+0x128>
-											# 子プロセス
-  401d48:	4f03e5e0 	movi	v0.16b, #0x6f	# v0 = 'o' x 16
-  401d4c:	d1000683 	sub	x3, x20, #0x1		# x3 = ret2 - 1
-  401d50:	d2800021 	mov	x1, #0x1                   	// #1
-  401d54:	7d006280 	str	h0, [x20, #48]		# ret2[48, 49] = ['o', 'o']
-  401d58:	ad000280 	stp	q0, q0, [x20]		# ret2[0:31] = '0'
-  401d5c:	3d800a80 	str	q0, [x20, #32]		# ret2[32:47] = '0'
-
-  401d60:	910103e0 	add	x0, sp, #0x40
-  401d64:	8b010000 	add	x0, x0, x1
-  401d68:	38616862 	ldrb	w2, [x3, x1]
-  401d6c:	385ff000 	ldurb	w0, [x0, #-1]
-  401d70:	6b00005f 	cmp	w2, w0
-  401d74:	54000121 	b.ne	401d98 <file_shared_with_fork_test+0xc4>  // b.any
-  401d78:	91000421 	add	x1, x1, #0x1
-  401d7c:	f103243f 	cmp	x1, #0xc9
-  401d80:	54ffff01 	b.ne	401d60 <file_shared_with_fork_test+0x8c>  // b.any
-  401d84:	394103e2 	ldrb	w2, [sp, #64]
-  401d88:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401d8c:	52800de1 	mov	w1, #0x6f                  	// #111
-  401d90:	91206000 	add	x0, x0, #0x818
-  401d94:	94000b8e 	bl	404bcc <printf>
-  401d98:	52800000 	mov	w0, #0x0                   	// #0
-  401d9c:	97fff89d 	bl	400010 <exit>
-  401da0:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401da4:	911dc000 	add	x0, x0, #0x770
-  401da8:	94000ba9 	bl	404c4c <puts>
-  401dac:	b0000060 	adrp	x0, 40e000 <__stdio_ofl_lockptr+0xa68>
-  401db0:	911f4000 	add	x0, x0, #0x7d0
-  401db4:	a94153f3 	ldp	x19, x20, [sp, #16]
-  401db8:	b9400401 	ldr	w1, [x0, #4]
-  401dbc:	11000421 	add	w1, w1, #0x1
-  401dc0:	b9000401 	str	w1, [x0, #4]
-  401dc4:	f94013f5 	ldr	x21, [sp, #32]
-  401dc8:	a8dd7bfd 	ldp	x29, x30, [sp], #464
-  401dcc:	d65f03c0 	ret
-  401dd0:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401dd4:	911d4000 	add	x0, x0, #0x750
-  401dd8:	94000b9d 	bl	404c4c <puts>
-  401ddc:	b0000060 	adrp	x0, 40e000 <__stdio_ofl_lockptr+0xa68>
-  401de0:	911f4000 	add	x0, x0, #0x7d0
-  401de4:	f94013f5 	ldr	x21, [sp, #32]
-  401de8:	b9400401 	ldr	w1, [x0, #4]
-  401dec:	11000421 	add	w1, w1, #0x1
-  401df0:	b9000401 	str	w1, [x0, #4]
-  401df4:	a8dd7bfd 	ldp	x29, x30, [sp], #464
-  401df8:	d65f03c0 	ret
-  401dfc:	9100f3e0 	add	x0, sp, #0x3c
-  401e00:	94000b10 	bl	404a40 <wait>
-  401e04:	d1000683 	sub	x3, x20, #0x1
-  401e08:	d2800021 	mov	x1, #0x1                   	// #1
-  401e0c:	d503201f 	nop
-  401e10:	910103e0 	add	x0, sp, #0x40
-  401e14:	38616864 	ldrb	w4, [x3, x1]
-  401e18:	8b010002 	add	x2, x0, x1
-  401e1c:	385ff040 	ldurb	w0, [x2, #-1]
-  401e20:	6b00009f 	cmp	w4, w0
-  401e24:	54000221 	b.ne	401e68 <file_shared_with_fork_test+0x194>  // b.any
-  401e28:	91000421 	add	x1, x1, #0x1
-  401e2c:	f103243f 	cmp	x1, #0xc9
-  401e30:	54ffff01 	b.ne	401e10 <file_shared_with_fork_test+0x13c>  // b.any
-  401e34:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401e38:	91218000 	add	x0, x0, #0x860
-  401e3c:	94000b84 	bl	404c4c <puts>
-  401e40:	b0000062 	adrp	x2, 40e000 <__stdio_ofl_lockptr+0xa68>
-  401e44:	911f4042 	add	x2, x2, #0x7d0
-  401e48:	aa1403e0 	mov	x0, x20
-  401e4c:	d2801901 	mov	x1, #0xc8                  	// #200
-  401e50:	b9400443 	ldr	w3, [x2, #4]
-  401e54:	11000463 	add	w3, w3, #0x1
-  401e58:	b9000443 	str	w3, [x2, #4]
-  401e5c:	94000a94 	bl	4048ac <__munmap>
-  401e60:	a94153f3 	ldp	x19, x20, [sp, #16]
-  401e64:	17ffffd8 	b	401dc4 <file_shared_with_fork_test+0xf0>
-  401e68:	aa1403e0 	mov	x0, x20
-  401e6c:	d2801901 	mov	x1, #0xc8                  	// #200
-  401e70:	94000a8f 	bl	4048ac <__munmap>
-  401e74:	3100041f 	cmn	w0, #0x1
-  401e78:	54000600 	b.eq	401f38 <file_shared_with_fork_test+0x264>  // b.none
-  401e7c:	2a1303e0 	mov	w0, w19
-  401e80:	940013ab 	bl	406d2c <close>
-  401e84:	f942eea0 	ldr	x0, [x21, #1496]
-  401e88:	52800041 	mov	w1, #0x2                   	// #2
-  401e8c:	94000a13 	bl	4046d8 <open>
-  401e90:	2a0003f3 	mov	w19, w0
-  401e94:	4f03e5e0 	movi	v0.16b, #0x6f
-  401e98:	910423e1 	add	x1, sp, #0x108
-  401e9c:	d2801902 	mov	x2, #0xc8                  	// #200
-  401ea0:	ad0203e0 	stp	q0, q0, [sp, #64]
-  401ea4:	3d801be0 	str	q0, [sp, #96]
-  401ea8:	7d00e3e0 	str	h0, [sp, #112]
-  401eac:	940013b0 	bl	406d6c <read>
-  401eb0:	f103201f 	cmp	x0, #0xc8
-  401eb4:	540003a1 	b.ne	401f28 <file_shared_with_fork_test+0x254>  // b.any
-  401eb8:	f94087e1 	ldr	x1, [sp, #264]
-  401ebc:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401ec0:	911ee000 	add	x0, x0, #0x7b8
-  401ec4:	94000b42 	bl	404bcc <printf>
-  401ec8:	d2800020 	mov	x0, #0x1                   	// #1
-  401ecc:	d503201f 	nop
-  401ed0:	910423e1 	add	x1, sp, #0x108
-  401ed4:	8b000022 	add	x2, x1, x0
-  401ed8:	910103e1 	add	x1, sp, #0x40
-  401edc:	8b000021 	add	x1, x1, x0
-  401ee0:	385ff042 	ldurb	w2, [x2, #-1]
-  401ee4:	385ff021 	ldurb	w1, [x1, #-1]
-  401ee8:	6b01005f 	cmp	w2, w1
-  401eec:	540002e1 	b.ne	401f48 <file_shared_with_fork_test+0x274>  // b.any
-  401ef0:	91000400 	add	x0, x0, #0x1
-  401ef4:	f103241f 	cmp	x0, #0xc9
-  401ef8:	54fffec1 	b.ne	401ed0 <file_shared_with_fork_test+0x1fc>  // b.any
-  401efc:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401f00:	91214000 	add	x0, x0, #0x850
-  401f04:	94000b52 	bl	404c4c <puts>
-  401f08:	2a1303e0 	mov	w0, w19
-  401f0c:	94001388 	bl	406d2c <close>
-  401f10:	b0000061 	adrp	x1, 40e000 <__stdio_ofl_lockptr+0xa68>
-  401f14:	a94153f3 	ldp	x19, x20, [sp, #16]
-  401f18:	b947d020 	ldr	w0, [x1, #2000]
-  401f1c:	11000400 	add	w0, w0, #0x1
-  401f20:	b907d020 	str	w0, [x1, #2000]
-  401f24:	17ffffa8 	b	401dc4 <file_shared_with_fork_test+0xf0>
-  401f28:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401f2c:	911e8000 	add	x0, x0, #0x7a0
-  401f30:	94000b47 	bl	404c4c <puts>
-  401f34:	17ffff9e 	b	401dac <file_shared_with_fork_test+0xd8>
-  401f38:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401f3c:	911e2000 	add	x0, x0, #0x788
-  401f40:	94000b43 	bl	404c4c <puts>
-  401f44:	17ffff9a 	b	401dac <file_shared_with_fork_test+0xd8>
-  401f48:	3941cbe6 	ldrb	w6, [sp, #114]
-  401f4c:	d0000040 	adrp	x0, 40b000 <_fini+0x780>
-  401f50:	3941c7e5 	ldrb	w5, [sp, #113]
-  401f54:	911f2000 	add	x0, x0, #0x7c8
-  401f58:	394103e4 	ldrb	w4, [sp, #64]
-  401f5c:	3944ebe3 	ldrb	w3, [sp, #314]
-  401f60:	3944e7e2 	ldrb	w2, [sp, #313]
-  401f64:	394423e1 	ldrb	w1, [sp, #264]
-  401f68:	94000b19 	bl	404bcc <printf>
-  401f6c:	17ffff90 	b	401dac <file_shared_with_fork_test+0xd8>
-```
-
-## uvm_copy2()を作成
-
-- mmap-region部分のマッピングはコピーしない
-- p->base -> p->sz, p->stksz -> USERTOPまでをコピー
-- mmap-region部分はcopy_mmap_listでマッピング
-
-```
-init: starting sh
-[1]pgdir_walk: failed
-pte shuld exist: addr=0xa000
-kern/console.c:283: kernel panic at cpu 1.
-```
-
-### uvm_copy2のバグ
-
-- stkszはあくまでサイズなのでスタックの開始アドレスは`USERTOP - stksz`
-- 結果は同じな上に終了せずスタック
-
-```
-# mmaptest2
-
-[F-13] file backed shared mapping with fork test
-buf2[0]=0xffff00003bb42000
-[F-13] failed at strcmp 3: buf2[0, 49, 50]=[, o, a], buf=[o, o, a]
-
-file_test:  ok: 0, ng: 1
-anon_test:  ok: 0, ng: 0
-other_test: ok: 0, ng: 0    // ここでスタック
-```
-
-### ret2アドレスの値が変更された時にブレークさせる
-
-- `watch *0x600000001000` (4バイト単位)
-
-```
-(gdb) c
-Continuing.
-[Switching to Thread 1.2]
-
-Thread 2 hit Hardware watchpoint 1: *0x600000001000
-
-Old value = <unreadable>
-New value = 1869573999  (= 0x6f6f6f6f)
-0x0000000000401d5c in ?? ()
-(gdb) c
-Continuing.
-[Switching to Thread 1.1]
-
-Thread 1 hit Hardware watchpoint 1: *0x600000001000
-
-Old value = 1869573999  (= 0x6f6f6f6f)
-New value = 4395432     (= 0x4311a8)
-0x000000000041a8dc in ?? ()
-(gdb) bt
-#0  0x000000000041a8dc in ?? ()
-Backtrace stopped: previous frame identical to this frame (corrupt stack?)
-(gdb) c
-Continuing.
-[Inferior 1 (process 1) exited normally]
-```
-
-- `watch *(char *)0x600000001000` (1バイト単位)
-
-```
-(gdb) c
-Continuing.
-[Switching to Thread 1.2]
-
-Thread 2 hit Hardware watchpoint 1: *(char *)0x600000001000
-
-Old value = <unreadable>
-New value = 111 'o'
-0x0000000000401d5c in ?? ()
-(gdb) c
-Continuing.
-[Switching to Thread 1.1]
-
-Thread 1 hit Hardware watchpoint 1: *(char *)0x600000001000
-
-Old value = 111 'o'
-New value = 168 '\250'
-0x000000000041a8dc in ?? ()
-```
-
-- 2回目のストップ時にはすでに実行を終えている。
-- 2回めのストップ時のアドレス0x000000000041a8dcはmmaptest2でもdashでもない
-
-### mmap.cを変更中
-
-- uvm_map()にpermを渡すようにしたがPTE_UDATA以外のpermを指定すると最初に`ls`を実行するとストールする。
-- `/bin/ls`や`mmaptest2`を最初に実行すると動く。
-- ただし、2つ目のコマンドがストールする
-- PTE_UDATAにするとls, /bin/ls, mmaptest2が動くが、mmaptest2実行後はlsも/bin/lsもストールする
-- mmaptestも同じ症状になった
+## mmaptestでも同じ現象が再現
 
 ```
 # mmaptest
@@ -2077,24 +2574,159 @@ mmap_test: Total: 1, OK: 1, NG: 0
 fork_test starting
 p1[PGSIZE]=A
 p2[PGSIZE]=A
-mismatch at 0, wanted 'A', got 0x0, addr=0x600000001000
+mismatch at 0, wanted 'A', got 0x0, addr=0x600000001000		// 同じような値
 mismatch at 1, wanted 'A', got 0x80, addr=0x600000001001
-mismatch at 2, wanted 'A', got 0xbb, addr=0x600000001002
+mismatch at 2, wanted 'A', got 0xb1, addr=0x600000001002
 mismatch at 3, wanted 'A', got 0x3b, addr=0x600000001003
 mismatch at 4, wanted 'A', got 0x0, addr=0x600000001004
 mismatch at 5, wanted 'A', got 0x0, addr=0x600000001005
 mismatch at 6, wanted 'A', got 0xff, addr=0x600000001006
 mismatch at 7, wanted 'A', got 0xff, addr=0x600000001007
 - fork parent v1(p1): ret: -8
-mismatch at 0, wanted 'A', got 0x0, addr=0x600000003000
-mismatch at 1, wanted 'A', got 0x90, addr=0x600000003001
-mismatch at 2, wanted 'A', got 0xbb, addr=0x600000003002
-mismatch at 3, wanted 'A', got 0x3b, addr=0x600000003003
-mismatch at 4, wanted 'A', got 0x0, addr=0x600000003004
-mismatch at 5, wanted 'A', got 0x0, addr=0x600000003005
-mismatch at 6, wanted 'A', got 0xff, addr=0x600000003006
-mismatch at 7, wanted 'A', got 0xff, addr=0x600000003007
-- fork parent v1(p2): ret: -8
 fork_test OK
 mmaptest: all tests succeeded
+# ls								// ストール
 ```
+
+### uvm_unmap時の配慮が他にも必要だった
+
+- munmap()
+- delete_mmap_node()
+
+```
+# mmaptest
+mmap_testスタート
+[7] test mmap two files
+- open mmap1 (3) RDWR/CREAT
+- write 3: 12345
+- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000001000
+- close 3
+- unlink mmap1
+- open mmap2 (3) RDWR/CREAT
+- write 3: 67890
+- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000002000
+- close 3
+- unlink mmap2
+- munmap PAGE: addr=0x600000001000
+- munmap PAGE: addr=0x600000002000
+[7] OK
+mmap_test: Total: 1, OK: 1, NG: 0
+
+fork_test starting
+p1: 0x600000001000 [8192]=A
+p2: 0x600000003000 [16384]=A
+- fork child v1(p1) ok
+- fork patent v1(p1) ok
+- fork patent v1(p2) ok
+fork_test OK
+mmaptest: all tests succeeded
+# ls
+bin  dev  etc  home  lib  test.txt  usr
+```
+
+## (FIXME) 現状MAP_SHAREDのpaは開放されることがない
+
+- kallocが返すページにref counterを導入し
+- uvm_mapで+1, uvm_unmapで-1
+- 0担ったらkfreeするようなロジックを考える
+
+## umv_mapでpermを使うとusr/bin/lsが動かない
+
+- 動く場合
+
+```
+ls
+[0]syscall1: sys_fstatat called
+[1]syscall1: sys_fstatat called
+[1]syscall1: sys_fstatat called
+[1]syscall1: sys_fstatat called
+[0]syscall1: sys_rt_sigprocmask called
+[0]syscall1: sys_clone called
+[3]syscall1: sys_rt_sigprocmask called
+[1]syscall1: sys_getpid called
+[3]syscall1: sys_setpgid called
+[1]syscall1: sys_setpgid called
+[1]syscall1: sys_ioctl called
+[1]syscall1: sys_rt_sigaction called
+[1]syscall1: sys_rt_sigaction called
+[0]syscall1: sys_wait4 called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_rt_sigprocmask called
+[2]syscall1: sys_execve called
+[0]syscall1: sys_gettid called
+[0]syscall1: sys_ioctl called
+[0]syscall1: sys_ioctl called
+[0]syscall1: sys_brk called
+[0]syscall1: sys_brk called
+[0]syscall1: sys_mmap called
+[0]syscall1: sys_mmap called
+[3]syscall1: sys_mmap called
+[0]syscall1: sys_openat called
+[0]syscall1: sys_fcntl called
+[0]syscall1: sys_mmap called
+[0]syscall1: sys_getdents64 called
+[1]syscall1: sys_getdents64 called
+[1]syscall1: sys_close called
+[1]syscall1: sys_munmap called
+[2]syscall1: sys_ioctl called
+bin  dev  etc  home  lib  test.txt  usr
+[2]syscall1: sys_close called
+[2]syscall1: sys_close called
+[2]syscall1: sys_exit called
+[1]syscall1: sys_wait4 called
+[1]syscall1: sys_ioctl called
+[3]syscall1: sys_mmap called
+[3]syscall1: sys_write called
+# [3]syscall1: sys_munmap called
+[3]syscall1: sys_read called
+```
+
+- 動かない場合
+
+```
+ls
+[2]syscall1: sys_fstatat called
+[3]syscall1: sys_fstatat called
+[0]syscall1: sys_fstatat called
+[1]syscall1: sys_fstatat called
+[0]syscall1: sys_rt_sigprocmask called
+[0]syscall1: sys_clone called
+[2]syscall1: sys_rt_sigprocmask called
+[3]syscall1: sys_getpid called
+[2]syscall1: sys_setpgid called
+[3]syscall1: sys_setpgid called
+[3]syscall1: sys_ioctl called
+[3]syscall1: sys_rt_sigaction called
+[2]syscall1: sys_wait4 called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_rt_sigaction called
+[3]syscall1: sys_rt_sigprocmask called
+[3]syscall1: sys_execve called
+[0]syscall1: sys_gettid called
+[0]syscall1: sys_ioctl called
+[0]syscall1: sys_ioctl called
+[0]syscall1: sys_brk called
+[0]syscall1: sys_brk called
+[0]syscall1: sys_mmap called
+[0]syscall1: sys_mmap called
+[1]syscall1: sys_mmap called
+[3]syscall1: sys_openat called
+[3]syscall1: sys_fcntl called
+[3]syscall1: sys_mmap called
+[0]syscall1: sys_getdents64 called
+[0]syscall1: sys_getdents64 called
+[0]syscall1: sys_close called
+```
+
+### これは原因不明でpermを使うことを諦めた
+
+- 当面、遅延ロードもCOWも実装しないので問題はない
+- どうしても必要になったら再度考える
+
+## mmaptest, mmaptest2, mmaptest2などmmaptest系を3回繰り返すとストールする
+
+- 原因不明

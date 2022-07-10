@@ -118,7 +118,7 @@ proc_initx(char *name, char *code, size_t len)
     p->pgdir = vm_init();
     assert(p->pgdir);
 
-    int ret = uvm_map(p->pgdir, 0, PGSIZE, V2P(va), PTE_UDATA);
+    int ret = uvm_map(p->pgdir, 0, PGSIZE, V2P(va));
     assert(ret == 0);
 
     memmove(va, code, len);

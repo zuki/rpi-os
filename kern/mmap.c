@@ -51,16 +51,9 @@ delete_mmap_node(struct proc *p, struct mmap_region *node)
             region = region->next;
         }
     }
-    //if (node->addr == 0xfffffffff000)
-    //    cprintf("dmn[%d]: addr=0x%p, ref=%d\n", p->pid, node->addr, node->original);
-    //if (node->flags & MAP_PRIVATE || node->original < 1) {
-
-    if (node->original) {
-        uvm_unmap(p->pgdir, (uint64_t)node->addr, (((uint64_t)node->length + PGSIZE - 1) / PGSIZE), 1);
-        //memset(node, 0, sizeof(struct mmap_region));
-    } else {
-        uvm_unmap(p->pgdir, (uint64_t)node->addr, (((uint64_t)node->length + PGSIZE - 1) / PGSIZE), 0);
-    }
+    // FIXME: paをshareしているmmapがすべて削除されたことを判断する方法
+    int free = (node->flags & MAP_SHARED) ? 0 : 1;
+    uvm_unmap(p->pgdir, (uint64_t)node->addr, (((uint64_t)node->length + PGSIZE - 1) / PGSIZE), free);
     kmfree(node);
     node = 0;
     //print_mmap_list(p, "delete node after");
@@ -114,20 +107,20 @@ uint64_t
 get_perm(int prot, int flags)
 {
     uint64_t perm;
-
     if (flags & MAP_ANONYMOUS)
-        perm = PTE_VALID | PTE_USER | PTE_PXN | PTE_PAGE
+        perm = PTE_USER | PTE_PXN | PTE_PAGE
              | (MT_NORMAL_NC << 2) | PTE_AF | PTE_SH;
     else
-        perm = PTE_VALID | PTE_USER | PTE_PXN | PTE_PAGE
+        perm = PTE_USER | PTE_PXN | PTE_PAGE
              | (MT_NORMAL << 2) | PTE_AF | PTE_SH;
+
+    if (prot & PROT_READ)
+        perm |= PTE_RO;
     if (prot & PROT_WRITE)
         perm &= ~PTE_RO;
-    else if (prot & PROT_READ)
-        perm |= PTE_RO;
     if (!(prot & PROT_EXEC))
         perm |= PTE_UXN;
-    if (prot & PROT_NONE)
+    if (prot & PROT_NONE || !(prot & (PROT_READ | PROT_WRITE)))
         perm &= ~PTE_USER;
 
     return perm;
@@ -147,8 +140,9 @@ scale_mmap_region(struct mmap_region *region, uint64_t size)
     } else {                        // 縮小
         uint64_t dstart = ROUNDDOWN((uint64_t)region->addr + region->length, PGSIZE);
         uint64_t dpages = (region->length - dstart + PGSIZE - 1) / PGSIZE;
+        int free = (region->flags & MAP_SHARED) ? 0 : 1;
         if ((uint64_t)region->addr + size <= dstart && dpages > 0) {
-            uvm_unmap(thisproc()->pgdir, dstart, dpages, 1);
+            uvm_unmap(thisproc()->pgdir, dstart, dpages, free);
         }
     }
     region->length = size;
@@ -219,7 +213,7 @@ map_file_page(void *addr, size_t length, uint64_t perm, struct file *f, off_t of
     }
     // ページをユーザプロセスにマッピング
     //cprintf("- map_region: addr=0x%p, mem=0x%p\n", (void *)addr, mem);
-    if ((error = uvm_map(p->pgdir, (void *)addr, PGSIZE, V2P(mem), perm)) < 0) {
+    if ((error = uvm_map(p->pgdir, (void *)addr, PGSIZE, V2P(mem))) < 0) {
         //cprintf("map_pagecache_page: map_region failed\n");
         kfree(mem);
         return error;
@@ -262,7 +256,7 @@ map_anon_page(void *addr, uint64_t perm)
     memset(page, 0, PGSIZE);
     //cprintf("map_anon_page: map addr=0x%llx, page=0x%p\n", addr, V2P(page));
     //if (map_region(p->pgdir, addr, PGSIZE, V2P(page), perm) < 0) {
-    if (uvm_map(p->pgdir, addr, PGSIZE, V2P(page), perm) < 0) {
+    if (uvm_map(p->pgdir, addr, PGSIZE, V2P(page)) < 0) {
         kfree(page);
         return -EINVAL;
     }
@@ -499,16 +493,13 @@ munmap(void *addr, size_t length)
     // lengthは境界になくてもよいが、処理は境界に合わせる
     length = ROUNDUP(length, PGSIZE);
 
-    trace("addr=0x%p, length=0x%llx", addr, length);
+    debug("addr=0x%p, length=0x%llx", addr, length);
 
     struct mmap_region *region = find_mmap_region(addr);
     if (region == NULL) return 0;
 
-    debug("found: addr=0x%p\n", region->addr);
-    //int anon = region->flags & MAP_ANONYMOUS;
-    //int shared = region->flags & MAP_SHARED;
+    debug(" - found: addr=0x%p", region->addr);
     // ファイルが背後にある共有マップは書き戻し
-    //if (shared && !anon && region->f && (region->prot & PROT_WRITE)) {
     if ((region->flags & MAP_SHARED) && region->f && (region->prot & PROT_WRITE)) {
         begin_op();
         error = writei(region->f->ip, region->addr, region->offset, region->length);
@@ -525,14 +516,14 @@ munmap(void *addr, size_t length)
         delete_mmap_node(p, region);
         p->nregions -= 1;
     } else {
-        uvm_unmap(p->pgdir, (uint64_t)addr, length / PGSIZE, 1);    // FIXME: length < PGSIZEだと0ページだがそれで良いのか
+        int free = (region->flags & MAP_SHARED) ? 0 : 1;
+        if (length / PGSIZE) {
+            uvm_unmap(p->pgdir, (uint64_t)addr, length / PGSIZE, free);
+        }
         region->addr += length;
         region->length -= length;
         debug("new region: addr=0x%p, length=0x%llx", region->addr, region->length);
     }
-    //cprintf("munmap ok\n");
-    //uvm_switch(p->pgdir);
-    //print_mmap_list(p, "munmap");
     return 0;
 }
 
@@ -658,6 +649,7 @@ copy_mmap_list(struct proc *parent, struct proc *child)
         if (region == (struct mmap_region *)0)
             return -ENOMEM;
         copy_mmap_region(region, node);
+    /*
         if (node->flags & MAP_SHARED) {
             ptep = pgdir_walk(parent->pgdir, node->addr, 0);
             if (!ptep) panic("parent pgdir not pte: va=0x%p\n", region->addr);
@@ -670,6 +662,7 @@ copy_mmap_list(struct proc *parent, struct proc *child)
             debug("ptep=0x%llx, *ptep=0x%llx", ptep, *ptep);
             debug("ptec=0x%llx, *ptec=0x%llx", ptec, *ptec);
         }
+    */
         if (cnode == 0)
             cnode = region;
         else
@@ -715,7 +708,7 @@ copy_mmap_list2(struct proc *parent, struct proc *child)
             // MAP_PRIVATEの場合は、READ ONLYで割り当て
             if (node->flags & MAP_PRIVATE)
                 perm |= PTE_RO;
-            if ((error = uvm_map(child->pgdir, start, PGSIZE, pa, perm)) < 0)
+            if ((error = uvm_map(child->pgdir, start, PGSIZE, pa)) < 0)
                 goto bad;
         }
         if (cnode == 0)
