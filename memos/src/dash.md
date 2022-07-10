@@ -2372,7 +2372,81 @@ pa: ret2[0]=0xffff00003bb3f000
 [F-13] ok
 ```
 
-## execve()のflush_old_exec()でfree_mmap_list()を実行した場合
+## mmaptestでも同じ現象が再現
+
+```
+# mmaptest
+mmap_testスタート
+[7] test mmap two files
+- open mmap1 (3) RDWR/CREAT
+- write 3: 12345
+- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000001000
+- close 3
+- unlink mmap1
+- open mmap2 (3) RDWR/CREAT
+- write 3: 67890
+- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000002000
+- close 3
+- unlink mmap2
+- munmap PAGE: addr=0x600000001000
+- munmap PAGE: addr=0x600000002000
+[7] OK
+mmap_test: Total: 1, OK: 1, NG: 0
+
+fork_test starting
+p1[PGSIZE]=A
+p2[PGSIZE]=A
+mismatch at 0, wanted 'A', got 0x0, addr=0x600000001000		// 同じような値
+mismatch at 1, wanted 'A', got 0x80, addr=0x600000001001
+mismatch at 2, wanted 'A', got 0xb1, addr=0x600000001002
+mismatch at 3, wanted 'A', got 0x3b, addr=0x600000001003
+mismatch at 4, wanted 'A', got 0x0, addr=0x600000001004
+mismatch at 5, wanted 'A', got 0x0, addr=0x600000001005
+mismatch at 6, wanted 'A', got 0xff, addr=0x600000001006
+mismatch at 7, wanted 'A', got 0xff, addr=0x600000001007
+- fork parent v1(p1): ret: -8
+fork_test OK
+mmaptest: all tests succeeded
+# ls								// ストール
+```
+
+### uvm_unmap時の配慮が他にも必要だった
+
+- munmap()
+- delete_mmap_node()
+
+```
+# mmaptest
+mmap_testスタート
+[7] test mmap two files
+- open mmap1 (3) RDWR/CREAT
+- write 3: 12345
+- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000001000
+- close 3
+- unlink mmap1
+- open mmap2 (3) RDWR/CREAT
+- write 3: 67890
+- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000002000
+- close 3
+- unlink mmap2
+- munmap PAGE: addr=0x600000001000
+- munmap PAGE: addr=0x600000002000
+[7] OK
+mmap_test: Total: 1, OK: 1, NG: 0
+
+fork_test starting
+p1: 0x600000001000 [8192]=A
+p2: 0x600000003000 [16384]=A
+- fork child v1(p1) ok
+- fork patent v1(p1) ok
+- fork patent v1(p2) ok
+fork_test OK
+mmaptest: all tests succeeded
+# ls
+bin  dev  etc  home  lib  test.txt  usr
+```
+
+## execve()のflush_old_exec()でfree_mmap_list()を実行した場合にエラー
 
 ```
 $ /bin/ls
@@ -2383,7 +2457,7 @@ $ /bin/ls
 pgdir_walk
 ```
 
-- 以下の通り、free_mmap_listは不要
+- 以下の通り、free_mmap_listは不要だった
 
 ```c
 void *oldpgdir = curproc->pgdir, *pgdir = vm_init();
@@ -2393,10 +2467,11 @@ curproc->pgdir = pgdir;     // この段階でcurpoc->pgdir はカラなので�
 flush_old_exec();   // 親から受け継いだ不要な資源を開放
 ```
 
-## 現状
+## mmaptest2の全体テスト
 
-- F系列で2つ失敗
+- 7月9日現在、F系列で2つ失敗
 - 一気通貫テストはできない（途中でストールする）
+- 以下は分割してテストをした結果をまとめたもの
 
 ```
 [F-01] 不正なfdを指定した場合のテスト
@@ -2550,87 +2625,32 @@ p[0]=0, p[2499]=2499
 [O-05] test ok
 ```
 
-## mmaptestでも同じ現象が再現
+### F系で失敗するのはテスト環境のせいらしい
+
+- F-09から系全部とA系、O系の通しテストをすると全部成功
+- F-01からF-08とA系、O系の通しテストはF系は全部成功するがA-01でストール
+- F-01からF-07とA系、O系の通しテストはF系は全部とA=01は成功するがA-02でストール
+- 個々のテストは全部OKらしいが、通しテストをストールさせる何かがあるらしい
+
+### F-06のテスト条件が問題だった
+
+- xv6-armv8ではMMAPTOPを600MBとしていたが今回はUSERTOPに合わせた
+- この条件でF-06を実行するとmmapで想定外のエラーとなっていた
+- F-06の条件の方を変えたことで一気通貫テストが成功した
 
 ```
-# mmaptest
-mmap_testスタート
-[7] test mmap two files
-- open mmap1 (3) RDWR/CREAT
-- write 3: 12345
-- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000001000
-- close 3
-- unlink mmap1
-- open mmap2 (3) RDWR/CREAT
-- write 3: 67890
-- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000002000
-- close 3
-- unlink mmap2
-- munmap PAGE: addr=0x600000001000
-- munmap PAGE: addr=0x600000002000
-[7] OK
-mmap_test: Total: 1, OK: 1, NG: 0
-
-fork_test starting
-p1[PGSIZE]=A
-p2[PGSIZE]=A
-mismatch at 0, wanted 'A', got 0x0, addr=0x600000001000		// 同じような値
-mismatch at 1, wanted 'A', got 0x80, addr=0x600000001001
-mismatch at 2, wanted 'A', got 0xb1, addr=0x600000001002
-mismatch at 3, wanted 'A', got 0x3b, addr=0x600000001003
-mismatch at 4, wanted 'A', got 0x0, addr=0x600000001004
-mismatch at 5, wanted 'A', got 0x0, addr=0x600000001005
-mismatch at 6, wanted 'A', got 0xff, addr=0x600000001006
-mismatch at 7, wanted 'A', got 0xff, addr=0x600000001007
-- fork parent v1(p1): ret: -8
-fork_test OK
-mmaptest: all tests succeeded
-# ls								// ストール
-```
-
-### uvm_unmap時の配慮が他にも必要だった
-
-- munmap()
-- delete_mmap_node()
-
-```
-# mmaptest
-mmap_testスタート
-[7] test mmap two files
-- open mmap1 (3) RDWR/CREAT
-- write 3: 12345
-- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000001000
-- close 3
-- unlink mmap1
-- open mmap2 (3) RDWR/CREAT
-- write 3: 67890
-- mmap 3 -> PAGE PROT_READ MAP_PRIVATE: addr=0x600000002000
-- close 3
-- unlink mmap2
-- munmap PAGE: addr=0x600000001000
-- munmap PAGE: addr=0x600000002000
-[7] OK
-mmap_test: Total: 1, OK: 1, NG: 0
-
-fork_test starting
-p1: 0x600000001000 [8192]=A
-p2: 0x600000003000 [16384]=A
-- fork child v1(p1) ok
-- fork patent v1(p1) ok
-- fork patent v1(p2) ok
-fork_test OK
-mmaptest: all tests succeeded
-# ls
-bin  dev  etc  home  lib  test.txt  usr
+file_test:  ok: 21, ng: 0
+anon_test:  ok: 13, ng: 0
+other_test: ok: 5, ng: 0
 ```
 
 ## (FIXME) 現状MAP_SHAREDのpaは開放されることがない
 
 - kallocが返すページにref counterを導入し
 - uvm_mapで+1, uvm_unmapで-1
-- 0担ったらkfreeするようなロジックを考える
+- 0になったらkfreeするようなロジックを考える
 
-## umv_mapでpermを使うとusr/bin/lsが動かない
+## (FIXME) umv_mapでpermを使うとusr/bin/lsが動かない
 
 - 動く場合
 
@@ -2727,6 +2747,6 @@ ls
 - 当面、遅延ロードもCOWも実装しないので問題はない
 - どうしても必要になったら再度考える
 
-## mmaptest, mmaptest2, mmaptest2などmmaptest系を3回繰り返すとストールする
+## (FIXME) mmaptest, mmaptest2, mmaptest2などmmaptest系を3回繰り返すとストールする
 
 - 原因不明

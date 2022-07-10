@@ -9,6 +9,7 @@
 #include <errno.h>
 
 #define MMAPBASE 0x600000000000UL
+#define MMAPTOP 0x0001000000000000UL
 
 char *filename = "README";
 
@@ -62,8 +63,7 @@ void mmap_invalid_map_fixed_test();
 void write_readme(int n);
 
 void file_tests() {
-    write_readme(8192);
-/*
+    //write_readme(8192);
     file_invalid_fd_test();
     file_invalid_flags_test();
     file_writeable_shared_mapping_on_ro_file_test();
@@ -72,14 +72,11 @@ void file_tests() {
     file_exceed_size_test();
     file_exceed_count_test();
     file_empty_file_size_test();  // FIXME: n > 32
-
     file_private_test();
     file_shared_test();
     file_pagecache_coherency_test();
     file_private_with_fork_test();
-*/
     file_shared_with_fork_test();
-/*
     file_mapping_with_offset_test();
     file_given_addr_test();
     file_invalid_addr_test();
@@ -88,7 +85,6 @@ void file_tests() {
     file_intermediate_given_addr_not_possible_test();
     file_exceeds_file_size_test();
     file_mapping_on_wo_file_test();
-*/
 }
 
 void anonymous_tests() {
@@ -147,8 +143,8 @@ int file_ok = 0, file_ng = 0, anon_ok = 0, anon_ng = 0, other_ok = 0,
 
 int main(int args, char *argv[]) {
     file_tests();
-    //anonymous_tests();
-    //other_tests();
+    anonymous_tests();
+    other_tests();
     printf("\nfile_test:  ok: %d, ng: %d\n", file_ok, file_ng);
     printf("anon_test:  ok: %d, ng: %d\n", anon_ok, anon_ng);
     printf("other_test: ok: %d, ng: %d\n", other_ok, other_ng);
@@ -494,7 +490,8 @@ void file_exceed_size_test() {
         file_ng++;
         return;
     }
-    int size = 600 * 1024 * 1024;  // 600 MB
+    //int size = 600 * 1024 * 1024;  // 600 MB (150Kページ)
+    size_t size = MMAPTOP;
     void *ret = mmap((void *)0, size, PROT_READ | PROT_WRITE,
                              MAP_PRIVATE, fd, 0);
     if (ret != MAP_FAILED) {
@@ -504,7 +501,6 @@ void file_exceed_size_test() {
         file_ng++;
         return;
     }
-    perror(" error");
     close(fd);
     printf("[F-06] ok\n");
     file_ok++;
@@ -580,8 +576,7 @@ void file_mapping_with_offset_test() {
     }
     n = read(fd, buf, size);
     if (n != (size - 4096)) {
-        printf("[F-14] failed at read 2, n=%d\n",
-               n);
+        printf("[F-14] failed at read 2, n=%d\n", n);
         file_ng++;
         return;
     }
