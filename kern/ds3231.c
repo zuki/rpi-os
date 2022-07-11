@@ -1,3 +1,4 @@
+#include "arm.h"
 #include "base.h"
 #include "i2c.h"
 #include "i2c.h"
