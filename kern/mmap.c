@@ -27,7 +27,7 @@ delete_mmap_node(struct proc *p, struct mmap_region *node)
 {
     if (p->regions == 0) return;
 
-    //cprintf("delete_mmap_node[%d]: addr=0x%p, original=%d\n", p->pid, node->addr, node->original);
+    //cprintf("delete_mmap_node[%d]: addr=0x%p\n", p->pid, node->addr);
 
     //print_mmap_list(p, "delete node before");
 
@@ -52,8 +52,8 @@ delete_mmap_node(struct proc *p, struct mmap_region *node)
         }
     }
     // FIXME: paをshareしているmmapがすべて削除されたことを判断する方法
-    int free = (node->flags & MAP_SHARED) ? 0 : 1;
-    uvm_unmap(p->pgdir, (uint64_t)node->addr, (((uint64_t)node->length + PGSIZE - 1) / PGSIZE), free);
+    //int free = (node->flags & MAP_SHARED) ? 0 : 1;
+    uvm_unmap(p->pgdir, (uint64_t)node->addr, (((uint64_t)node->length + PGSIZE - 1) / PGSIZE));
     kmfree(node);
     node = 0;
     //print_mmap_list(p, "delete node after");
@@ -93,7 +93,6 @@ copy_mmap_region(struct mmap_region *dest, struct mmap_region *src)
     dest->prot          = src->prot;
     dest->offset        = src->offset;
     dest->next          = NULL;
-    dest->original      = 0;
 
     if (!(src->flags & MAP_ANONYMOUS) && src->f) {
         dest->f = filedup(src->f);
@@ -140,9 +139,9 @@ scale_mmap_region(struct mmap_region *region, uint64_t size)
     } else {                        // 縮小
         uint64_t dstart = ROUNDDOWN((uint64_t)region->addr + region->length, PGSIZE);
         uint64_t dpages = (region->length - dstart + PGSIZE - 1) / PGSIZE;
-        int free = (region->flags & MAP_SHARED) ? 0 : 1;
+        //int free = (region->flags & MAP_SHARED) ? 0 : 1;
         if ((uint64_t)region->addr + size <= dstart && dpages > 0) {
-            uvm_unmap(thisproc()->pgdir, dstart, dpages, free);
+            uvm_unmap(thisproc()->pgdir, dstart, dpages);
         }
     }
     region->length = size;
@@ -234,7 +233,7 @@ map_file_pages(void *addr, size_t length, uint64_t perm, struct file *f, off_t o
         mapsize = PGSIZE > size ? size : PGSIZE;
         if ((error = map_file_page(addr + cur, mapsize, perm, f, offset + cur)) < 0) {
             if (cur != 0)
-                uvm_unmap(thisproc()->pgdir, addr, cur/PGSIZE, 1);
+                uvm_unmap(thisproc()->pgdir, addr, cur/PGSIZE);
             return error;
         }
         size -= mapsize;
@@ -272,7 +271,7 @@ map_anon_pages(void *addr, size_t length, uint64_t perm)
     for (uint64_t cur = 0; cur < length; cur += PGSIZE) {
         if ((ret = map_anon_page(addr + cur, perm)) < 0) {
             if (cur != 0)
-                uvm_unmap(thisproc()->pgdir, addr, cur/PGSIZE, 1);
+                uvm_unmap(thisproc()->pgdir, addr, cur/PGSIZE);
             return ret;
         }
 
@@ -427,8 +426,6 @@ select_addr:
     } else {
         region->f = NULL;
     }
-    // 2.3 オリジナルフラグを設定: FIXME このフラグの必要性は?
-    region->original = 1;
 
     // 3. p->regionsに作成したmmap_regionを追加する
 
@@ -516,10 +513,10 @@ munmap(void *addr, size_t length)
         delete_mmap_node(p, region);
         p->nregions -= 1;
     } else {
-        int free = (region->flags & MAP_SHARED) ? 0 : 1;
-        if (length / PGSIZE) {
-            uvm_unmap(p->pgdir, (uint64_t)addr, length / PGSIZE, free);
-        }
+        //int free = (region->flags & MAP_SHARED) ? 0 : 1;
+        //if (length / PGSIZE) {
+            uvm_unmap(p->pgdir, (uint64_t)addr, length / PGSIZE);
+        //}
         region->addr += length;
         region->length -= length;
         debug("new region: addr=0x%p, length=0x%llx", region->addr, region->length);
@@ -680,57 +677,6 @@ copy_mmap_list(struct proc *parent, struct proc *child)
     uvm_switch(child->pgdir);
     uvm_switch(parent->pgdir);
     return 0;
-}
-
-long
-copy_mmap_list2(struct proc *parent, struct proc *child)
-{
-    void *start;
-    uint64_t *pte;
-    uint64_t pa, perm;
-    long error;
-
-    struct mmap_region *node = parent->regions;
-    struct mmap_region *cnode = 0, *tail = 0;
-
-    while (node) {
-        struct mmap_region *region = (struct mmap_region *)kmalloc(sizeof(struct mmap_region));
-        if (region == (struct mmap_region *)0)
-            return -ENOMEM;
-        copy_mmap_region(region, node);
-
-        start = node->addr;
-        for (; start < node->addr + node->length; start += PGSIZE) {
-            pte = pgdir_walk(parent->pgdir, start, 0);
-            if (!pte) panic("parent pgdir not pte: va=0x%p\n", start);
-            pa = PTE_ADDR(*pte);
-            perm = PTE_FLAGS(*pte);
-            // MAP_PRIVATEの場合は、READ ONLYで割り当て
-            if (node->flags & MAP_PRIVATE)
-                perm |= PTE_RO;
-            if ((error = uvm_map(child->pgdir, start, PGSIZE, pa)) < 0)
-                goto bad;
-        }
-        if (cnode == 0)
-            cnode = region;
-        else
-            tail->next = region;
-
-        tail = region;
-        node = node->next;
-    }
-
-    child->regions = cnode;
-    child->nregions = parent->nregions;
-    debug("child nregions=%d, regions=0x%p\n", child->nregions, child->regions);
-    //print_mmap_list(parent, parent->name);
-    //print_mmap_list(child, "child");
-    uvm_switch(child->pgdir);
-    uvm_switch(parent->pgdir);
-    return 0;
-bad:
-    free_mmap_list(child);
-    return error;
 }
 
 // Copy on Write機能を実装（trap.cでFLT_PERMISSIONの場合に呼び出される）

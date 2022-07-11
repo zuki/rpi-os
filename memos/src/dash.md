@@ -2650,6 +2650,66 @@ other_test: ok: 5, ng: 0
 - uvm_mapで+1, uvm_unmapで-1
 - 0になったらkfreeするようなロジックを考える
 
+### 実装
+
+- [https://github.com/vishwesh96/xv6_cow-fork](https://github.com/vishwesh96/xv6_cow-fork)のロジックを使用
+
+```
+$ make qemu
+...
+qemu-system-aarch64 -M raspi3b -nographic -serial null -serial mon:stdio -drive file=obj/sd.img,if=sd,format=raw -kernel obj/kernel8.img
+[2]free_range: 0xffff000000212000 ~ 0xffff00003b400000, 242158 pages
+[2]rand_init: rand_init ok
+pagecache_init ok
+[2]main: cpu 2 init finished
+[0]main: cpu 0 init finished
+[1]main: cpu 1 init finished
+[3]main: cpu 3 init finished
+[2]emmc_card_init: poweron
+[2]emmc_issue_command_int: rrror occured whilst waiting for command complete interrupt
+[2]emmc_card_reset: found valid version 2.00 SD card
+[2]dev_init: LBA of 1st block 0x20800, 0xf0000 blocks totally
+[2]iinit: sb: size 800000 nblocks 799419 ninodes 1024 nlog 126 logstart 2 inodestart 128 bmapstart 385
+init: starting sh
+# uname
+xv6
+# ls
+bin  dev  etc  home  lib  test.txt  usr
+# mmaptest2
+...
+file_test:  ok: 21, ng: 0
+anon_test:  ok: 13, ng: 0
+other_test: ok: 5, ng: 0
+# /bin/ls
+drwxrwxr-x    1 root wheel  1024  7 10 16:31 .
+drwxrwxr-x    1 root wheel  1024  7 10 16:31 ..
+drwxrwxr-x    2 root wheel  1024  7 10 16:31 bin
+drwxrwxr-x    3 root wheel   384  7 10 16:31 dev
+drwxrwxr-x    8 root wheel   256  7 10 16:31 etc
+drwxrwxrwx    9 root wheel   128  7 10 16:31 lib
+drwxrwxr-x   10 root wheel   192  7 10 16:31 home
+drwxrwxr-x   12 root wheel   256  7 10 16:31 usr
+-rwxr-xr-x   30 root wheel    94  7 10 16:31 test.txt
+# sigtest
+PID 22 ready
+PID 23 ready
+PID 24 ready
+PID 25 ready
+PID 26 ready
+PID 26 caught sig 2, j 3
+PID 25 caught sig 2, j 2
+PID 24 caught sig 2, j 1
+26 is dead
+PID 23 caught sig 2, j 0
+24 is dead
+PID 22 caught sig 2, j -1
+25 is dead
+23 is dead
+22 is dead
+# uname -a
+xv6 mini 1.0.1 2022-06-26 (musl) AArch64 Elf
+```
+
 ## (FIXME) umv_mapでpermを使うとusr/bin/lsが動かない
 
 - 動く場合

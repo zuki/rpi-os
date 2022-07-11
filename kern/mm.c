@@ -17,71 +17,104 @@ static void *alloc_ptr[MAX_PAGES];
 
 extern char end[];
 
-struct freelist {
-    void *next;
-    void *start, *end;
-} freelist;
+// 実機 free_range: 0xffff000000125000 ~ 0xffff00003b400000, 242395 pages
+// QEMU free_range: 0xffff0000000a6000 ~ 0xffff00003c000000, 245594 pages
+#define PHYSTOP 0x3b400000
+#define NFRAMES (PHYSTOP / PGSIZE)
 
-static struct spinlock memlock;
+struct run {
+    struct run *next;
+};
 
-static uint64_t totalram;
-static uint64_t freeram = 0;
+struct _kmem {
+    struct spinlock lock;
+    struct run *freelist;
+    uint64_t fpages;
+} kmem;
 
-void mm_test();
+struct _kmem_reftable {
+    int ref[NFRAMES];
+    struct spinlock lock;
+} kmem_reftable;
 
-/*
- * Allocate one 4096-byte page of physical memory.
- * Returns a pointer that the kernel can use.
- * Returns 0 if the memory cannot be allocated.
- */
-static void *
-freelist_alloc(struct freelist *f)
-{
-    void *p = f->next;
-    if (p)
-        f->next = *(void **)p;
-    return p;
-}
+static uint64_t totalram = 0;
 
-/*
- * Free the page of physical memory pointed at by v.
- */
 static void
-freelist_free(struct freelist *f, void *v)
-{
-    *(void **)v = f->next;
-    f->next = v;
-}
-
-void
 free_range(void *start, void *end)
 {
     int cnt = 0;
+
     for (void *p = start; p + PGSIZE <= end; p += PGSIZE, cnt++) {
-        freelist_free(&freelist, p);
-        freeram += PGSIZE;
+        kfree(p);
+        totalram += PGSIZE;
     }
     info("0x%p ~ 0x%p, %d pages", start, end, cnt);
 }
 
 void
-mm_init()
+mm_init(void)
 {
+    initlock(&kmem_reftable.lock);
+    initlock(&kmem.lock);
+
+    acquire(&kmem_reftable.lock);
+    for (int i = 0; i < NFRAMES; i++) {
+        kmem_reftable.ref[i] = 0;
+    }
+    release(&kmem_reftable.lock);
+
+    kmem.fpages = 0;
     // HACK Raspberry pi 4b.
-    size_t phystop = MIN(0x3F000000, mbox_get_arm_memory());
-    free_range(ROUNDUP((void *)end, PGSIZE), P2V(phystop));
-    totalram = freeram;
-#ifdef DEBUG
-    for (int i = 0; i < MAX_PAGES; i++) {
-        void *p = freelist_alloc(&freelist);
-        memset(p, 0xAC, PGSIZE);
-        alloc_ptr[i] = p;
-    }
-    for (int i = 0; i < MAX_PAGES; i++) {
-        freelist_free(&freelist, alloc_ptr[i]);
-        alloc_ptr[i] = 0;
-    }
-#endif
+    //size_t phystop = MIN(0x3F000000, mbox_get_arm_memory());
+    free_range(ROUNDUP((void *)end, PGSIZE), P2V(PHYSTOP));
+}
+
+void
+inc_kmem_ref(uint64_t pa)
+{
+    acquire(&kmem_reftable.lock);
+    kmem_reftable.ref[pa >> PGSHIFT]++;
+    release(&kmem_reftable.lock);
+}
+
+void
+dec_kmem_ref(uint64_t pa)
+{
+    acquire(&kmem_reftable.lock);
+    kmem_reftable.ref[pa >> PGSHIFT]--;
+    release(&kmem_reftable.lock);
+}
+
+int
+get_kmem_ref(uint64_t pa)
+{
+    acquire(&kmem_reftable.lock);
+    int ref = kmem_reftable.ref[pa >> PGSHIFT];
+    release(&kmem_reftable.lock);
+    return ref;
+}
+
+static void
+set_kmem_ref(uint64_t pa, int count)
+{
+    acquire(&kmem_reftable.lock);
+    kmem_reftable.ref[pa >> PGSHIFT] = count;
+    release(&kmem_reftable.lock);
+}
+
+uint64_t
+get_totalram(void)
+{
+    return totalram;
+}
+
+uint64_t
+get_freeram(void)
+{
+    acquire(&kmem.lock);
+    uint64_t fpages = kmem.fpages;
+    release(&kmem.lock);
+    return fpages * PGSIZE;
 }
 
 /*
@@ -90,55 +123,36 @@ mm_init()
  * Corrupt the page by filling non-zero value in it for debugging.
  */
 void *
-kalloc()
+kalloc(void)
 {
-    acquire(&memlock);
-    void *p = freelist_alloc(&freelist);
-    if (!p) freeram -= PGSIZE;
-#ifdef DEBUG
-    if (p) {
-        for (int i = 8; i < PGSIZE; i++) {
-            assert(*(char *)(p + i) == 0xAC);
-        }
+    struct run *r;
 
-        int i;
-        for (i = 0; i < MAX_PAGES; i++) {
-            if (!alloc_ptr[i]) {
-                alloc_ptr[i] = p;
-                break;
-            }
-        }
-        if (i == MAX_PAGES) {
-            panic("mm: no more space for debug. ");
-        }
-    } else
-        warn("null");
-#endif
-    release(&memlock);
-    return p;
+    acquire(&kmem.lock);
+    r = kmem.freelist;
+    if (r) {
+        kmem.freelist = r->next;
+        kmem.fpages--;
+        set_kmem_ref((uint64_t)V2P((uint64_t)r), 1);
+    }
+    release(&kmem.lock);
+    return r;
 }
 
 /* Free the physical memory pointed at by v. */
 void
 kfree(void *va)
 {
-    acquire(&memlock);
-#ifdef DEBUG
-    memset(va, 0xAC, PGSIZE);   // For debug.
-    int i;
-    for (i = 0; i < MAX_PAGES; i++) {
-        if (alloc_ptr[i] == va) {
-            alloc_ptr[i] = 0;
-            break;
-        }
-    }
-    if (i == MAX_PAGES) {
-        panic("kfree: not allocated. ");
-    }
-#endif
-    freelist_free(&freelist, va);
-    freeram += PGSIZE;
-    release(&memlock);
+    struct run *r;
+    if ((uint64_t)va % PGSIZE || va < end || V2P(va) >= PHYSTOP)
+        panic("kfree: va=0x%p", va);
+
+    acquire(&kmem.lock);
+    r = (struct run *)va;
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+    kmem.fpages++;
+    set_kmem_ref((uint64_t)V2P((uint64_t)va), 0);
+    release(&kmem.lock);
 }
 
 
@@ -169,16 +183,4 @@ mm_test()
     while (i--)
         kfree(p[i]);
 #endif
-}
-
-uint64_t
-get_totalram(void)
-{
-    return totalram;
-}
-
-uint64_t
-get_freeram(void)
-{
-    return freeram;
 }

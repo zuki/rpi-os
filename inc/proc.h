@@ -35,7 +35,6 @@ struct mmap_region {
     struct file *f;
     int         prot;
     int         flags;
-    int         original;
     struct mmap_region  *next;
 };
 

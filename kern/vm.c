@@ -96,6 +96,7 @@ uvm_copy(uint64_t * pgdir)
                                     void *np;
                                     if (region && region->flags & MAP_SHARED) {
                                         np = P2V(pa);
+                                        inc_kmem_ref(pa);
                                     } else {
                                         np = kalloc();
                                         if (np == 0) {
@@ -142,9 +143,12 @@ vm_free(uint64_t * pgdir)
                                                 | (uint64_t) i1 << L1SHIFT
                                                 | (uint64_t) i2 << L2SHIFT
                                                 | (uint64_t) i3 << L3SHIFT;
+                                    uint64_t pa = PTE_ADDR(pgt3[i3]);
                                     struct mmap_region *region = find_mmap_region((void *)va);
-                                    if (!region || !(region->flags & MAP_SHARED)) {
-                                        uint64_t *p = P2V(PTE_ADDR(pgt3[i3]));
+                                    if (region && (region->flags & MAP_SHARED))
+                                        dec_kmem_ref((uint64_t)pa);
+                                    if (get_kmem_ref(pa) == 0) {
+                                        uint64_t *p = P2V(pa);
                                         debug("free pte =0x%p", p);
                                         kfree(p);
                                     }
@@ -238,7 +242,9 @@ uvm_dealloc(uint64_t * pgdir, size_t base, size_t oldsz, size_t newsz)
         if (pte && (*pte & PTE_VALID)) {
             uint64_t pa = PTE_ADDR(*pte);
             assert(pa);
-            kfree(P2V(pa));
+            dec_kmem_ref(pa);
+            if (get_kmem_ref(pa) == 0)
+                kfree(pa);
             *pte = 0;
         } else {
             warn("attempt to free unallocated page");
@@ -384,14 +390,14 @@ vm_test()
 // 1) vaはページ境界になければならない。
 // 2) 割り当てられた物理メモリが存在しなければならない。
 void
-uvm_unmap(uint64_t *pgdir, uint64_t va, uint64_t npages, int do_free)
+uvm_unmap(uint64_t *pgdir, uint64_t va, uint64_t npages)
 {
     uint64_t a;
     uint64_t *pte;
 
     if ((va % PGSIZE) != 0)
         panic("not aligned");
-    trace("va=0x%x, length=0x%x, free=%d", va, npages * PGSIZE, do_free);
+    debug("va=0x%x, length=0x%x", va, npages * PGSIZE);
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE) {
         if ((pte = pgdir_walk(pgdir, (const void *)a, 0)) == 0)
             panic("pgdir_walk\n");
@@ -399,11 +405,11 @@ uvm_unmap(uint64_t *pgdir, uint64_t va, uint64_t npages, int do_free)
             panic("not mapped\n");
         if ((PTE_FLAGS(*pte) & (PTE_PAGE | PTE_VALID)) == PTE_VALID)
             panic("not a leaf\n");
-        if (do_free) {
-            uint64_t pa = (uint64_t)P2V(PTE_ADDR(*pte));
-            debug("uvm_unmap[%d]: free pa=0x%llx, *pte=0x%llx", thisproc()->pid, pa, PTE_ADDR(*pte));
-            kfree((char *)pa);
-        }
+        uint64_t pa = PTE_ADDR(*pte);
+        debug("pa=0x%llx, ref=%d, *pte=0x%llx",pa, get_kmem_ref(pa), *pte);
+        dec_kmem_ref(pa);
+        if (get_kmem_ref(pa) == 0)
+            kfree((char *)P2V(pa));
         *pte = PTE_ADDR(0UL);  // PTEを削除
         debug("- a=0x%llx, *p=0x%llx\n", a, *pte);
     }

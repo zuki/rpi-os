@@ -21,6 +21,7 @@
  * and Chapter D5 of Arm Architecture Reference Manual Armv8, for Armv8-A architecture profile.
  */
 #define PGSIZE 4096
+#define PGSHIFT 12
 
 /* Memory region attributes */
 #define MT_DEVICE_nGnRnE        0x0
