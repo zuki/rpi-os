@@ -691,7 +691,8 @@ sigprocmask(int how, sigset_t *set, sigset_t *oldset, size_t size)
                 sigandset(&signal->mask, &signal->mask, set);
                 break;
             case SIG_SETMASK:
-                signal->mask = *set;
+                siginitset(&signal->mask, set);
+                //signal->mask = *set;
                 break;
             default:
                 ret = -EINVAL;
