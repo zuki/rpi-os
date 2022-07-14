@@ -21,7 +21,7 @@ struct file {
     int ref;
     struct pipe *pipe;
     struct inode *ip;
-    size_t off;
+    off_t off;
     int flags;
     char readable;
     char writable;
