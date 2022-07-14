@@ -37,7 +37,7 @@ void
 dev_init()
 {
     list_init(&devque);
-    initlock(&cardlock);
+    initlock(&cardlock, "dev");
 
 #if RASPI == 3
     irq_enable(IRQ_SDIO);

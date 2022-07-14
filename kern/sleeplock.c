@@ -1,11 +1,14 @@
 #include "sleeplock.h"
+#include "spinlock.h"
+#include "console.h"
 
 void
 initsleeplock(struct sleeplock *lk, char *name)
 {
-    initlock(&lk->lk);
+    initlock(&lk->lk, "sleeplock");
     lk->locked = 0;
     lk->pid = 0;
+    lk->name = name;
 }
 
 void

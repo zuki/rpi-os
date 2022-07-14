@@ -3,8 +3,11 @@
 
 struct spinlock {
     volatile int locked;
+    char *name;
+    struct cpu *cpu;
 };
-void initlock(struct spinlock *);
+
+void initlock(struct spinlock *, char *name);
 void acquire(struct spinlock *);
 void release(struct spinlock *);
 

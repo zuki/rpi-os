@@ -9,6 +9,7 @@ struct sleeplock {
     int locked;         /* Is the lock held? */
     struct spinlock lk; /* Spinlock protecting this sleep lock */
     int pid;
+    char *name;
 };
 
 void initsleeplock(struct sleeplock *lk, char *name);

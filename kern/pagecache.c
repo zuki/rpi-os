@@ -18,7 +18,7 @@ struct {
 
 void pagecache_init(void)
 {
-    initlock(&pagecache.lock);
+    initlock(&pagecache.lock, "pagecache");
 
     acquire(&pagecache.lock);
     for (int i = 0; i < NPAGECACHE; i++) {

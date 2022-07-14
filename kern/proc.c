@@ -141,7 +141,7 @@ proc_initx(char *name, char *code, size_t len)
 
     p->nregions = 0;
     p->regions = 0;
-    initlock(p->regions_lock);
+    initlock(p->regions_lock, "mapregion");
 
     p->tf->elr = 0;
 

@@ -54,8 +54,8 @@ free_range(void *start, void *end)
 void
 mm_init(void)
 {
-    initlock(&kmem_reftable.lock);
-    initlock(&kmem.lock);
+    initlock(&kmem_reftable.lock, "kmem_ref");
+    initlock(&kmem.lock, "kmem");
 
     acquire(&kmem_reftable.lock);
     for (int i = 0; i < NFRAMES; i++) {

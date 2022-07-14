@@ -41,7 +41,7 @@ isdirempty(struct inode *dp)
 void
 fileinit()
 {
-    initlock(&ftable.lock);
+    initlock(&ftable.lock, "file");
 }
 
 /* Allocate a file structure. */
@@ -314,6 +314,7 @@ filelseek(struct file *f, off_t offset, int whence)
     return f->off;
 
 bad:
+    debug("invalid offset %d", offset)
     return -EINVAL;
 }
 
