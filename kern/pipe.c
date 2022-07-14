@@ -1,12 +1,11 @@
 #include "pipe.h"
 #include "types.h"
-// #include "mmu.h"
 #include "proc.h"
 #include "fs.h"
 #include "spinlock.h"
-#include "sleeplock.h"
 #include "file.h"
 #include "mm.h"
+#include "console.h"
 
 int
 pipealloc(struct file **f0, struct file **f1, int flags)
@@ -23,17 +22,20 @@ pipealloc(struct file **f0, struct file **f1, int flags)
     pi->writeopen = 1;
     pi->nwrite = 0;
     pi->nread = 0;
-    initlock(&pi->lock);
+    initlock(&pi->lock, "pipe");
     (*f0)->type = FD_PIPE;
     (*f0)->readable = 1;
     (*f0)->writable = 0;
     (*f0)->pipe = pi;
-    (*f0)->flags = O_RDONLY | O_APPEND | (flags & PIPE2_FLAGS);
+    (*f0)->flags = O_RDONLY | (flags & PIPE2_FLAGS);
+    (*f0)->off = 0;
     (*f1)->type = FD_PIPE;
     (*f1)->readable = 0;
     (*f1)->writable = 1;
     (*f1)->pipe = pi;
     (*f1)->flags = O_WRONLY | O_APPEND | (flags & PIPE2_FLAGS);
+    (*f1)->off = 0;
+    trace("pi->nread; 0x%p, nwrite: 0x%p", &pi->nread, &pi->nwrite);
     return 0;
 
   bad:
@@ -68,22 +70,21 @@ pipeclose(struct pipe *pi, int writable)
 ssize_t
 pipewrite(struct pipe *pi, char *addr, ssize_t n)
 {
-    ssize_t i = 0;
+    ssize_t i/* = 0 */;
     struct proc *p = thisproc();
 
+    trace("[%d]: nread=%d, nwrite=%d, n=%lld, addr='%c'", p->pid, pi->nread, pi->nwrite, n, addr[0]);
     acquire(&pi->lock);
-    while (i < n) {
-        if (pi->readopen == 0 || p->killed) {
-            release(&pi->lock);
-            return -1;
-        }
-        if (pi->nwrite == pi->nread + PIPESIZE) {
+    for (i = 0; i < n; i++) {
+        while (pi->nwrite == pi->nread + PIPESIZE) {
+            if (pi->readopen == 0 || p->killed) {
+                release(&pi->lock);
+                return -1;
+            }
             wakeup(&pi->nread);
             sleep(&pi->nwrite, &pi->lock);
-        } else {
-            pi->data[pi->nwrite++ % PIPESIZE] = addr[i];
-            i++;
         }
+        pi->data[pi->nwrite++ % PIPESIZE] = addr[i];
     }
     wakeup(&pi->nread);
     release(&pi->lock);
@@ -95,7 +96,7 @@ piperead(struct pipe *pi, char *addr, ssize_t n)
 {
     ssize_t i;
     struct proc *p = thisproc();
-
+    trace("[%d] nread=%d, nwrite=%d, n=%lld", p->pid, pi->nread, pi->nwrite, n);
     acquire(&pi->lock);
     while (pi->nread == pi->nwrite && pi->writeopen) {
         if (p->killed) {
@@ -111,6 +112,5 @@ piperead(struct pipe *pi, char *addr, ssize_t n)
     }
     wakeup(&pi->nwrite);
     release(&pi->lock);
-
     return i;
 }

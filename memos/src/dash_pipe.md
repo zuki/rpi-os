@@ -775,3 +775,257 @@ pipe: pp=[3, 4]
 dopipes(2)						// ここでストール
 QEMU: Terminated
 ```
+
+## sys_ioctlのバグだった
+
+- fがpipeの場合、f->ipはないためf->ip->typeがエラー
+
+```diff
+@@ -192,9 +193,9 @@ sys_ioctl()
+     if (argfd(0, &fd, &f) < 0 || argu64(1, &req) < 0)
+         return -EINVAL;
+
+-    trace("fd: %d, req: 0x%llx, f->type: %d", fd, req, f->ip->type);
++    trace("fd=%d, req=0x%llx, type=%d", fd, req, f->type);
+
+-    if (f->ip->type != T_DEV) return -ENOTTY;
++    if (f->type != FD_INODE || f->ip->type != T_DEV) return -ENOTTY;
+
+     trace("fd=%d, req=0x%llx\n", fd, req);
+```
+
+```
+# cat test.txt | head -5 | wc -l
+[2]pipealloc: pi->nread; 0xffff00003af6f218, nwrite: 0xffff00003af6f21c
+[2]sys_pipe2: pipefd[3, 4]
+[0]sys_ioctl: fd=10, req=0x5410, type=2
+[2]sys_close: [6] fd=4, f: inum=-1
+[0]sys_close: [7] fd=3, f: inum=-1
+[0]sys_dup3: [7] fd1=4, fd2=1, flags=0, p->ofile[1]->ip->inum=-1
+[1]sys_close: [7] fd=4, f: inum=-1
+[2]pipealloc: pi->nread; 0xffff00003af04218, nwrite: 0xffff00003af0421c
+[2]sys_pipe2: pipefd[4, 5]
+[0]sys_close: [6] fd=3, f: inum=-1
+[0]sys_close: [6] fd=5, f: inum=-1
+[3]sys_ioctl: fd=10, req=0x5410, type=2
+[3]sys_close: [8] fd=4, f: inum=-1
+[3]sys_dup3: [8] fd1=3, fd2=0, flags=0, p->ofile[0]->ip->inum=-1
+[3]sys_close: [8] fd=3, f: inum=-1
+[3]sys_dup3: [8] fd1=5, fd2=1, flags=0, p->ofile[1]->ip->inum=-1
+[3]sys_close: [8] fd=5, f: inum=-1
+[0]sys_close: [6] fd=4, f: inum=-1
+[2]sys_ioctl: fd=10, req=0x5410, type=2
+[2]sys_dup3: [9] fd1=4, fd2=0, flags=0, p->ofile[0]->ip->inum=-1
+[2]sys_close: [9] fd=4, f: inum=-1
+[1]sys_openat: [7] path=test.txt
+[3]piperead: [8] nread=0, nwrite=0, n=1024
+[3]piperead: [8] sleep: nread: 0xffff00003af6f218
+[1]pipewrite: [7]: nread=0, nwrite=0, n=94, addr='1'
+[1]pipewrite: [7] pi->nwrite: 94
+[1]pipewrite: [7] wakeup nread: 0xffff00003af6f218
+[3]piperead: [8] pi->nread: 94
+[3]piperead: [8] wakeup nwrite: 0xffff00003af6f21c
+[3]sys_lseek: [8] fd=0, f->inum=-1, offset=-74, whence=1
+[1]sys_close: [7] fd=3, f: inum=31
+[3]filelseek: f->off: 0, +offset: -74
+[1]sys_close: [7] fd=1, f: inum=-1
+[3]filelseek: invalid offset -74
+[1]sys_close: [7] fd=2, f: inum=7
+[3]sys_ioctl: fd=1, req=0x5413, type=1
+[3]pipewrite: [8]: nread=0, nwrite=0, n=0, addr=''
+[3]pipewrite: [8] pi->nwrite: 0
+[3]pipewrite: [8] wakeup nread: 0xffff00003af04218
+[3]pipewrite: [8]: nread=0, nwrite=0, n=20, addr='1'
+[3]pipewrite: [8] pi->nwrite: 20
+[3]pipewrite: [8] wakeup nread: 0xffff00003af04218
+[3]sys_close: [8] fd=0, f: inum=-1
+[3]sys_close: [8] fd=1, f: inum=-1
+[3]sys_close: [8] fd=2, f: inum=7
+[1]piperead: [9] nread=0, nwrite=20, n=16384
+[1]piperead: [9] pi->nread: 20
+[1]piperead: [9] wakeup nwrite: 0xffff00003af0421c
+[1]piperead: [9] nread=20, nwrite=20, n=16384
+[1]piperead: [9] pi->nread: 20
+[1]piperead: [9] wakeup nwrite: 0xffff00003af0421c
+5
+[2]sys_close: [9] fd=0, f: inum=-1
+[2]sys_close: [9] fd=1, f: inum=7
+[2]sys_close: [9] fd=2, f: inum=7
+[1]sys_ioctl: fd=10, req=0x5410, type=2
+```
+
+```
+# cat test.txt | head -5 | wc -l
+5
+# 1 sleep  init
+2 runble idle
+3 run    idle
+4 run    idle
+5 run    idle
+6 sleep  dash fa: 1
+# cat test.txt | head -5 | cat
+123
+111
+111
+123
+999
+```
+
+## `sort test.txt | wc -5`は依然としてストール
+
+- ただし、別のコマンドでエラー発生
+- デバッグプリントを入れると`sort test.txt | wc -5`も動く
+
+```
+# sort test.txt | wc -l
+[1]sys_lseek: [7] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [7] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [7] fd=3, f.type=2, offset=0, whence=1
+[2]sys_lseek: [7] fd=3, f.type=2, offset=94, whence=0
+sort: fflush failed: 'standard output': Bad address
+sort: write error
+[1]exit: exit: pid 7, name sort, err 2
+11
+[3]sys_write: [6] fd: 2, p: # , n: 2, f->type: 2
+# sort test.txt | head -5
+[0]sys_lseek: [9] fd=3, f.type=2, offset=0, whence=1
+[3]sys_lseek: [9] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [9] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [9] fd=3, f.type=2, offset=94, whence=0
+111
+[0]sys_lseek: [10] fd=0, f.type=1, offset=-72, whence=1
+111
+123
+123
+12345
+sort: fflush failed: 'standard output': Bad address     // sys_writevでエラー
+sort: write error
+[1]exit: exit: pid 9, name sort, err 2
+[2]sys_write: [6] fd: 2, p: # , n: 2, f->type: 2
+#
+```
+
+```
+# sort test.txt | wc -l
+[0]sys_lseek: [7] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [7] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [7] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [7] fd=3, f.type=2, offset=94, whence=0   // 94 = test.txtのサイズ
+[3]sys_writev: [7] fd 1, iovcnt: 2
+len=0: base[0]: '*'                                     // 以降の2つのsys_writevはsort.txtの出力
+len=4: base[0]: '1'                                     // 111\n
+[3]sys_writev: [7] fd 1, iovcnt: 2
+len=90: base[0]: '1'                                    // test.txtの111\n以降
+[3]sys_writev: [7] fd 2, iovcnt: 2                      // 以降のsys_writevはsortのエラー出力
+len=6: base[0]: 's'
+sort:
+[3]sys_writev: [7] fd 2, iovcnt: 2
+len=0: base[0]: '*'                                     // このiovでEFAULT発生
+len=32: base[0]: 'f'
+fflush failed: 'standard output'
+[2]sys_writev: [7] fd 2, iovcnt: 2
+len=13: base[0]: ':'
+: Bad address[2]sys_writev: [7] fd 2, iovcnt: 2
+len=0: base[0]: '*'
+len=1: base[0]: '$'
+
+[2]sys_writev: [7] fd 2, iovcnt: 2
+len=6: base[0]: 's'
+sort:
+[2]sys_writev: [7] fd 2, iovcnt: 2
+len=0: base[0]: '*'
+len=11: base[0]: 'w'
+write error
+[0]sys_writev: [8] fd 1, iovcnt: 2
+len=2:
+[2]sys_wribase[0t]ev: ': 1'
+[17] f1d 2, iovlcen=1nt: :2 b
+ase[0]: '$'
+len=0: base[0]: '*'
+len=1: base[0]: '$'
+
+
+[3]exit: exit: pid 7, name sort, err 2
+[0]sys_write: [6] fd: 2, p: # , n: 2, f->type: 2
+# sort test.txt | head -5
+[1]sys_lseek: [9] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [9] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [9] fd=3, f.type=2, offset=0, whence=1
+[1]sys_lseek: [9] fd=3, f.type=2, offset=94, whence=0
+[0]sys_writev: [9] fd 1, iovcnt: 2
+len=0: base[0]: '*'
+len=4: base[0]: '1'
+[1]sys_writev: [10] fd 1, iovcnt: 2
+len=0: base[0]: '*'
+len=4: base[0]: '1'
+[0]sys_writev: [9] fd 1, iovcnt: 2
+len=90: base[0]: '1'
+111
+[1]sys_lseek: [10] fd=0, f.type=1, offset=-72, whence=1
+[1]sys_writev: [10] fd 1, iovcnt: 2
+len=0: base[0]: '*'
+len=18: base[0]: '1'
+[0]sys_writev: [9] fd 2, iovcnt: 2
+len=6: base[0]: 's'
+111
+123
+123
+12345
+sort: [3]sys_writev: [9] fd 2, iovcnt: 2
+len=0: base[0]: '*'
+len=32: base[0]: 'f'
+fflush failed: 'standard output'[3]sys_writev: [9] fd 2, iovcnt: 2
+len=13: base[0]: ':'
+: Bad address[3]sys_writev: [9] fd 2, iovcnt: 2
+len=0: base[0]: '*'
+len=1: base[0]: '$'
+
+[3]sys_writev: [9] fd 2, iovcnt: 2
+len=6: base[0]: 's'
+sort: [3]sys_writev: [9] fd 2, iovcnt: 2
+len=0: base[0]: '*'
+len=11: base[0]: 'w'
+write error[3]sys_writev: [9] fd 2, iovcnt: 2
+len=0: base[0]: '*'
+len=1: base[0]: '$'
+
+[3]exit: exit: pid 9, name sort, err 2
+[3]sys_write: [6] fd: 2, p: # , n: 2, f->type: 2
+```
+
+## fflush時に実行されるf->write(f, 0, 0)をエラーにしていた
+
+- sys_writevでiov_base=0となりin_user()でエラーとなり-EFAULTを返していた
+- 上記の場合は読み飛ばすようにした
+
+```
+# sort test.txt | wc -l
+11
+# sort test.txt | head -5
+111
+111
+123
+123
+12345
+# sort test.txt | uniq -c
+      2 111
+      2 123
+      1 12345
+      2 999
+      3 あいうえお
+      1 かきくけこ
+# sort test.txt | uniq -c | head -3
+[3]exit: exit: pid 15, name head, err 1
+# sort test.txt | head -10 | uniq -c
+      2 111
+      2 123
+      1 12345
+      2 999
+      3 あいうえお
+# sort test.txt | uniq -c | head -n 3
+[2]exit: exit: pid 21, name head, err 1
+```
+
+## headがexit(1)で終了している
+
+- エラーメッセージはproc()#exit()で出力

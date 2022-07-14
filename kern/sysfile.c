@@ -89,10 +89,10 @@ sys_dup3()
     f = p->ofile[fd1];
     if (p->ofile[fd2])
         fileclose(p->ofile[fd2]);
-    p->ofile[fd2] = filedup(f);
+    filedup(f);
     if (flags & O_CLOEXEC)
         bit_add(p->fdflag, fd2);
-
+    p->ofile[fd2] = f;
     return fd2;
 }
 
@@ -109,7 +109,7 @@ sys_pipe2()
     if (argptr(0, (char **)&pipefd, sizeof(int)*2) < 0 || argint(1, &flags) < 0)
         return -EINVAL;
 
-    debug("pipefd: 0x%llx, flags: 0x%x", pipefd, flags);
+    trace("pipefd: 0x%llx, flags: 0x%x", pipefd, flags);
 
     if (flags & ~PIPE2_FLAGS) {
         warn("invalid flags=%d", flags);
@@ -138,8 +138,7 @@ sys_pipe2()
         bit_add(p->fdflag, fd0);
         bit_add(p->fdflag, fd1);
     }
-
-    debug("fd0=%d, fd1=%d, pipefd[%d, %d]", fd0, fd1, *pipefd, *(pipefd+1));
+    debug("pipefd[%d, %d]", fd0, fd1);
     return 0;
 }
 
@@ -192,9 +191,9 @@ sys_ioctl()
     if (argfd(0, &fd, &f) < 0 || argu64(1, &req) < 0)
         return -EINVAL;
 
-    trace("fd: %d, req: 0x%llx, f->type: %d", fd, req, f->ip->type);
+    trace("fd=%d, req=0x%llx, type=%d", fd, req, f->type);
 
-    if (f->ip->type != T_DEV) return -ENOTTY;
+    if (f->type != FD_INODE || f->ip->type != T_DEV) return -ENOTTY;
 
     trace("fd=%d, req=0x%llx\n", fd, req);
 
@@ -294,7 +293,8 @@ sys_write()
     if (argfd(0, &fd, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0)
         return -EINVAL;
 
-    debug("fd: %d, p: %s, n: %lld, f->type: %d", fd, p, n, f->type);
+    trace("[%d] fd: %d, p: %s, n: %lld, f->type: %d", thisproc()->pid, fd, p, n, f->type);
+
     return filewrite(f, p, n);
 }
 
@@ -310,11 +310,19 @@ sys_writev()
         argptr(1, (char **)&iov, iovcnt * sizeof(struct iovec)) < 0) {
         return -1;
     }
-    trace("fd %d, iovcnt: %d", fd, iovcnt);
+    trace("[%d] fd %d, iovcnt: %d", thisproc()->pid, fd, iovcnt);
 
     size_t tot = 0;
     for (p = iov; p < iov + iovcnt; p++) {
-        if (!in_user(p->iov_base, p->iov_len)) return -EFAULT;
+        if (!in_user(p->iov_base, p->iov_len)) {
+            if (p->iov_base == 0 && p->iov_len == 0) continue;      // fflushで実行
+            return -EFAULT;
+        }
+    /*
+        char c = p->iov_len == 0 ? '*' :
+            *(char *)p->iov_base == 0x0a ? '$' : *(char *)p->iov_base;
+        cprintf("len=%d: base[0]: '%c'\n", p->iov_len, c);
+    */
         tot += filewrite(f, p->iov_base, p->iov_len);
     }
     return tot;
@@ -326,12 +334,14 @@ sys_lseek()
     off_t offset;
     int whence;
     struct file *f;
+    int fd;
 
-    if (argfd(0, 0, &f) < 0 || argu64(1, (uint64_t *)&offset) < 0
+    if (argfd(0, &fd, &f) < 0 || argu64(1, (uint64_t *)&offset) < 0
      || argint(2, &whence) < 0)
         return -EINVAL;
 
     if (whence & ~(SEEK_SET|SEEK_CUR|SEEK_END)) return -EINVAL;
+    trace("[%d] fd=%d, f.type=%d, offset=%lld, whence=%d", thisproc()->pid, fd, f->type, offset, whence);
 
     return filelseek(f, offset, whence);
 }
@@ -344,9 +354,12 @@ sys_close()
 
     if (argfd(0, &fd, &f) < 0)
         return -1;
+    trace("[%d] fd=%d, f: inum=%d", thisproc()->pid, fd, f->type == FD_INODE ? f->ip->inum : -1);
+
     thisproc()->ofile[fd] = 0;
     fileclose(f);
     bit_remove(thisproc()->fdflag, fd);
+
     return 0;
 }
 
@@ -511,7 +524,6 @@ sys_openat()
         warn("expect O_LARGEFILE in open flags");
         return -EINVAL;
     }
-
     return fileopen(path, flags, mode);
 
 }
