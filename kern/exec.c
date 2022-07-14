@@ -30,6 +30,7 @@ static void flush_old_exec(void)
         if (p->ofile[i] && bit_test(p->fdflag, i)) {
             fileclose(p->ofile[i]);
             p->ofile[i] = 0;
+            bit_remove(p->fdflag, i);
         }
     }
 }
@@ -37,6 +38,7 @@ static void flush_old_exec(void)
 int
 execve(const char *path, char *const argv[], char *const envp[])
 {
+    trace("parse [%d] %s", thisproc()->pid, path);
     char *s;
     if (fetchstr((uint64_t) path, &s) < 0)
         return -1;
@@ -245,7 +247,7 @@ execve(const char *path, char *const argv[], char *const envp[])
 
     uvm_switch(curproc->pgdir);
     vm_free(oldpgdir);
-    trace("finish %s", curproc->name);
+    debug("run [%d] %s", curproc->pid, curproc->name);
     return 0;
 
   bad:

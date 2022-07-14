@@ -444,7 +444,7 @@ exit(int err)
         panic("init exit");
 
     if (err) {
-        info("exit: pid %d, name %s, err %d", cp->pid, cp->name, err);
+        warn("exit: pid %d, name %s, err %d", cp->pid, cp->name, err);
     }
 
     // Close all open files.

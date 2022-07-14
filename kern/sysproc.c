@@ -269,7 +269,7 @@ sys_rt_sigprocmask()
      || argptr(2, (char **)&oldset, sizeof(sigset_t)) < 0 || argu64(3, (uint64_t *)&size) < 0)
         return -EINVAL;
 
-    trace("how=%d, *set=0x%llx, oldset=0x%p, size=%lld", how, set ? *set : 0, oldset, size);
+    trace("[%d] how=%d, *set=0x%llx, oldset=0x%p, size=%lld", thisproc()->pid, how, set ? *set : 0, oldset, size);
 
     return sigprocmask(how, set, oldset, size);
 }
