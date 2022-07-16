@@ -15,6 +15,10 @@ static void *alloc_ptr[MAX_PAGES];
 
 #endif
 
+#define KB  (1024UL)
+#define MB  (KB * KB)
+#define GB  (MB * KB)
+
 extern char end[];
 
 // 実機 free_range: 0xffff000000125000 ~ 0xffff00003b400000, 242395 pages
@@ -159,6 +163,7 @@ kfree(void *va)
 void
 mm_dump()
 {
+    cprintf("\nTotal Memory: %lld MB, Free Memmory: %lld MB\n\n", get_totalram() / MB, get_freeram() / MB);
 #ifdef DEBUG
     int cnt = 0;
     for (int i = 0; i < MAX_PAGES; i++) {
