@@ -334,7 +334,7 @@ vm_stat(uint64_t * pgdir)
                                             9 * 2) | (uint64_t) i2 << (12 +
                                                                        9) |
                                         i3 << 12;
-                                    debug
+                                    info
                                         ("va: 0x%p, pa: 0x%p, pte: 0x%p, PTE_ADDR(pte): 0x%p, P2V(...): 0x%p",
                                          va, p, pgt3[i3],
                                          PTE_ADDR(pgt3[i3]),
@@ -344,7 +344,7 @@ vm_stat(uint64_t * pgdir)
                                         va_end = va + PGSIZE;
                                     else {
                                         if (va_start < va_end)
-                                            debug("va: [0x%p ~ 0x%p)",
+                                            info("va: [0x%p ~ 0x%p)",
                                                   va_start, va_end);
 
                                         va_start = va;
@@ -355,7 +355,7 @@ vm_stat(uint64_t * pgdir)
                 }
         }
     if (va_start < va_end) {
-        debug("va: [0x%p ~ 0x%p)", va_start, va_end);
+        info("va: [0x%p ~ 0x%p)", va_start, va_end);
     }
 }
 
