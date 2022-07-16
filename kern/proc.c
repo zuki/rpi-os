@@ -413,7 +413,7 @@ wait4(pid_t pid, int *status, int options, struct rusage *ru)
              || (options & WNOHANG)) {
                 //assert(p->parent == cp);
 
-                if (status) *status = p->xstate;
+                if (status) *status = p->xstate << 8;
                 if (ru) memset(ru, 0, sizeof(struct rusage));
 
                 list_drop(&p->clink);
@@ -483,7 +483,7 @@ exit(int err)
     assert(list_empty(q));
 
     // Jump into the scheduler, never to return.
-    cp->xstate = err & 0xff;
+    cp->xstate = err & 0x7f;
     cp->state = ZOMBIE;
 
     swtch(&cp->context, thiscpu()->scheduler);

@@ -1586,3 +1586,63 @@ sort test.txt | uniq -c | head -3
 [3]sleep: 'dash'(6) wakeup lk=F
 [1]sleep: 'dash'(6) sleep lk=A
 ```
+
+## 間違ったコマンド入力で新しいエラー
+
+```
+# sort test.txt | unic -c | cat
+dash: 11: unic: not found           // 11: このdashセッションの11番めのコマンド入力
+Unknown signal
+```
+
+```c
+# libc/incluse/sys/wait.h
+#define WEXITSTATUS(s) (((s) & 0xff00) >> 8)
+#define WTERMSIG(s) ((s) & 0x7f)
+#define WSTOPSIG(s) WEXITSTATUS(s)
+#define WCOREDUMP(s) ((s) & 0x80)
+#define WIFEXITED(s) (!WTERMSIG(s))
+#define WIFSTOPPED(s) ((short)((((s)&0xffff)*0x10001)>>8) > 0x7f00)
+#define WIFSIGNALED(s) (((s)&0xffff)-1U < 0xffu)
+#define WIFCONTINUED(s) ((s) == 0xffff)
+
+# dash/src/jobs.c
+sprint_status(char *os, int status, int sigonly)
+{
+	st = WEXITSTATUS(status);                       // st = 0; cp->xstate = err & 0xff;  # in exit()
+	if (!WIFEXITED(status)) {                       // = 0
+#if JOBS
+		st = WSTOPSIG(status);                    // = 0
+		if (!WIFSTOPPED(status))                  // = 1
+#endif
+			st = WTERMSIG(status);              // = 0
+		if (sigonly) {
+			if (st == SIGINT || st == SIGPIPE)
+				goto out;
+#if JOBS
+			if (WIFSTOPPED(status))
+				goto out;
+#endif
+		}
+		s = stpncpy(s, strsignal(st), 32);        // strsignal(0) = "Unknown signal"
+```
+
+### proc.cを修正
+
+```diff
+@@ -411,7 +413,7 @@ wait4(pid_t pid, int *status, int options, struct rusage *ru)
+              || (options & WNOHANG)) {
+                 //assert(p->parent == cp);
+
+-                if (status) *status = p->xstate;
++                if (status) *status = p->xstate << 8;            // 終了コードを2バイト目に設定
+                 if (ru) memset(ru, 0, sizeof(struct rusage));    // signalは未設定
+
+                 list_drop(&p->clink);
+```
+
+```
+# sort test.txt | unic -c
+dash: 1: unic: not found
+#
+```
