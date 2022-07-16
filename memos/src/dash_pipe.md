@@ -1029,3 +1029,560 @@ len=1: base[0]: '$'
 ## headがexit(1)で終了している
 
 - エラーメッセージはproc()#exit()で出力
+- デバッグ出力したら出力された
+
+```
+# [0]syscall1: proc[6] sys_read called
+sort test.txt | uniq -c | head -3
+[2]syscall1: proc[6] sys_fstatat called
+[3]syscall1: proc[6] sys_fstatat called
+[2]syscall1: proc[6] sys_fstatat called
+[1]syscall1: proc[6] sys_fstatat called
+[0]syscall1: proc[6] sys_pipe2 called
+[2]syscall1: proc[6] sys_rt_sigprocmask called
+[2]syscall1: proc[6] sys_rt_sigprocmask called
+[2]syscall1: proc[6] sys_clone called
+[1]syscall1: proc[7] sys_gettid called
+[0]syscall1: proc[6] sys_rt_sigprocmask called
+[1]syscall1: proc[7] sys_rt_sigprocmask called
+[0]syscall1: proc[6] sys_rt_sigprocmask called
+[1]syscall1: proc[7] sys_rt_sigprocmask called
+[0]syscall1: proc[6] sys_setpgid called
+[1]syscall1: proc[7] sys_getpid called
+[1]syscall1: proc[7] sys_setpgid called
+[0]syscall1: proc[6] sys_close called
+[1]syscall1: proc[7] sys_ioctl called
+[0]syscall1: proc[6] sys_fstatat called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_close called
+[2]syscall1: proc[7] sys_dup3 called
+[0]syscall1: proc[6] sys_fstatat called
+[2]syscall1: proc[7] sys_close called
+[3]syscall1: proc[7] sys_mmap called
+[3]syscall1: proc[7] sys_execve called
+[0]syscall1: proc[6] sys_fstatat called
+[0]syscall1: proc[6] sys_fstatat called
+[0]syscall1: proc[6] sys_pipe2 called
+[0]syscall1: proc[6] sys_rt_sigprocmask called
+[0]syscall1: proc[6] sys_rt_sigprocmask called
+[0]syscall1: proc[6] sys_clone called
+[2]syscall1: proc[8] sys_gettid called
+[2]syscall1: proc[8] sys_rt_sigprocmask called
+[0]syscall1: proc[6] sys_rt_sigprocmask called
+[2]syscall1: proc[8] sys_rt_sigprocmask called
+[0]syscall1: proc[6] sys_rt_sigprocmask called
+[1]syscall1: proc[8] sys_setpgid called
+[0]syscall1: proc[6] sys_setpgid called
+[1]syscall1: proc[8] sys_ioctl called
+[0]syscall1: proc[6] sys_close called
+[1]syscall1: proc[8] sys_rt_sigaction called
+[0]syscall1: proc[6] sys_close called
+[1]syscall1: proc[8] sys_rt_sigaction called
+[0]syscall1: proc[6] sys_fstatat called
+[1]syscall1: proc[8] sys_rt_sigaction called
+[1]syscall1: proc[8] sys_rt_sigaction called
+[1]syscall1: proc[8] sys_rt_sigaction called
+[1]syscall1: proc[8] sys_close called
+[1]syscall1: proc[8] sys_dup3 called
+[1]syscall1: proc[8] sys_close called
+[1]syscall1: proc[8] sys_dup3 called
+[1]syscall1: proc[8] sys_close called
+[1]syscall1: proc[8] sys_mmap called
+[0]syscall1: proc[6] sys_fstatat called
+[1]syscall1: proc[8] sys_execve called
+[0]syscall1: proc[6] sys_fstatat called
+[0]syscall1: proc[6] sys_fstatat called
+[0]syscall1: proc[6] sys_rt_sigprocmask called
+[0]syscall1: proc[6] sys_rt_sigprocmask called
+[0]syscall1: proc[6] sys_clone called
+[0]syscall1: proc[9] sys_gettid called
+[2]syscall1: proc[6] sys_rt_sigprocmask called
+[0]syscall1: proc[9] sys_rt_sigprocmask called
+[2]syscall1: proc[6] sys_rt_sigprocmask called
+[0]syscall1: proc[9] sys_rt_sigprocmask called
+[2]syscall1: proc[6] sys_setpgid called
+[2]syscall1: proc[6] sys_close called
+[2]syscall1: proc[6] sys_close called
+[0]syscall1: proc[9] sys_setpgid called
+[2]syscall1: proc[6] sys_wait4 called
+[0]syscall1: proc[9] sys_ioctl called
+[0]syscall1: proc[9] sys_rt_sigaction called
+[0]syscall1: proc[9] sys_rt_sigaction called
+[0]syscall1: proc[9] sys_rt_sigaction called
+[0]syscall1: proc[9] sys_rt_sigaction called
+[0]syscall1: proc[9] sys_rt_sigaction called
+[0]syscall1: proc[9] sys_dup3 called
+[0]syscall1: proc[9] sys_close called
+[0]syscall1: proc[9] sys_mmap called
+[0]syscall1: proc[9] sys_execve called
+[1]syscall1: proc[8] sys_gettid called
+[1]syscall1: proc[8] sys_fadvise64 called
+[1]syscall1: proc[8] sys_read called
+[1]syscall1: proc[7] sys_gettid called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[1]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigprocmask called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_rt_sigaction called
+[3]syscall1: proc[7] sys_brk called
+[3]syscall1: proc[7] sys_brk called
+[3]syscall1: proc[7] sys_mmap called
+[3]syscall1: proc[7] sys_mmap called
+[3]syscall1: proc[7] sys_faccessat2 called
+[3]syscall1: proc[7] sys_sched_getaffinity called
+[3]syscall1: proc[7] sys_sched_getaffinity called
+[3]syscall1: proc[7] sys_openat called
+[3]syscall1: proc[7] sys_fcntl called
+[3]syscall1: proc[7] sys_mmap called
+[3]syscall1: proc[7] sys_fadvise64 called
+[3]syscall1: proc[7] sys_fstat called
+[0]syscall1: proc[7] sys_prlimit64 called
+[0]syscall1: proc[7] sys_prlimit64 called
+[0]syscall1: proc[7] sys_prlimit64 called
+[0]syscall1: proc[7] sys_sysinfo called
+[0]syscall1: proc[7] sys_sysinfo called
+[0]syscall1: proc[7] sys_mmap called
+[0]syscall1: proc[7] sys_readv called
+[0]syscall1: proc[7] sys_read called
+[0]syscall1: proc[7] sys_lseek called
+[0]syscall1: proc[7] sys_lseek called
+[0]syscall1: proc[7] sys_lseek called
+[0]syscall1: proc[7] sys_lseek called
+[0]syscall1: proc[7] sys_close called
+[0]syscall1: proc[7] sys_munmap called
+[0]syscall1: proc[7] sys_ioctl called
+[3]syscall1: proc[7] sys_writev called
+[0]syscall1: proc[8] sys_brk called
+[3]syscall1: proc[7] sys_writev called
+[0]syscall1: proc[8] sys_brk called
+[3]syscall1: proc[7] sys_munmap called
+[0]syscall1: proc[8] sys_mmap called
+[3]syscall1: proc[7] sys_close called
+[3]syscall1: proc[7] sys_close called
+[3]syscall1: proc[7] sys_exit called
+[0]syscall1: proc[8] sys_mmap called
+[2]syscall1: proc[9] sys_gettid called
+[3]syscall1: proc[6] sys_wait4 called
+[0]syscall1: proc[8] sys_read called
+[0]syscall1: proc[8] sys_ioctl called
+[0]syscall1: proc[8] sys_writev called
+[1]syscall1: proc[9] sys_read called
+[0]syscall1: proc[8] sys_read called
+[1]syscall1: proc[9] sys_ioctl called
+[1]syscall1: proc[9] sys_writev called
+[0] s     2 ys111c
+ll1: proc[8] sys_lseek called
+[1]syscall1: proc[9] sys_read called
+[0]syscall1: proc[8] sys_lseek called
+[0]syscall1: proc[8] sys_lseek called
+[0]syscall1: proc[8] sys_lseek called
+[0]syscall1: proc[8] sys_close called
+[0]syscall1: proc[8] sys_munmap called
+[0]syscall1: proc[8] sys_writev called
+[0]syscall1: proc[8] sys_close called
+[2]syscall1: proc[9] sys_lseek called
+[0]syscall1: proc[8] sys_close called
+[2]syscall1: proc[9] sys_fstat called
+[0]syscall1: proc[8] sys_exit called
+[2]syscall1: proc[9] sys_writev called
+      2 123
+      1 12345
+[0]syscall1: proc[6] sys_wait4 called
+[2]syscall1: proc[9] sys_close called
+[2]syscall1: proc[9] sys_close called
+[2]syscall1: proc[9] sys_close called
+[0]syscall1: proc[9] sys_exit called
+[0]syscall1: proc[6] sys_wait4 called
+[0]syscall1: proc[6] sys_ioctl called
+[0]syscall1: proc[6] sys_mmap called
+[0]syscall1: proc[6] sys_write called
+# [0]syscall1: proc[6] sys_munmap called
+```
+
+- コマンドの実行順で結果が変わる
+
+```
+# sort test.txt | uniq -c | head -3
+      2 111
+      2 123
+      1 12345
+# sort test.txt | head -10 | head -3
+111
+111
+123
+# sort test.txt | head -10 | uniq -c
+      2 111
+      2 123
+      1 12345
+      2 999
+      3 あいうえお
+# sort test.txt | uniq -c | head -3
+[1]exit: exit: pid 18, name head, err 1
+#
+```
+
+### １回目の実行はOK
+
+```
+# sort test.txt | uniq -c | head -3
+[1]syscall1: proc[9] sys_gettid called
+[1]syscall1: proc[9] sys_rt_sigprocmask called
+[1]syscall1: proc[9] sys_rt_sigprocmask called
+[1]syscall1: proc[9] sys_setpgid called
+[1]syscall1: proc[9] sys_ioctl called
+[1]syscall1: proc[9] sys_rt_sigaction called
+[1]syscall1: proc[9] sys_rt_sigaction called
+[1]syscall1: proc[9] sys_rt_sigaction called
+[1]syscall1: proc[9] sys_rt_sigaction called
+[1]syscall1: proc[9] sys_rt_sigaction called
+[1]syscall1: proc[9] sys_dup3 called
+[1]syscall1: proc[9] sys_close called
+[1]syscall1: proc[9] sys_mmap called
+[1]syscall1: proc[9] sys_execve called
+[1]syscall1: proc[9] sys_gettid called
+[1]syscall1: proc[9] sys_read called
+[1]syscall1: proc[9] sys_lseek called
+[1]syscall1: proc[9] sys_fstat called
+[1]syscall1: proc[9] sys_ioctl called
+[1]syscall1: proc[9] sys_writev called
+      2 111
+      2 123
+      1 12345
+[1]syscall1: proc[9] sys_close called
+[1]syscall1: proc[9] sys_close called
+[1]syscall1: proc[9] sys_close called
+[1]syscall1: proc[9] sys_exit called
+# QEMU: Terminated
+```
+
+### 2回目の実行はNG
+
+```
+# sort test.txt | uniq -c | head -3
+      2 111
+      2 123
+      1 12345
+# sort test.txt | uniq -c
+      2 111
+      2 123
+      1 12345
+      2 999
+      3 あいうえお
+      1 かきくけこ
+# sort test.txt | uniq -c | head -3
+[1]syscall1: proc[14] sys_gettid called
+[1]syscall1: proc[14] sys_rt_sigprocmask called
+[1]syscall1: proc[14] sys_rt_sigprocmask called
+[1]syscall1: proc[14] sys_setpgid called
+[1]syscall1: proc[14] sys_ioctl called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_dup3 called
+[1]syscall1: proc[14] sys_close called
+[1]syscall1: proc[14] sys_mmap called
+[1]syscall1: proc[14] sys_execve called
+[3]syscall1: proc[14] sys_gettid called
+[3]syscall1: proc[14] sys_read called
+[0]exit: exit: head [14]: err 1
+# QEMU: Terminated
+```
+
+### 未対応trapが発生していた
+
+- farはheaのtext内のアドレス
+- headは途中まで処理が進んでいる
+- 今更何故このアドレスのtranslationが失敗するのかわからない
+
+```
+[0]trap: unknown trap code: 32
+[0]exit: [14] head exit with 1
+
+iabort: esr=0x82000004, ec=32, dfs=4, far=0x41a4bc             // 1回発生
+iabort: esr=0x82000007, ec=32, dfs=7, far=0x41a4bc             // 直後からendlessに発生
+            0b100000_1_000000000000_00_0_0_0_0_0_000100        // SET[12:11]: Recoverable state (if FEAT_RAS)
+                                                               // FnV[10]: FAR is valid
+                                                               // S1PTW:[7] Fault not on a stage 2
+                                                               // IFSC[5:0]: 4: Translation fault, level 0
+                                                               // IFSC[5:0]: 7: Translation fault, level 3
+```
+
+```
+000000000041a49c <__syscall_cp_c>:
+  41a49c:   aa0003e8    mov x8, x0
+  41a4a0:   aa0103e0    mov x0, x1
+  41a4a4:   aa0203e1    mov x1, x2
+  41a4a8:   aa0303e2    mov x2, x3
+  41a4ac:   aa0403e3    mov x3, x4
+  41a4b0:   aa0503e4    mov x4, x5
+  41a4b4:   aa0603e5    mov x5, x6
+  41a4b8:   d4000001    svc #0x0
+  41a4bc:   d65f03c0    ret
+```
+
+### trap.c
+
+```c
+    if (dfs <= 7) {             // Translation fault
+        lttbr0((uint64_t)p->pgdir);                                   // そのプロセスのlevel 0を設定
+        if ((pte = pgdir_walk(p->pgdir, (void *)far, 1)) == 0) {      // その他のレベルを作成
+            warn("[%d] recoveary failed: dfs=%d, far=0x%llx", p->pid, dfs, far);
+            return -1;
+        } else {
+            info("pte=0x%llx, *pte=0x%llx", pte, *pte);
+            return 0;
+        }
+```
+
+```
+[2]trap: iabort: esr=0x82000004, ec=32, dfs=4, far=0x41a4bc    //
+[2]pf_handler: pte=0xffff00003acda0d0, *pte=0x0                // paがない
+[2]trap: iabort: esr=0x82000007, ec=32, dfs=7, far=0x41a4bc
+[2]pf_handler: pte=0xffff00003acda0d0, *pte=0x0                // paがない
+```
+
+```
+# [0]sys_read: [6] f->type=2, p=0x42dfd0, n=1024
+sort test.txt | uniq -c | head -3
+[1]syscall1: proc[14] sys_gettid called
+[1]syscall1: proc[14] sys_rt_sigprocmask called
+[1]syscall1: proc[14] sys_rt_sigprocmask called
+[1]syscall1: proc[14] sys_setpgid called
+[1]syscall1: proc[14] sys_ioctl called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_rt_sigaction called
+[1]syscall1: proc[14] sys_dup3 called
+[1]syscall1: proc[14] sys_close called
+[1]syscall1: proc[14] sys_mmap called
+[1]syscall1: proc[14] sys_execve called
+[0]sys_read: [13] f->type=1, p=0x421ae4, n=1024
+[0]piperead: [13] nread=0, nwrite=0, n=1024
+[1]syscall1: proc[14] sys_gettid called
+[1]syscall1: proc[14] sys_read called
+[1]sys_read: [14] f->type=1, p=0xfffffffffac0, n=1024          // stack領域に読み込み
+[1]piperead: [14] nread=0, nwrite=0, n=1024
+[0]sys_read: [12] f->type=2, p=0x600000003120, n=1024          // region_mapに読み込み
+[0]piperead: [13] nread=4, nwrite=4
+[3]exit: [12] sort exit with 0
+[0]sys_read: [13] f->type=1, p=0x421ae4, n=1024                // data領域に読み込み
+[0]piperead: [13] nread=4, nwrite=94, n=1024
+[0]piperead: [13] nread=94, nwrite=94
+[2]piperead: [14] nread=12, nwrite=12
+[0]sys_read: [13] f->type=1, p=0x421ae4, n=1024
+[2]trap: iabort: esr=0x82000004, ec=32, dfs=4, far=0x41a4bc
+[0]piperead: [13] nread=94, nwrite=94, n=1024
+[0]piperead: [13] nread=94, nwrite=94
+[2]pf_handler: pte=0xffff00003ab9e0d0, *pte=0x0
+[2]trap: iabort: esr=0x82000007, ec=32, dfs=7, far=0x41a4bc
+[2]pf_handler: pte=0xffff00003ab9e0d0, *pte=0x0
+[2]trap: iabort: esr=0x82000007, ec=32, dfs=7, far=0x41a4bc
+[2]pf_handler: pte=0xffff00003ab9e0d0, *pte=0x0
+```
+
+- vm_statを入れたらエラー発生せず
+
+```
+# sort test.txt | uniq -c | head -3
+[1]execve: parse [12] /usr/bin/sort
+[3]syscall1: proc[14] sys_gettid called
+[3]syscall1: proc[14] sys_rt_sigprocmask called
+[0]execve: parse [13] /usr/bin/uniq
+[3]syscall1: proc[14] sys_rt_sigprocmask called
+[3]syscall1: proc[14] sys_setpgid called
+[3]syscall1: proc[14] sys_ioctl called
+[3]syscall1: proc[14] sys_rt_sigaction called
+[3]syscall1: proc[14] sys_rt_sigaction called
+[3]syscall1: proc[14] sys_rt_sigaction called
+[3]syscall1: proc[14] sys_rt_sigaction called
+[3]syscall1: proc[14] sys_rt_sigaction called
+[3]syscall1: proc[14] sys_dup3 called
+[3]syscall1: proc[14] sys_close called
+[3]syscall1: proc[14] sys_mmap called
+[3]syscall1: proc[14] sys_execve called
+[3]execve: parse [14] /usr/bin/head
+[0]sys_read: [13] f->type=1, p=0x421ae4, n=1024
+[0]piperead: [13] nread=0, nwrite=0, n=1024
+[1]sys_read: [12] f->type=2, p=0x600000003120, n=1024
+[3]vm_stat: va: 0x400000, pa: 0xffff00003accd000, pte: 0x3accd647, PTE_ADDR(pte): 0x3accd000, P2V(...): 0xffff00003accd000
+[3]vm_stat: va: 0x401000, pa: 0xffff00003ac96000, pte: 0x3ac96647, PTE_ADDR(pte): 0x3ac96000, P2V(...): 0xffff00003ac96000
+[3]vm_stat: va: 0x402000, pa: 0xffff00003ac95000, pte: 0x3ac95647, PTE_ADDR(pte): 0x3ac95000, P2V(...): 0xffff00003ac95000
+[3]vm_stat: va: 0x403000, pa: 0xffff00003ac94000, pte: 0x3ac94647, PTE_ADDR(pte): 0x3ac94000, P2V(...): 0xffff00003ac94000
+[3]vm_stat: va: 0x404000, pa: 0xffff00003accb000, pte: 0x3accb647, PTE_ADDR(pte): 0x3accb000, P2V(...): 0xffff00003accb000
+[3]vm_stat: va: 0x405000, pa: 0xffff00003acca000, pte: 0x3acca647, PTE_ADDR(pte): 0x3acca000, P2V(...): 0xffff00003acca000
+[3]vm_stat: va: 0x406000, pa: 0xffff00003acc9000, pte: 0x3acc9647, PTE_ADDR(pte): 0x3acc9000, P2V(...): 0xffff00003acc9000
+[3]vm_stat: va: 0x407000, pa: 0xffff00003abc8000, pte: 0x3abc8647, PTE_ADDR(pte): 0x3abc8000, P2V(...): 0xffff00003abc8000
+[3]vm_stat: va: 0x408000, pa: 0xffff00003abc7000, pte: 0x3abc7647, PTE_ADDR(pte): 0x3abc7000, P2V(...): 0xffff00003abc7000
+[3]vm_stat: va: 0x409000, pa: 0xffff00003abc6000, pte: 0x3abc6647, PTE_ADDR(pte): 0x3abc6000, P2V(...): 0xffff00003abc6000
+[3]vm_stat: va: 0x40a000, pa: 0xffff00003abc5000, pte: 0x3abc5647, PTE_ADDR(pte): 0x3abc5000, P2V(...): 0xffff00003abc5000
+[3]vm_stat: va: 0x40b000, pa: 0xffff00003abc4000, pte: 0x3abc4647, PTE_ADDR(pte): 0x3abc4000, P2V(...): 0xffff00003abc4000
+[3]vm_stat: va: 0x40c000, pa: 0xffff00003abc3000, pte: 0x3abc3647, PTE_ADDR(pte): 0x3abc3000, P2V(...): 0xffff00003abc3000
+[3]vm_stat: va: 0x40d000, pa: 0xffff00003abc2000, pte: 0x3abc2647, PTE_ADDR(pte): 0x3abc2000, P2V(...): 0xffff00003abc2000
+[0]piperead: [13] nread=4, nwrite=4
+[3]vm_stat: va: 0x40e000, pa: 0xffff00003abc1000, pte: 0x3abc1647, PTE_ADDR(pte): 0x3abc1000, P2V(...): 0xffff00003abc1000
+[3]vm_stat: va: 0x40f000, pa: 0xffff00003abc0000, pte: 0x3abc0647, PTE_ADDR(pte): 0x3abc0000, P2V(...): 0xffff00003abc0000
+[1]exit: [12] sort exit with 0
+[3]vm_stat: va: 0x410000, pa: 0xffff00003abbf000, pte: 0x3abbf647, PTE_ADDR(pte): 0x3abbf000, P2V(...): 0xffff00003abbf000
+[3]vm_stat: va: 0x411000, pa: 0xffff00003abbe000, pte: 0x3abbe647, PTE_ADDR(pte): 0x3abbe000, P2V(...): 0xffff00003abbe000
+[0]sys_read: [13] f->type=1, p=0x421ae4, n=1024
+[0]piperead: [13] nread=4, nwrite=94, n=1024
+[0]piperead: [13] nread=94, nwrite=94
+[3]vm_stat: va: 0x412000, pa: 0xffff00003abbd000, pte: 0x3abbd647, PTE_ADDR(pte): 0x3abbd000, P2V(...): 0xffff00003abbd000
+[3]vm_stat: va: 0x413000, pa: 0xffff00003abbc000, pte: 0x3abbc647, PTE_ADDR(pte): 0x3abbc000, P2V(...): 0xffff00003abbc000
+[3]vm_stat: va: 0x414000, pa: 0xffff00003abbb000, pte: 0x3abbb647, PTE_ADDR(pte): 0x3abbb000, P2V(...): 0xffff00003abbb000
+[3]vm_stat: va: 0x415000, pa: 0xffff00003abba000, pte: 0x3abba647, PTE_ADDR(pte): 0x3abba000, P2V(...): 0xffff00003abba000
+[3]vm_stat: va: 0x416000, pa: 0xffff00003abb9000, pte: 0x3abb9647, PTE_ADDR(pte): 0x3abb9000, P2V(...): 0xffff00003abb9000
+[3]vm_stat: va: 0x417000, pa: 0xffff00003abb8000, pte: 0x3abb8647, PTE_ADDR(pte): 0x3abb8000, P2V(...): 0xffff00003abb8000
+[3]vm_stat: va: 0x418000, pa: 0xffff00003abb7000, pte: 0x3abb7647, PTE_ADDR(pte): 0x3abb7000, P2V(...): 0xffff00003abb7000
+[0]sys_read: [13] f->type=1, p=0x421ae4, n=1024
+[3]vm_stat: va: 0x419000, pa: 0xffff00003abb6000, pte: 0x3abb6647, PTE_ADDR(pte): 0x3abb6000, P2V(...): 0xffff00003abb6000
+[0]piperead: [13] nread=94, nwrite=94, n=1024
+[0]piperead: [13] nread=94, nwrite=94
+[3]vm_stat: va: 0x41a000, pa: 0xffff00003abb5000, pte: 0x3abb5647, PTE_ADDR(pte): 0x3abb5000, P2V(...): 0xffff00003abb5000
+[3]vm_stat: va: 0x41b000, pa: 0xffff00003abb4000, pte: 0x3abb4647, PTE_ADDR(pte): 0x3abb4000, P2V(...): 0xffff00003abb4000
+[3]vm_stat: va: 0x41c000, pa: 0xffff00003abb3000, pte: 0x3abb3647, PTE_ADDR(pte): 0x3abb3000, P2V(...): 0xffff00003abb3000
+[3]vm_stat: va: 0x41d000, pa: 0xffff00003abb2000, pte: 0x3abb2647, PTE_ADDR(pte): 0x3abb2000, P2V(...): 0xffff00003abb2000
+[3]vm_stat: va: 0x41e000, pa: 0xffff00003abb1000, pte: 0x3abb1647, PTE_ADDR(pte): 0x3abb1000, P2V(...): 0xffff00003abb1000
+[3]vm_stat: va: 0x41f000, pa: 0xffff00003acdf000, pte: 0x3acdf647, PTE_ADDR(pte): 0x3acdf000, P2V(...): 0xffff00003acdf000
+[3]vm_stat: va: 0x420000, pa: 0xffff00003acde000, pte: 0x3acde647, PTE_ADDR(pte): 0x3acde000, P2V(...): 0xffff00003acde000
+[3]vm_stat: va: 0x421000, pa: 0xffff00003acdd000, pte: 0x3acdd647, PTE_ADDR(pte): 0x3acdd000, P2V(...): 0xffff00003acdd000
+[3]vm_stat: va: 0x422000, pa: 0xffff00003aea8000, pte: 0x3aea8647, PTE_ADDR(pte): 0x3aea8000, P2V(...): 0xffff00003aea8000
+[3]vm_stat: va: 0xffffffff6000, pa: 0xffff00003ab99000, pte: 0x3ab99647, PTE_ADDR(pte): 0x3ab99000, P2V(...): 0xffff00003ab99000
+[3]vm_stat: va: [0x400000 ~ 0x423000)
+[3]vm_stat: va: 0xffffffff7000, pa: 0xffff00003ab98000, pte: 0x3ab98647, PTE_ADDR(pte): 0x3ab98000, P2V(...): 0xffff00003ab98000
+[3]vm_stat: va: 0xffffffff8000, pa: 0xffff00003ab96000, pte: 0x3ab96647, PTE_ADDR(pte): 0x3ab96000, P2V(...): 0xffff00003ab96000
+[3]vm_stat: va: 0xffffffff9000, pa: 0xffff00003ab93000, pte: 0x3ab93647, PTE_ADDR(pte): 0x3ab93000, P2V(...): 0xffff00003ab93000
+[2]exit: [13] uniq exit with 0
+[3]vm_stat: va: 0xffffffffa000, pa: 0xffff00003ab91000, pte: 0x3ab91647, PTE_ADDR(pte): 0x3ab91000, P2V(...): 0xffff00003ab91000
+[3]vm_stat: va: 0xffffffffb000, pa: 0xffff00003ab90000, pte: 0x3ab90647, PTE_ADDR(pte): 0x3ab90000, P2V(...): 0xffff00003ab90000
+[3]vm_stat: va: 0xffffffffc000, pa: 0xffff00003ab8f000, pte: 0x3ab8f647, PTE_ADDR(pte): 0x3ab8f000, P2V(...): 0xffff00003ab8f000
+[3]vm_stat: va: 0xffffffffd000, pa: 0xffff00003ab8e000, pte: 0x3ab8e647, PTE_ADDR(pte): 0x3ab8e000, P2V(...): 0xffff00003ab8e000
+[3]vm_stat: va: 0xffffffffe000, pa: 0xffff00003ab8d000, pte: 0x3ab8d647, PTE_ADDR(pte): 0x3ab8d000, P2V(...): 0xffff00003ab8d000
+[3]vm_stat: va: 0xfffffffff000, pa: 0xffff00003ab9a000, pte: 0x3ab9a647, PTE_ADDR(pte): 0x3ab9a000, P2V(...): 0xffff00003ab9a000
+[3]vm_stat: va: [0xffffffff6000 ~ 0x1000000000000)
+[0]syscall1: proc[14] sys_gettid called
+[0]syscall1: proc[14] sys_read called
+[0]sys_read: [14] f->type=1, p=0xfffffffffac0, n=1024
+[0]piperead: [14] nread=0, nwrite=98, n=1024
+[0]piperead: [14] nread=98, nwrite=98
+[0]syscall1: proc[14] sys_lseek called
+[0]syscall1: proc[14] sys_ioctl called
+[0]syscall1: proc[14] sys_writev called
+[0]filewrite: [14] addr=0x0, n=0, f->off=92
+[0]filewrite: [14] addr=0x20, n=38, f->off=92
+      2 111
+      2 123
+      1 12345
+[0]syscall1: proc[14] sys_close called
+[2]syscall1: proc[14] sys_close called
+[2]syscall1: proc[14] sys_close called
+[0]syscall1: proc[14] sys_exit called
+[0]exit: [14] head exit with 0
+#
+```
+
+### メモリ共有をouterからinnerに変更
+
+- 2回め以降の`sort test.txt | uniq -c | head -3`は何も出力されずコマンドプロンプトに戻る
+- その他は特に変わりなく、正常に動く
+
+## pipetestは相変わらずストールする
+
+- 3つのコマンドは実行されている
+- wcが結果出力している`[1]filewrite: [8] addr=0x35, n=1, f->off=9`
+  - filewrite -> console_write -> unlock(ip) ->releasesleep
+    wakeup -> acquire(&ptable.lock)
+- 最後のacquireで&ptable.lockがデッドロック
+- acquire(&ptable.lock)してrelease()していないのはexit()だけだがrelease()するとロックされていないエラーになる
+
+### pipetest
+
+```
+[0]sleep: 'dash'(6) sleep lk=A
+[0]sleep: 'dash'(6) wakeup lk=A
+[3]sleep: 'dash'(6) sleep lk=B
+[3]sleep: 'pipetest'(7) sleep lk=B
+[1]sleep: ''(10) sleep lk=C
+[0]sleep: ''(9) sleep lk=D
+[1]sleep: ''(9) wakeup lk=D
+[0]sleep: ''(10) wakeup lk=C
+[1]piperead: [9] nread=0, nwrite=0, n=1024
+[1]sleep: 'head'(9) sleep lk=E
+[2]piperead: [8] nread=0, nwrite=0, n=16384
+[2]sleep: 'wc'(8) sleep lk=F
+[0]pipewrite: [10]: nread=0, nwrite=0, n=94, addr='1'
+[2]sleep: 'head'(9) wakeup lk=E
+[2]pipewrite: [9]: nread=0, nwrite=0, n=0, addr=''
+[1]sleep: 'wc'(8) wakeup lk=F
+[2]pipewrite: [9]: nread=0, nwrite=0, n=20, addr='1'
+[1]sleep: 'wc'(8) sleep lk=F
+[1]sleep: 'wc'(8) wakeup lk=F
+[1]piperead: [8] nread=20, nwrite=20, n=16384
+[1]sleep: 'wc'(8) sleep lk=F
+[1]sleep: 'wc'(8) wakeup lk=F
+[1]filewrite: [8] addr=0x35, n=1, f->off=9
+```
+
+### `cat test.txt | head -5 | wc -l`
+
+```
+[2]sleep: 'dash'(6) sleep lk=A
+[3]sleep: 'dash'(6) wakeup lk=A
+[1]sleep: 'dash'(6) sleep lk=B
+[0]sleep: 'dash'(6) wakeup lk=B
+[0]sleep: 'dash'(6) sleep lk=C
+[1]sleep: 'dash'(6) wakeup lk=C
+[1]sleep: 'dash'(6) sleep lk=B
+[1]sleep: 'dash'(6) wakeup lk=B
+[1]sleep: 'dash'(6) sleep lk=D
+[1]sleep: 'dash'(6) wakeup lk=D
+[1]sleep: 'dash'(6) sleep lk=E
+[2]sleep: 'dash'(6) wakeup lk=E
+[2]sleep: 'dash'(6) sleep lk=F
+[1]sleep: ''(9) sleep lk=A
+[1]sleep: ''(9) wakeup lk=A
+[3]sleep: 'cat'(7) sleep lk=A
+[2]sleep: 'cat'(7) wakeup lk=A
+[2]pipewrite: [7]: nread=0, nwrite=0, n=94, addr='1'
+[0]piperead: [8] nread=0, nwrite=94, n=1024
+[0]filewrite: [8] addr=0x0, n=0, f->off=0
+[0]pipewrite: [8]: nread=0, nwrite=0, n=0, addr=''
+[2]sleep: 'dash'(6) wakeup lk=F
+[0]filewrite: [8] addr=0x31, n=20, f->off=0
+[2]sleep: 'dash'(6) sleep lk=F
+[0]pipewrite: [8]: nread=0, nwrite=0, n=20, addr='1'
+[0]sleep: 'dash'(6) wakeup lk=F
+[0]sleep: 'dash'(6) sleep lk=F
+[1]piperead: [9] nread=0, nwrite=20, n=16384
+[1]piperead: [9] nread=20, nwrite=20, n=16384
+5
+[3]sleep: 'dash'(6) wakeup lk=F
+[1]sleep: 'dash'(6) sleep lk=A
+```

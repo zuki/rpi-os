@@ -50,6 +50,7 @@ static pid_t pid = 0;
 void
 proc_init()
 {
+    initlock(&ptable.lock, "ptable");
     list_init(&ptable.sched_que);
     for (int i = 0; i < SQSIZE; i++)
         list_init(&ptable.slpque[i]);
@@ -257,6 +258,7 @@ sleep(void *chan, struct spinlock *lk)
     list_push_back(&ptable.slpque[i], &p->link);
 
     p->state = SLEEPING;
+    trace("'%s'(%d) sleep lk=0x%p", p->name, p->pid, lk);
     swtch(&thisproc()->context, thiscpu()->scheduler);
     trace("'%s'(%d) wakeup lk=0x%p", p->name, p->pid, lk);
     p->state = RUNNING;
@@ -442,9 +444,10 @@ exit(int err)
     struct proc *cp = thisproc();
     if (cp == initproc)
         panic("init exit");
+    trace("[%d] %s exit with %d", cp->pid, cp->name, err);
 
     if (err) {
-        warn("exit: pid %d, name %s, err %d", cp->pid, cp->name, err);
+        debug("exit: %s [%d]: err %d", cp->name, cp->pid, err);
     }
 
     // Close all open files.

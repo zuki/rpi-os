@@ -56,11 +56,18 @@ trap(struct trapframe *tf)
         }
         break;
 
-    case EC_DABORT:     // 0x24 = 36: ユーザモードで発生
-    case EC_DABORT2:    // 0x25 = 37: カーネルモードで発生
+
+    case EC_IABORT:     // 0x20 = 32: ユーザモードで発生した命令例外
+    case EC_IABORT2:    // 0x21 = 33: カーネルモードで発生した命令例外
+        //info("iabort: esr=0x%llx, ec=%d, dfs=%d, far=0x%llx", esr, ec, dfs, far);
+        //exit(1);
+        // through
+    case EC_DABORT:     // 0x24 = 36: ユーザモードで発生したデータ例外
+    case EC_DABORT2:    // 0x25 = 37: カーネルモードで発生したデータ例外
         if (dfs >= 4 && dfs <= 15) {
             if ((tf->x[0] = pf_handler(dfs, far)) < 0) {
                 thisproc()->killed = 1;
+                info("inst/dataabort: dfs=%d, far=0x%llx", dfs, far);
                 exit(1);
             }
             check_pending_signal();
@@ -70,6 +77,7 @@ trap(struct trapframe *tf)
         }
         break;
     default:
+        info("unknown trap code: %d", ec);
         exit(1);
     }
 }
@@ -91,9 +99,18 @@ pf_handler(int dfs, uint64_t far)
     far = ROUNDDOWN(far, PGSIZE);
 
     if (dfs <= 7) {             // Translation fault
-        if ((pte = pgdir_walk(p->pgdir, (void *)far, 1)) == 0)
+        // 現在のところロジック上ありえない。何らかのバグなのでエラーとする
+        return -1;
+    /*
+        lttbr0((uint64_t)p->pgdir);
+        if ((pte = pgdir_walk(p->pgdir, (void *)far, 1)) == 0) {
+            warn("[%d] recoveary failed: dfs=%d, far=0x%llx", p->pid, dfs, far);
             return -1;
-        return 0;
+        } else {
+            debug("pte=0x%llx, *pte=0x%llx", pte, *pte);
+            return 0;
+        }
+    */
     } else if (dfs <= 11) {     // Access fault: 遅延読み込み
         region = p->regions;
         while (region) {

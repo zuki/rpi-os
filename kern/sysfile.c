@@ -249,8 +249,12 @@ sys_read()
     size_t n;
     char *p;
 
-    if (argfd(0, 0, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0)
+    if (argfd(0, 0, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0) {
+        info("parse error");
         return -EINVAL;
+    }
+
+    trace("[%d] f->type=%d, p=0x%p, n=%lld", thisproc()->pid, f->type, p, n);
 
     return fileread(f, p, n);
 }
@@ -310,19 +314,21 @@ sys_writev()
         argptr(1, (char **)&iov, iovcnt * sizeof(struct iovec)) < 0) {
         return -1;
     }
+
     trace("[%d] fd %d, iovcnt: %d", thisproc()->pid, fd, iovcnt);
 
     size_t tot = 0;
     for (p = iov; p < iov + iovcnt; p++) {
+        debug("[%d] iov_base=0x%llx: iov_len=%lld", thisproc()->pid, p->iov_base, p->iov_len);
         if (!in_user(p->iov_base, p->iov_len)) {
             if (p->iov_base == 0 && p->iov_len == 0) continue;      // fflushで実行
             return -EFAULT;
         }
-    /*
-        char c = p->iov_len == 0 ? '*' :
-            *(char *)p->iov_base == 0x0a ? '$' : *(char *)p->iov_base;
-        cprintf("len=%d: base[0]: '%c'\n", p->iov_len, c);
-    */
+/*
+            char c = p->iov_len == 0 ? '*' :
+                *(char *)p->iov_base == 0x0a ? '$' : *(char *)p->iov_base;
+            cprintf("len=%d: base[0]: '%c'\n", p->iov_len, c);
+*/
         tot += filewrite(f, p->iov_base, p->iov_len);
     }
     return tot;
@@ -342,7 +348,8 @@ sys_lseek()
 
     if (whence & ~(SEEK_SET|SEEK_CUR|SEEK_END)) return -EINVAL;
     trace("[%d] fd=%d, f.type=%d, offset=%lld, whence=%d", thisproc()->pid, fd, f->type, offset, whence);
-
+    if (f->type == FD_PIPE)
+        return 0;
     return filelseek(f, offset, whence);
 }
 
