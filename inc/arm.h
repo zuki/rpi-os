@@ -152,6 +152,10 @@ lvbar(void *p)
     disb();
 }
 
+// FIXME: tlbi vmalle1isはinner shareableのメモリのTLBを無効化する
+//  設定ではouter shareableを使用している。しかし、vmalle1osは次のエラー
+// /var/folders/rc/r22l0fy5611279w4ljf1vbn40000gn/T//ccLgq01l.s:85: Error: selected processor does not support system register name 'vmalle1os'
+// vmalle1は動かず
 static inline void
 tlbi1()
 {

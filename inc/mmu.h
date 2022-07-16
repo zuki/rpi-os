@@ -39,9 +39,10 @@
 #define SH_INNER        (3 << 8)       /* Inner shareable */
 #define AF_USED         (1 << 10)
 
-#define PTE_NORMAL_NC   ((MT_NORMAL_NC << 2) | AF_USED | SH_OUTER)
-#define PTE_NORMAL      ((MT_NORMAL << 2) | AF_USED | SH_OUTER)
-// #define PTE_NORMAL      ((MT_NORMAL << 2) | AF_USED | SH_INNER)
+// #define PTE_NORMAL_NC   ((MT_NORMAL_NC << 2) | AF_USED | SH_OUTER)
+#define PTE_NORMAL_NC   ((MT_NORMAL_NC << 2) | AF_USED | SH_INNER)
+// #define PTE_NORMAL      ((MT_NORMAL << 2) | AF_USED | SH_OUTER)
+#define PTE_NORMAL      ((MT_NORMAL << 2) | AF_USED | SH_INNER)
 #define PTE_DEVICE      ((MT_DEVICE_nGnRnE << 2) | AF_USED)
 
 /* PTE flags */
@@ -87,9 +88,15 @@
 #define TCR_ORGN0_IRGN0 ((1 << 10) | (1 << 8))
 #define TCR_ORGN1_IRGN1 ((1 << 26) | (1 << 24))
 
+/*
 #define TCR_VALUE       (TCR_T0SZ           | TCR_T1SZ      |   \
                          TCR_TG0_4K         | TCR_TG1_4K    |   \
                          TCR_SH0_OUTER      | TCR_SH1_OUTER |   \
+                         TCR_ORGN0_IRGN0    | TCR_ORGN1_IRGN1)
+*/
+#define TCR_VALUE       (TCR_T0SZ           | TCR_T1SZ      |   \
+                         TCR_TG0_4K         | TCR_TG1_4K    |   \
+                         TCR_SH0_INNER      | TCR_SH1_INNER |   \
                          TCR_ORGN0_IRGN0    | TCR_ORGN1_IRGN1)
 
 #endif
