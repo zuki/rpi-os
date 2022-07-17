@@ -1,55 +1,68 @@
-# Raspberry Pi Operating System
+# Raspberry Piオペレーティングシステム
 
-Yet another unix-like toy operating system running on Raspberry Pi 3/4, which is built when I was preparing [labs](https://github.com/FDUCSLG/OS-2020Fall-Fudan/) for operating system course at Fudan University, following the classic framework of [xv6](https://github.com/mit-pdos/xv6-public/).
+Raspberry Pi 3/4で稼働するunixライクのもう一つのトイOSです。復旦大学のオペレーティングシステムコースの[研究用](https://github.com/FDUCSLG/OS-2020Fall-Fudan/) に古典的な[xv6](https://github.com/mit-pdos/xv6-public/)のフレームワークに基づいて作成されました。
 
-Tested on Raspberry Pi 3A+, 3B+, 4B.
+Raspberry Pi 3A+, 3B+, 4Bでテストしています。
 
-## Related works
+## 関連プロジェクト
 
-- [linux](https://github.com/raspberrypi/linux): real world operating system
-- [circle](https://github.com/rsta2/circle): contains lots of portable drivers
-- [s-matyukevich's](https://github.com/s-matyukevich/raspberry-pi-os)
-- [bztsrc's](https://github.com/bztsrc/raspi3-tutorial)
+- [linux](https://github.com/raspberrypi/linux): 現実世界のオペレーティングシステム
+- [circle](https://github.com/rsta2/circle): 多くのポータブルなドライバを含んでいます。
+- [s-matyukevichのraspberry-pi-os](https://github.com/s-matyukevich/raspberry-pi-os)
+- [bztsrcのraspi3-tutorial](https://github.com/bztsrc/raspi3-tutorial)
 
-## What's different?
+## XV6との違い
 
-- We use [musl](https://musl.libc.org/) as user programs libc instead of reinventing one.
-- The set of syscalls supported by our kernel is a subset of linux's.
-- Compared to xv6, we use a queue-based scheduler and hash pid for process sleeping and waking.
+- ユーザプログラム用のlbcは再発明せずに[musl](https://musl.libc.org/)を使用しています。
+- カーネルがサポートしているシステムコールはLinuxのシステムコールのサブセットです。
+- xv6とは違い、プロセスの待機と起床（sleepingとwaking）にキューを使用したスケジューラとハッシュpidを使用しています。
 
-## Features
+## 機能
 
-- [x] AArch64 only
-- [x] Basic multi-core support
-- [x] Memory management
-- [x] Virtual memory without swapping
-- [x] Process management
-- [x] Disk driver(EMMC): ported from [circle](https://github.com/rsta2/circle/tree/master/addon/SDCard)
-- [x] File system: ported from xv6
-- [x] C library: [musl](https://musl.libc.org/)
-- [x] Shell: ported from xv6
-  - [x] Support argc, envp
-  - [x] Support pipe
+- [x] AArch64だけに対応
+- [x] 基本的なマルチコアのサポート
+- [x] メモリ管理
+- [x] スワップ機能を持たない仮想メモリ
+- [x] プロセス管理
+- [x] ディスクドライバ（EMMC）: [circle](https://github.com/rsta2/circle/tree/master/addon/SDCard)からポーティング
+- [x] ファイルシステム: xv6からポーティング
+- [x] Cライブラリ: [musl](https://musl.libc.org/)
+- [x] シェル: xv6からポーティング
+  - [x] argcとenvpのサポート
+  - [x] pipeのサポート
 
-## Prerequisite
+### 新規追加機能
 
-For Ubuntu 20.04 on x86, just run `make init` and skip this section.
+- [x] 二重間接ブロックによる約8.5MBまでの大規模ファイルに対応
+- [x] 時間機能のサポート
+  - [x] RTC (DS3231)対応
+  - [ ] タイマー対応
+- [x] シグナル機能のサポート
+- [x] mmap機能のサポート
+- [x] ファイル情報のサポート
+- [x] ユーザ情報のサポート
+- [x] システムコールの追加（23 -> 83)
+- [x] Dashのサポート
+- [x] Coreutilsのサポート
 
-### GCC toolchain
+## 前提条件
 
-If you are cross compiling on macOS,
+x86で動くUbun20 20.04では`make init`を実行するだけで、このセクションは飛ばしてください。
 
-1. run `brew install zstd`,
-2. install aarch64-unknown-linux-gnu by [macos-cross-toolchains](https://github.com/messense/homebrew-macos-cross-toolchains),
-3. change the prefix such as `CROSS := aarch64-unknown-linux-gnu-` in config.mk.
+### GCCツールチェイン
+macOSでクロスコンパイルする場合は次の手順に従ってください。
 
-If you are native compiling, i.e., running natively on ARMv8, set `CROSS := ` in config.mk to use local gcc.
+1. `brew install zstd`を実行する
+2. [macos-cross-toolchains](https://github.com/messense/homebrew-macos-cross-toolchains)からaarch64-unknown-linux-gnuをインストールする
+3. config.mkで`CROSS := aarch64-unknown-linux-gnu-`のようにCROSS変数を変更する
 
-If `$(CROSS)gcc --version` gives out version less than 9.3.0, remove `-mno-outline-atomics` from Makefile.
+ネイティブコンパイルする場合、すなわち、ARMv8上でネイティブに実行する場合は、config.mkで`CROSS := `と設定し、ローカルのgccを使ってください。
+
+If `$(CROSS)gcc --version`を実行してバージョンが9.3.0未満の場合はMakefileの`-mno-outline-atomics`を削除してください。
 
 ### QEMU
 
-You can install QEMU (>= 6.0) by package manager or compile it from source such as
+QEMU (>= 6.0)をパッケージマネージャからインストールするか、次の手順でソースからコンパイルしてください。
 
 ```
 git clone https://github.com/qemu/qemu.git
@@ -57,43 +70,45 @@ mkdir -p qemu/build
 (cd qemu/build && ../configure --target-list=aarch64-softmmu && make -j8)
 ```
 
-On some OS such as CentOS, you may also need to install the following dependencies
+CentOSなど位一部のOSでは次のパッケージのインストールも必要かもしれません。
 
 ```
 yum install ninja-build
 yum install pixman-devel.aarch64
 ```
 
-Then add the generated `qemu-system-aarch64` to PATH or just modify the `QEMU` variable in config.mk.
+作成された`qemu-system-aarch64`をPATHに追加するか、config.mkの`QEMU`変数を変更してください。
 
-### Build musl
+[Macへのインストール作業メモ](mac.md)
 
-First, fetch musl by `git submodule update --init --recursive`.
+### muslのビルド
 
-Then if you are cross compiling, run `(cd libc && export CROSS_COMPILE=X && ./configure --target=aarch64)`, where `X` is the `CROSS` variable in config.mk. Otherwise, run `(cd libc && ./configure)`.
+まず、 `git submodule update --init --recursive`を実行してmuslを取り込みます。
 
-### File system tools
+次に、クロスコンパイルする場合は`(cd libc && export CROSS_COMPILE=X && ./configure --target=aarch64)`を実行します。ここで、`X`はconfig.mkの`CROSS`変数の値です。それ以外の場合は`(cd libc && ./configure)`を実行します。
 
-mtools is used to build our fat32 file system image, which can be installed by package manager, e.g, `sudo apt install mtools` on Ubuntu and `brew install mtools` on macOS.
+### ファイルシステムツール
 
-sfdisk is used to create MBR-partitioned disk images. It has already been installed on most Linux distributions. But for macOS,
+fat32ファイルシステムイメージをビルドするためにmtoolsを使用しています。これはパッケージマネージャでインストールすることができます。たとえば、Ubunntuでは`sudo apt install mtools`を、macOSでは`brew install mtools`を実行してください。
 
-1. run `brew install util-linux` to install sfdisk,
-2. modify the PATH according to the instructions given by brew.
+MBRパーティションディスクイメージを作成するためにsfdiskを使用しています。このコマンドはほとんどのLinuxディストリビューションにはすでにインストールされていますが、macOSの場合は次の手順でインストールしてください。
 
-## Development
+1. `brew install util-linux`を実行してsfdiskをインストールする
+2. brewの指示に従いPATHを変更する
 
-- `make qemu`: Emulate the kernel at `obj/kernel8.img`.
-- `make`: Create a bootable sd card image at `obj/sd.img` for Raspberry Pi 3, which can be burned to a tf card using [Raspberry Pi Imager](https://www.raspberrypi.org/software/).
-- `make lint`: Lint source code of kernel and user programs.
+## 開発
+
+- `make qemu`: `obj/kernel8.img`にあるカーネルをエミュレートする
+- `make`: Raspberry Pi 3用のブート可能なSDカードイメージを`obj/sd.img`に作成する。 これは[Raspberry Pi Imager](https://www.raspberrypi.org/software/)を使ってtfに焼くことができます。
+- `make lint`: カーンルコードとユーザプログラムの構文チェックをします。
 
 ### Raspberry Pi 4
 
-It works on Pi 4 as well. Change `RASPI := 3` to `RASPI := 4` in Makefile, run `make clean && make` and have fun with your Pi 4.
+Pi 4でも正常に動きます。Makefileの`RASPI := 3`を`RASPI := 4`に変更して、`make clean && make`を実行し、Pi 4で楽しんでください。
 
-### Logging level
+### ログレベル
 
-Logging level is controlled via compiler option `-DLOG_XXX` in Makefile, where `XXX` can be one of
+ログレベルはMakefileにあるコンパイラオプション`-DLOG_XXX`で制御されます。ここで`XXX`に指定できるのは以下のいずれかです。
 
 - `ERROR`
 - `WARN`
@@ -101,17 +116,17 @@ Logging level is controlled via compiler option `-DLOG_XXX` in Makefile, where `
 - `DEBUG`
 - `TRACE`
 
-Defaults to `-DLOG_INFO`.
+デフォルトは`-DLOG_INFO`です。
 
-### Debug mode
+### デバッグモード
 
-Enabling debug mode via compiler option `-DDEBUG` in Makefile will incorporate runtime assertions,
-testing and memory usage profiling(see below). Defaults to `-DNOT_DEBUG`.
+Makefileにあるコンパイラオプション`-DDEBUG`でデバッグモードを有効にすると、実行時のアサーション、テスト、メモリ使用量プロファイリング（下記参照）が組み込まれます()。デフォルトは `-DNOT_DEBUG` です。
 
-### Profile
+### プロファイル
 
-We can inspect the information of processes and memory usage(shown when `-DDEBUG`) by `Ctrl+P`.
-This may output something like
+`Ctrl+P`と押下することでプロセスとメモリ使用量（`-DDEBUG`を有効にした場合に表示）に関する情報を見ることができます。
+
+次のように出力されます。
 
 ```
 1 sleep  init
@@ -119,23 +134,22 @@ This may output something like
 3 runble idle
 4 run    idle
 5 run    idle
-6 sleep  sh fa: 1  
+6 sleep  sh fa: 1
 ```
 
-where each row contains the pid, state, name and father's pid of each process.
+ここで、各行はプロセスのpid, 状態、親のpidです。
 
-## Project structure
+## プロジェクトの構成
 
 ```
 .
 ├── Makefile
-├── mksd.mk: Part of Makefile for generating bootable image.
+├── mksd.mk: ブート可能なイメージを生成するためのMakefikeの構成ファイル
 |
-├── boot: Official boot loader.
-├── libc: C library musl.
+├── boot: オフィシャルブートローダ
+├── libc: Cライブラリmusl.
 |
-├── inc: Kernel headers.
-├── kern: Kernel source code.
-└── usr: User programs.
+├── inc: カーネルヘッダ
+├── kern: カーネルソースコード
+└── usr: ユーザプログラム
 ```
-

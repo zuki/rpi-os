@@ -19,4 +19,5 @@
 
 # 翻訳
 
+- [rpi-osのREADME](README.md)
 - [dashのTOUR文書](dash_tour.md)
