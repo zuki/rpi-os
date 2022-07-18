@@ -2,6 +2,7 @@
 
 - READMEにあるMacで開発する手順にしたがったところ、問題なく実行できた
 - bigtestも実機の1/2速くらいで動く
+- その後、`messense/macos-cross-toolchains`から`aarch64-elf-gcc`へツールチェインを変更（詳細は[muslをインストール](../book/musl.html#dwarfエラーについて)を参照）
 
 ```
 $ brew install zstd
