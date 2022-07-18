@@ -25,6 +25,8 @@ long sys_getrandom();
 long sys_uname();
 long sys_clock_settime();
 long sys_ppoll();
+long sys_getitimer();
+long sys_setitimer();
 long syscall1(struct trapframe *);
 
 // kern/sysproc.c
@@ -60,8 +62,6 @@ long sys_setfsuid();
 long sys_setfsgid();
 long sys_getgroups();
 long sys_setgroups();
-long sys_getitimer();
-long sys_setitimer();
 long sys_gettid();
 long sys_getpid();
 long sys_getppid();

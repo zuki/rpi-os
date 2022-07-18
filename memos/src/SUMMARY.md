@@ -16,6 +16,7 @@
   - [mmaptestでエラー発生](dash_mmaptest.md)
   - [kallocでストール](dash_kalloc.md)
   - [パイプ処理でストール](dash_pipe.md)
+- [タイマー機能を追加](timer.md)
 
 # 翻訳
 

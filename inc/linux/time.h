@@ -5,7 +5,9 @@
 #include "list.h"
 
 #define HZ  100
-#define INITIAL_JIFFIES ((uint64_t)-300 * HZ)
+//#define INITIAL_JIFFIES ((uint64_t)-300 * HZ)                     # itimerが動かず
+//#define INITIAL_JIFFIES (((uint64_t)(-300 * HZ)) & 0xffffffff)    # clock割り込みしない
+#define INITIAL_JIFFIES 0UL
 
 struct timeval {
     time_t      tv_sec;
@@ -83,6 +85,5 @@ void run_timer_list(void);
 long getitimer(int, struct itimerval *);
 void it_real_fn(uint64_t);
 long setitimer(int, struct itimerval *, struct itimerval *);
-
 
 #endif

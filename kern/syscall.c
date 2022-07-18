@@ -1,5 +1,6 @@
 #include "linux/syscall.h"
 #include "linux/errno.h"
+#include "linux/time.h"
 #include "types.h"
 #include "syscall1.h"
 #include "memlayout.h"
@@ -218,6 +219,37 @@ sys_clock_settime()
 }
 
 long
+sys_getitimer()
+{
+    int which;
+    struct itimerval *curr_value;
+
+    if (argint(0, &which) < 0 || argptr(1, &curr_value, sizeof(struct itimerval)) < 0)
+        return -EINVAL;
+
+    trace("which: %d, curr_value: 0x%p", which, curr_value);
+
+    return getitimer(which, curr_value);
+}
+
+long
+sys_setitimer()
+{
+    int which;
+    struct itimerval *new_value, *old_value;
+
+    if (argint(0, &which) < 0
+     || argptr(1, &new_value, sizeof(struct itimerval)) < 0
+     || argptr(2, &old_value, sizeof(struct itimerval)) < 0)
+        return -EINVAL;
+
+    trace("which: &d, new_value: 0x%p, old_value: 0x%p", which, new_value, old_value);
+
+    return setitimer(which, new_value, old_value);
+}
+
+
+long
 sys_sched_getaffinity()
 {
     // TODO
@@ -345,8 +377,8 @@ static func syscalls[] = {
     [SYS_exit_group] = sys_exit_group,          // 94
     [SYS_set_tid_address] = sys_set_tid_address,  // 96
     [SYS_nanosleep] = sys_nanosleep,            // 101
-//    [SYS_getitimer] = sys_getitimer,            // 102
-//    [SYS_setitimer] = sys_setitimer,            // 103
+    [SYS_getitimer] = sys_getitimer,            // 102
+    [SYS_setitimer] = sys_setitimer,            // 103
     [SYS_clock_settime] = sys_clock_settime,    // 112
     [SYS_clock_gettime] = sys_clock_gettime,    // 113
     [SYS_sched_getaffinity] = sys_sched_getaffinity, // 123

@@ -11,32 +11,43 @@
     (type *)((char *)__mptr - offsetof(type,member));   \
 })
 
+// このエントリの構造体を返す
+#define list_entry(ptr, type, member) \
+    container_of(ptr, type, member)
+
 struct list_head {
     struct list_head *next, *prev;
 };
 
+// リストを初期化
 static inline void
 list_init(struct list_head *head)
 {
     head->next = head->prev = head;
 }
 
+// リストは空か?
 static inline int
 list_empty(struct list_head *head)
 {
     return head->next == head;
 }
+
+// リストの先頭のエントリを返す
 static inline struct list_head *
 list_front(struct list_head *head)
 {
     return head->next;
 }
+
+// リストの最後のエントリを返す
 static inline struct list_head *
 list_back(struct list_head *head)
 {
     return head->prev;
 }
 
+// prev -> cur -> next : curをprevとnextの間に挿入
 static inline void
 list_insert(struct list_head *cur, struct list_head *prev, struct list_head *next)
 {
@@ -46,18 +57,21 @@ list_insert(struct list_head *cur, struct list_head *prev, struct list_head *nex
     prev->next = cur;
 }
 
+// cur -> head : curをheadのheadの前に挿入
 static inline void
 list_push_front(struct list_head *head, struct list_head *cur)
 {
     list_insert(cur, head, head->next);
 }
 
+// head <- cur : curをheadの後ろに挿入
 static inline void
 list_push_back(struct list_head *head, struct list_head *cur)
 {
     list_insert(cur, head->prev, head);
 }
 
+// prev -> next : prevとnextの間のエントリを削除
 static inline void
 list_del(struct list_head *prev, struct list_head *next)
 {
@@ -65,24 +79,28 @@ list_del(struct list_head *prev, struct list_head *next)
     prev->next = next;
 }
 
+// prev -> (item) -> next : item自身をリストから削除
 static inline void
 list_drop(struct list_head *item)
 {
     list_del(item->prev, item->next);
 }
 
+// リストの先頭のエントリを削除
 static inline void
 list_pop_front(struct list_head *head)
 {
     list_drop(list_front(head));
 }
 
+// リストの最後のエントリを削除
 static inline void
 list_pop_back(struct list_head *head)
 {
     list_drop(list_back(head));
 }
 
+// リストからitemを探す
 static inline struct list_head *
 list_find(struct list_head *head, struct list_head *item)
 {
@@ -93,6 +111,7 @@ list_find(struct list_head *head, struct list_head *item)
     return 0;
 }
 
+// memberを要素に持つheadリストの要素をposに入れてループ
 #define LIST_FOREACH_ENTRY(pos, head, member)                           \
     for (pos = container_of(list_front(head), typeof(*pos), member);    \
         &pos->member != (head);                                         \

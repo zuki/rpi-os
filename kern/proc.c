@@ -369,6 +369,12 @@ fork()
 
     memmove(&np->signal, &cp->signal, sizeof(struct signal));
 
+    np->it_real_value = np->it_prof_value = np->it_virt_value = 0;
+    np->it_real_incr = np->it_prof_incr = np->it_virt_incr = 0;
+    init_timer(&np->real_timer);
+    np->real_timer.data = (unsigned long) np;
+    np->real_timer.function = it_real_fn;
+
     int pid = np->pid;
 
     acquire(&ptable.lock);

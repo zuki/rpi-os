@@ -59,18 +59,20 @@ clock_reset()
     put32(TIMER_CLR, TIMER_CLR_INT);
 }
 
+// 現在痔の更新
 static void update_wall_time(uint64_t ticks)
 {
     do {
         ticks--;
-        xtime.tv_nsec += TICK_NSEC;
-        if (xtime.tv_nsec >= 1000000000) {
-            xtime.tv_nsec -= 1000000000;
-            xtime.tv_sec++;
+        xtime.tv_nsec += TICK_NSEC;         // 1 tick = 10ms = 10 * 10^6
+        if (xtime.tv_nsec >= 1000000000) {  // nsec部分が1秒を超えたら
+            xtime.tv_nsec -= 1000000000;    // nsecから1秒引いて
+            xtime.tv_sec++;                 // secに1秒足す
         }
     } while (ticks);
 }
 
+// 現在時の調整
 static inline void update_times(void)
 {
     uint64_t ticks;
@@ -92,6 +94,7 @@ clock_intr()
     ++jiffies;
     trace("c: %d", jiffies);
     update_times();
+    run_timer_list();
     clock_reset();
 }
 

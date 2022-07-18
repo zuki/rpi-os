@@ -51,6 +51,7 @@ main()
     release(&mp.lock);
 
     timer_init();
+    init_timervecs();
     trap_init();
     info("cpu %d init finished", cpuid());
 

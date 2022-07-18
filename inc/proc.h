@@ -11,6 +11,7 @@
 #include "linux/ppoll.h"
 #include "linux/capability.h"
 #include "linux/resources.h"
+#include "linux/time.h"
 
 #define NPROC           128     // 最大プロセス数
 #define NCPU            4       // コア数
@@ -85,6 +86,10 @@ struct proc {
     int   ngroups;              // 実際に所属しているグループ数
     kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;   // capabilities
     mode_t umask;               // umask
+
+    uint64_t it_real_value, it_prof_value, it_virt_value;   /* timer interval value: READ, PROF, VIRTUAL */
+    uint64_t it_real_incr, it_prof_incr, it_virt_incr;      /* timer increment: READ, PROF, VIRTUAL */
+    struct timer_list real_timer;                           /* Real time timer */
 
     struct trapframe *tf;       /* Trap frame for current syscall. */
     struct context *context;    /* swtch() here to run process. */
