@@ -79,8 +79,6 @@ yum install pixman-devel.aarch64
 
 作成された`qemu-system-aarch64`をPATHに追加するか、config.mkの`QEMU`変数を変更してください。
 
-[Macへのインストール作業メモ](mac.md)
-
 ### muslのビルド
 
 まず、 `git submodule update --init --recursive`を実行してmuslを取り込みます。
