@@ -193,10 +193,10 @@ sys_clock_gettime()
     if (argint(0, (clockid_t *)&clk_id) < 0 || argptr(1, (char **)&tp, sizeof(struct timespec)) < 0)
         return -EINVAL;
 
+    trace("clk_id: %d, tp: 0x%p\n", clk_id, tp);
+
     if (clk_id != CLOCK_REALTIME)
         return -EINVAL;
-
-    trace("clk_id: %d, tp: 0x%p\n", clk_id, tp);
 
     return clock_gettime(clk_id, tp);
 }
@@ -533,7 +533,7 @@ syscall1(struct trapframe *tf)
     int sysno = tf->x[8];
 
     if (sysno > 0 && sysno < ARRAY_SIZE(syscalls) && syscalls[sysno]) {
-        if (sysno != SYS_sched_yield)
+        if (sysno != SYS_sched_yield && thisproc()->pid == 7)
             debug("proc[%d] %s called", thisproc()->pid, syscall_names[sysno]);
         return syscalls[sysno]();
     } else {
