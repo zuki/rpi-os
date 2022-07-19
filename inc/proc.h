@@ -87,8 +87,8 @@ struct proc {
     kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;   // capabilities
     mode_t umask;               // umask
 
-    uint64_t it_real_value, it_prof_value, it_virt_value;   /* timer interval value: READ, PROF, VIRTUAL */
-    uint64_t it_real_incr, it_prof_incr, it_virt_incr;      /* timer increment: READ, PROF, VIRTUAL */
+    uint64_t it_real_value, it_prof_value, it_virt_value;   /* timer interval value: REAL, PROF, VIRTUAL */
+    uint64_t it_real_incr, it_prof_incr, it_virt_incr;      /* timer increment: REAL, PROF, VIRTUAL */
     struct timer_list real_timer;                           /* Real time timer */
 
     struct trapframe *tf;       /* Trap frame for current syscall. */
