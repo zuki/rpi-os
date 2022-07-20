@@ -1,10 +1,12 @@
 #include "clock.h"
+#include "linux/errno.h"
 #include "linux/time.h"
 #include "arm.h"
 #include "base.h"
 #include "irq.h"
 #include "console.h"
 #include "rtc.h"
+#include "proc.h"
 
 /* Local timer */
 #define TIMER_ROUTE             (LOCAL_BASE + 0x24)
@@ -92,6 +94,7 @@ void
 clock_intr()
 {
     ++jiffies;
+    thisproc()->stime = jiffies * 1000000000 / HZ;
     trace("c: %d", jiffies);
     update_times();
     run_timer_list();
@@ -101,20 +104,39 @@ clock_intr()
 long
 clock_gettime(clockid_t clk_id, struct timespec *tp)
 {
-    // TODO: clk_idによる振り分け
-    tp->tv_nsec = xtime.tv_nsec;
-    tp->tv_sec = xtime.tv_sec;
+    uint64_t ptime;
 
-    trace("tv_sec: %lld, tv_nsec: %lld", tp->tv_sec, tp->tv_nsec);
+    switch(clk_id) {
+        default:
+            return -EINVAL;
+        case CLOCK_REALTIME:
+            tp->tv_nsec = xtime.tv_nsec;
+            tp->tv_sec = xtime.tv_sec;
+            break;
+        case CLOCK_PROCESS_CPUTIME_ID:
+            ptime = thisproc()->stime + thisproc()->utime;
+            tp->tv_nsec = ptime % 1000000000;
+            tp->tv_sec  = ptime / 1000000000;
+            break;
+    }
+    debug("clk: %d, tv_sec: %lld, tv_nsec: %lld", clk_id, tp->tv_sec, tp->tv_nsec);
     return 0;
 }
 
 long clock_settime(clockid_t clk_id, const struct timespec *tp)
 {
-    // TODO: 権限チェック, lock?
-    xtime.tv_nsec = tp->tv_nsec;
-    xtime.tv_sec = tp->tv_sec;
-
+    switch(clk_id) {
+        default:
+            return -EINVAL;
+        case CLOCK_REALTIME:
+            if (capable(CAP_SYS_TIME)) {
+                xtime.tv_nsec = tp->tv_nsec;
+                xtime.tv_sec = tp->tv_sec;
+            } else {
+                return -EPERM;
+            }
+            break;
+    }
     return 0;
 }
 

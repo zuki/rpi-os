@@ -4,9 +4,9 @@
 #include "types.h"
 #include "list.h"
 
-#define HZ  100
-//#define INITIAL_JIFFIES ((uint64_t)-300 * HZ)                     # itimerが動かず
-//#define INITIAL_JIFFIES (((uint64_t)(-300 * HZ)) & 0xffffffff)    # clock割り込みしない
+#define HZ 100
+//#define INITIAL_JIFFIES ((uint64_t)-300 * HZ)                // itimerが動かず
+//#define INITIAL_JIFFIES ((uint64_t)(uint32_t)(-300 * HZ))    // clock割り込みしない
 #define INITIAL_JIFFIES 0UL
 
 struct timeval {

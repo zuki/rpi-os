@@ -1,5 +1,6 @@
 #include "types.h"
 #include "linux/elf.h"
+#include "linux/capability.h"
 #include "trap.h"
 #include "file.h"
 #include "log.h"
@@ -33,6 +34,18 @@ static void flush_old_exec(void)
             bit_remove(p->fdflag, i);
         }
     }
+    // (4) capability 再設定
+    cap_clear(p->cap_inheritable);
+    cap_clear(p->cap_permitted);
+    cap_clear(p->cap_effective);
+
+    if (p->uid == 0 || p->euid == 0) {
+        cap_set_full(p->cap_inheritable);
+        cap_set_full(p->cap_permitted);
+    }
+
+    if (p->euid == 0)
+        cap_set_full(p->cap_effective);
 }
 
 int

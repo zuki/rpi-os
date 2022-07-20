@@ -164,6 +164,7 @@ user_init()
 {
     extern char icode[], eicode[];
     struct proc *p = proc_initx("icode", icode, (size_t)(eicode - icode));
+    p->cap_effective = p->cap_inheritable = p->cap_permitted = CAP_INIT_EFF_SET;
     p->cwd = namei("/");
     assert(p->cwd);
 
@@ -366,9 +367,13 @@ fork()
     np->fsgid = cp->fsgid;
     np->ngroups = cp->ngroups;
     memmove(np->groups, cp->groups, sizeof(gid_t) * cp->ngroups);
+    np->cap_effective = cp->cap_effective;
+    np->cap_inheritable = cp->cap_inheritable;
+    np->cap_permitted = cp->cap_permitted;
 
     memmove(&np->signal, &cp->signal, sizeof(struct signal));
 
+    np->stime = np->utime = 0;
     np->it_real_value = np->it_prof_value = np->it_virt_value = 0;
     np->it_real_incr = np->it_prof_incr = np->it_virt_incr = 0;
     init_timer(&np->real_timer);

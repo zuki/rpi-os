@@ -195,9 +195,6 @@ sys_clock_gettime()
 
     trace("clk_id: %d, tp: 0x%p\n", clk_id, tp);
 
-    if (clk_id != CLOCK_REALTIME)
-        return -EINVAL;
-
     return clock_gettime(clk_id, tp);
 }
 
@@ -208,9 +205,6 @@ sys_clock_settime()
     struct timespec *tp;
 
     if (argint(0, (clockid_t *)&clk_id) < 0 || argptr(1, (char **)&tp, sizeof(struct timespec)) < 0)
-        return -EINVAL;
-
-    if (clk_id != CLOCK_REALTIME)
         return -EINVAL;
 
     trace("clk_id: %d, tp: 0x%p\n", clk_id, tp);

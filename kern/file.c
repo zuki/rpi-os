@@ -689,6 +689,9 @@ faccess(char *path, int mode, int flags)
     gid_t gid, fgid;
     mode_t fmode;
 
+    if (mode & ~S_IRWXO)    /* where's F_OK, X_OK, W_OK, R_OK? */
+        return -EINVAL;
+
     begin_op();
     if ((ip = namei(path)) == 0) {
         end_op();
