@@ -34,8 +34,8 @@ main()
         memset(edata, 0, end - edata);
         i2c_init(DS3231_I2C_DIV);
         irq_init();
-        console_init();
         mm_init();
+        console_init();
         clock_init();
         rand_init();
         pagecache_init();

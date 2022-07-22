@@ -11,5 +11,5 @@ nogroup:x:65534:
 crontab:x:105:
 syslog:x:106:
 ssh:x:111:
-admin:x:113:
+admin:x:113:zuki
 zuki:x:1000:

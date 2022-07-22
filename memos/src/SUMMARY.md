@@ -18,6 +18,7 @@
   - [kallocでストール](dash_kalloc.md)
   - [パイプ処理でストール](dash_pipe.md)
 - [タイマー機能を追加](timer.md)
+- [su, login, passwdコマンドを追加](su_login_passwd.md)
 
 # 翻訳
 

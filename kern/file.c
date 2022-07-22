@@ -645,6 +645,7 @@ filechown(struct file *f, char *path, uid_t owner, gid_t group)
 
     if (owner != (uid_t)-1) {
         if (!capable(CAP_CHOWN)) {
+            debug("uid %d cant chown", owner);
             goto bad;
         }
         ip->uid = owner;
@@ -661,9 +662,11 @@ filechown(struct file *f, char *path, uid_t owner, gid_t group)
                 }
             }
             if (i == p->ngroups) {
+                debug("uid %d and gid %d cant chown", owner, group);
                 goto bad;
             }
         } else {
+            debug("gid %d cant chown", group);
             goto bad;
         }
     }
@@ -671,7 +674,7 @@ filechown(struct file *f, char *path, uid_t owner, gid_t group)
     if (ip->mode & S_IXUGO && !capable(CAP_CHOWN)) {
         ip->mode &= ~(S_ISUID|S_ISGID);
     }
-    iupdate(f->ip);
+    iupdate(ip);
     error = 0;
 
 bad:

@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "file.h"
 #include "mm.h"
+#include "linux/termios.h"
 
 #define CONSOLE 1
 
@@ -22,6 +23,29 @@ struct {
 } input;
 #define C(x)  ((x)-'@')         // Control-x
 #define BACKSPACE 0x100
+
+#define isecho (devsw[CONSOLE].termios->c_lflag & ECHO)
+#define islbuf (devsw[CONSOLE].termios->c_lflag & ICANON)
+
+static void set_default_termios(struct termios *termios)
+{
+    memset(termios, 0, sizeof(struct termios));
+
+    termios->c_oflag = (OPOST|ONLCR);
+    termios->c_iflag = (ICRNL|IXON|IXANY|IMAXBEL);
+    termios->c_cflag = (CREAD|CS8|B115200);
+    termios->c_lflag = (ISIG|ICANON|IEXTEN|ECHO|ECHOE|ECHOCTL|ECHOKE);
+
+    termios->c_cc[VTIME]   = 0;
+    termios->c_cc[VMIN]    = 1;
+    termios->c_cc[VINTR]   = (0x1f & 'c');
+    termios->c_cc[VQUIT]   = 28;
+    termios->c_cc[VEOF]    = (0x1f & 'd');
+    termios->c_cc[VSUSP]   = (0x1f & 'z');
+    termios->c_cc[VKILL]   = (0x1f & 'u');
+    termios->c_cc[VERASE]  = 0177;
+    termios->c_cc[VWERASE] = (0x1f & 'w');
+}
 
 static void
 consputc(int c)
@@ -62,6 +86,12 @@ console_read(struct inode *ip, char *dst, ssize_t n)
             sleep(&input.r, &conslock);
         }
         int c = input.buf[input.r++ % INPUT_BUF];
+        if (!islbuf) {
+            release(&conslock);
+            ilock(ip);
+            *dst = c;
+            return 1;
+        }
         if (c == C('D')) {      // EOF
             if (n < target) {
                 // Save ^D for next time, to make sure
@@ -115,8 +145,8 @@ console_intr1(int (*getc)())
             if (c != 0 && input.e - input.r < INPUT_BUF) {
                 c = (c == '\r') ? '\n' : c;
                 input.buf[input.e++ % INPUT_BUF] = c;
-                consputc(c);
-                if (c == '\n' || c == C('D')
+                if (isecho) consputc(c);
+                if (!islbuf || c == '\n' || c == C('D')
                     || input.e == input.r + INPUT_BUF) {
                     input.w = input.e;
                     wakeup(&input.r);
@@ -149,6 +179,10 @@ console_init()
 
     devsw[CONSOLE].read = console_read;
     devsw[CONSOLE].write = console_write;
+
+    devsw[CONSOLE].termios = (struct termios *)kalloc();
+    info("devsw[%d].termios: 0x%p", CONSOLE, devsw[CONSOLE].termios);
+    set_default_termios(devsw[CONSOLE].termios);
 }
 
 static void

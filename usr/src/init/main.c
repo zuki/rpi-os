@@ -33,7 +33,8 @@ main()
         }
         if (pid == 0) {
             //execve("/bin/sh", argv, envp);
-            execve("/usr/bin/dash", argv, envp);
+            //execve("/usr/bin/dash", argv, envp);
+            execve("/bin/getty", 0, 0);
             printf("init: exec sh failed\n");
             exit(1);
         }

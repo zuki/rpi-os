@@ -193,7 +193,10 @@ sys_ioctl()
 
     trace("fd=%d, req=0x%llx, type=%d", fd, req, f->type);
 
-    if (f->type != FD_INODE || f->ip->type != T_DEV) return -ENOTTY;
+    if (f->type != FD_INODE || f->ip->type != T_DEV) {
+        debug("bad type: %d, %d", f->type, f->ip->type);
+        return -ENOTTY;
+    }
 
     trace("fd=%d, req=0x%llx\n", fd, req);
 
@@ -205,15 +208,22 @@ sys_ioctl()
             memmove(term, devsw[f->ip->major].termios, sizeof(struct termios));
             break;
         case TCSETS:
+            debug("TCSETS");
         case TCSETSW:
         case TCSETSF:
+            debug("TCSETSF");
             if (argptr(2, (char **)&term, sizeof(struct termios)) < 0)
                 return -EINVAL;
             if (term == NULL) return -EINVAL;
+            debug("iflag: 0x%x, oflag: 0x%x, cflag: 0x%x, lflag: 0x%x",
+                term->c_iflag, term->c_oflag, term->c_cflag, term->c_lflag);
             memmove(devsw[f->ip->major].termios, term, sizeof(struct termios));
             break;
         case TCSBRK:
+            debug("TCSBRK");
+            break;
         case TCFLSH:            // TODO: cosole.flushを実装すること
+            debug("TCFLSH");
             break;
         case TIOCGWINSZ:
             if (argptr(2, (char **)&win, sizeof(struct winsize)) < 0)
@@ -248,13 +258,14 @@ sys_read()
     struct file *f;
     size_t n;
     char *p;
+    int fd;
 
-    if (argfd(0, 0, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0) {
+    if (argfd(0, &fd, &f) < 0 || argu64(2, (uint64_t *)&n) < 0 || argptr(1, &p, n) < 0) {
         info("parse error");
         return -EINVAL;
     }
 
-    trace("[%d] f->type=%d, p=0x%p, n=%lld", thisproc()->pid, f->type, p, n);
+    trace("[%d] fd=%d, f->type=%d, p=0x%p, n=%lld", thisproc()->pid, fd, f->type, p, n);
 
     return fileread(f, p, n);
 }
@@ -621,7 +632,7 @@ sys_chdir()
 
     if (argstr(0, &path) < 0)
         return -EINVAL;
-
+    trace("path=%s", path);
     begin_op();
     if ((ip = namei(path)) == 0) {
         end_op();
@@ -794,11 +805,11 @@ sys_fchownat()
      || argint(4, &flags) < 0)
         return -EINVAL;
 
+    trace("dirfd=%d, path=%s, uid=%d, gid=%d, flags=%d\n", dirfd, path, owner, group, flags);
+
     // TODO: AT_FDCWD以外の実装
     if (dirfd != AT_FDCWD) return -EINVAL;
     // TODO: flagsの実装
-
-    trace("dirfd=%d, path=%s, uid=%d, gid=%d, flags=%d\n", dirfd, path, owner, group, flags);
 
     return filechown(0, path, owner, group);
 }
@@ -843,15 +854,16 @@ sys_getcwd()
     iput(dp);
     end_op();
 root:
-    buf[pos++] = '/'; buf[pos] = 0;             // NULL終端
-
-   // bufを反転する
-    for (i = 0; i > (pos + 1) / 2; i++) {
-        char c = buf[i];
+    buf[pos] = '/';
+    // bufを反転する
+    char c;
+    for (i = 0; i < (pos + 1) / 2; i++) {
+        c = buf[i];
         buf[i] = buf[pos - i];
         buf[pos - i] = c;
     }
-    trace("buf: %s", buf);
+    buf[++pos] = 0;             // NULL終端
+    debug("buf: %s", buf);
     return buf;
 
 bad:
