@@ -117,6 +117,7 @@ char *usrbins[] = {
 char *etc_files[] = {
     "usr/etc/passwd",
     "usr/etc/group",
+    "usr/etc/inittab",
     NULL
 };
 

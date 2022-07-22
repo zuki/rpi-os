@@ -143,7 +143,7 @@ $ pwd
 $
 ```
 
-### 問題1: passwdで指定したパスワードでログインできない
+### 問題1: passwdで設定したパスワードでログインできない
 
 ```
 # cat /etc/passwd
@@ -181,3 +181,75 @@ zuki
 ## passwdコマンドで"Temporary file busy; try again later"と言われる場合
 
 - `/etc/ptmp`を削除する
+
+## `/etc/inittab`
+
+- initから`dash /etc/initab`を呼び出し、初期化処理をする
+
+```
+$ cat etc/inittab
+chmod 04755 /bin/passwd
+/bin/getty
+```
+
+```diff
+$ git diff usr/src/init/
+diff --git a/usr/src/init/main.c b/usr/src/init/main.c
+index c21b8f0..1ac3984 100644
+--- a/usr/src/init/main.c
++++ b/usr/src/init/main.c
+@@ -7,7 +7,7 @@
+ #include <sys/stat.h>
+ #include <sys/sysmacros.h>
+
+-char *argv[] = { "dash", 0 };
++char *argv[] = { "dash", "/etc/inittab", 0 };
+ //char *envp[] = { "TEST_ENV=FROM_INIT", "TZ=JST-9", 0 };
+ char *envp[] = { "TZ=JST-9", 0 };
+
+@@ -33,8 +33,8 @@ main()
+         }
+         if (pid == 0) {
+             //execve("/bin/sh", argv, envp);
+-            //execve("/usr/bin/dash", argv, envp);
+-            execve("/bin/getty", 0, 0);
++            execve("/usr/bin/dash", argv, envp);
++            //execve("/bin/getty", 0, 0);
+             printf("init: exec sh failed\n");
+             exit(1);
+         }
+```
+
+### 実行
+
+```
+Welcome to xv6 2022-06-26 (musl) mini tty
+
+mini login: root
+Password:
+[2]fileopen: cant namei /etc/profile
+[1]fileopen: cant namei /.profile
+# ls -l /bin/passwd
+-rwsr-xr-x 1 root root 66608 Jul 22  2022 /bin/passwd
+#
+```
+
+## dashをexit可能に
+
+```
+mini login: root
+Password:
+# ls -l /bin/passwd
+-rwsr-xr-x 1 root root 66608 Jul 22  2022 /bin/passwd
+# exit
+
+Welcome to xv6 2022-06-26 (musl) mini tty
+
+mini login: zuki
+Password:
+$ exit
+
+Welcome to xv6 2022-06-26 (musl) mini tty
+
+mini login:
+```

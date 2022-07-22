@@ -195,7 +195,7 @@ main(int argc, char *argv[])
     // /usr/bin  (coreutils)
     copy_file(0, nelms(usrbins), usrbins, usrbinino, 0, 0, S_IFREG|0755);
 
-    // /etc/passwd, group
+    // /etc/passwd, group, inittab
     copy_file(0, nelms(etc_files), etc_files, etcino, 0, 0, S_IFREG|0644);
 
     // fix size of root inode dir
