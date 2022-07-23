@@ -123,6 +123,74 @@ Retype new password:
 Cannot recreat passwd file.
 ```
 
+### 課題2 解決
+
+1. exec.cでSet-uid Set-gidの処理を追加
+2. fs.c$permission()を修正
+3. /etc/passwdは更新されセッション中は新パスワードが有効であるが、qemuを再実行すると`usr/etc/passwd`が使用され新パスワードは破棄される。新パスワードを有効にするにはusr/etc/passwdを変更する必要がある
+
+#### 解決後の実行ログ
+
+```
+Welcome to xv6 2022-06-26 (musl) mini tty
+
+mini login: zuki
+Password:
+[3]fileopen: cant namei /etc/profile
+[3]fileopen: cant namei /.profile
+$ passwd zuki
+Old password:
+New password:
+Retype new password:
+$
+```
+
+#### 解決策(1)の実施
+
+- 変更前: /etc/passwdを再作成できない
+
+```
+[3]sys_openat: dirfd -100, path '/etc/ptmp', flag 0x20241, mode0x180
+[3]permission: ip: mode=0x00008180, uid=1000, gid=1000, p: fsuid=1000, fsgid=0, mask: 0x00000002
+[1]sys_openat: dirfd -100, path '/etc/ptmp', flag 0x20241, mode0x1b6
+[1]permission: ip: mode=0x00008180, uid=1000, gid=1000, p: fsuid=1000, fsgid=0, mask: 0x00000002
+[3]sys_openat: dirfd -100, path '/etc/passwd', flag 0x20000, mode0x1b6
+[3]permission: ip: mode=0x000081a4, uid=0, gid=0, p: fsuid=1000, fsgid=0, mask: 0x00000004
+[2]sys_openat: dirfd -100, path '/etc/ptmp', flag 0x20000, mode0x0
+[2]permission: ip: mode=0x00008180, uid=1000, gid=1000, p: fsuid=1000, fsgid=0, mask: 0x00000004
+[1]sys_openat: dirfd -100, path '/etc/passwd', flag 0x20241, mode0x1a4
+[1]permission: ip: mode=0x000081a4, uid=0, gid=0, p: fsuid=1000, fsgid=0, mask: 0x00000002
+[Cannot recreat passwd file.
+```
+
+- 変更後: 一時ファイルに書き込めない
+
+```
+Retype new password:
+[2]sys_openat: dirfd -100, path '/etc/ptmp', flag 0x20241, mode0x180
+[2]permission: ip: mode=0x00008180, uid=1000, gid=1000, p: fsuid=0, fsgid=0, mask: 0x00000002
+[2]sys_openat: dirfd -100, path '/etc/ptmp', flag 0x20241, mode0x1b6
+[2]permission: ip: mode=0x00008180, uid=1000, gid=1000, p: fsuid=0, fsgid=0, mask: 0x00000002
+Cannot create temporary file
+```
+
+#### fsuidがrootなら無条件で許可
+
+```diff
+$ git diff kern/fs.c
+@@ -937,10 +937,11 @@ permission(struct inode *ip, int mask)
+ {
+     struct proc *p = thisproc();
+     mode_t mode = ip->mode;
+
++    if (p->fsuid == 0) return 0;
++
+     if (p->fsuid == ip->uid)
+         mode >>= 6;
+     else if (p->fsgid == ip->gid)
+         mode >>= 3;
+```
+
 ## login
 
 - Robert Nordier氏の[v7/x86](https://www.nordier.com/)経由で

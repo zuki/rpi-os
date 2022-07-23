@@ -937,6 +937,10 @@ permission(struct inode *ip, int mask)
 {
     struct proc *p = thisproc();
     mode_t mode = ip->mode;
+    trace("ip: inum=%d, mode=0x%08x, uid=%d, gid=%d, p: fsuid=%d, fsgid=%d, mask: %s",
+        ip->inum, ip->mode, ip->uid, ip->gid, p->fsuid, p->fsgid, mask & MAY_READ ? "read" : "write");
+
+    if (p->fsuid == 0) return 0;
 
     if (p->fsuid == ip->uid)
         mode >>= 6;

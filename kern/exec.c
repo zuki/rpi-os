@@ -66,8 +66,6 @@ execve(const char *path, char *const argv[], char *const envp[])
         goto bad;
     }
 
-    trace("path='%s', argv=0x%p, envp=0x%p", s, argv, envp);
-
     begin_op();
     ip = namei(path);
     if (ip == 0) {
@@ -76,6 +74,8 @@ execve(const char *path, char *const argv[], char *const envp[])
         goto bad;
     }
     ilock(ip);
+
+    trace("path='%s', proc: uid=%d, gid=%d, ip: inum=%d, mode=0x%x, uid=%d, gid=%d", s, curproc->uid, curproc->gid, ip->inum, ip->mode, ip->uid, ip->gid);
 
     Elf64_Ehdr elf;
     if (readi(ip, (char *)&elf, 0, sizeof(elf)) != sizeof(elf)) {
@@ -100,6 +100,16 @@ execve(const char *path, char *const argv[], char *const envp[])
     Elf64_Phdr ph;
 
     curproc->pgdir = pgdir;     // Required since readi(sdrw) involves context switch(switch page table).
+
+    // Set-uid, Set-gidの処理
+    if (ip->mode & S_ISUID && curproc->uid != 0)
+        curproc->fsuid = ip->uid;
+    else
+        curproc->fsuid = curproc->uid;
+    if (((ip->mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) && curproc->gid != 0)
+        curproc->fsgid = ip->gid;
+    else
+        curproc->fsgid = curproc->gid;
 
     flush_old_exec();
 
