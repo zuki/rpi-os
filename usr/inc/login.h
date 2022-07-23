@@ -46,7 +46,4 @@ void setpwent(void);
 struct passwd *getpwent(void);
 struct passwd *getpwnam(char *);
 
-// login/cript.c
-char *crypt(char *, char *);
-
 #endif

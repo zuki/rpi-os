@@ -22,6 +22,7 @@ int     setgid(gid_t);
 void    exit(int);
 int     execl(const char *, const char *, ... /* (char  *) NULL */);
 char   *getpass(const char *);
+char *crypt(const char *, const char *);
 
 int
 main(int argc, char *argv[])
@@ -50,7 +51,6 @@ main(int argc, char *argv[])
     }
 
 ok:
-    //printf("ok: user=%s, uid=%d, gid=%d\n", pwd->pw_name, pwd->pw_uid, pwd->pw_gid);
     endpwent();
     printf("su before: uid: %d, gid: %d\n", getuid(), getgid());
     setgid(pwd->pw_gid);

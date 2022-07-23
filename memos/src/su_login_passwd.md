@@ -178,6 +178,94 @@ $ whoami
 zuki
 ```
 
+### 問題2-1: loginでパスワードを間違えると再ログインできない
+
+```
+mini login: zuki
+Password:             // パスワードを間違えると
+Login incorrect       // この表示のあとストール
+```
+
+#### 解決2-1: 再ログインを促すプロンプトがflushされていなかった
+
+```
+mini login: zuki
+user: zuki
+Password:
+Login incorrect
+login: zuki                 // プロンプトが出るようになった
+Password:                   // 正しいパスワードを入れてもincorrectになる
+Login incorrect
+login:
+```
+
+### 問題2-2: 再ログイン時に正しいパスワードを入力してもincorrectになる
+
+```
+login: zuki
+Password:
+namep: 'CyFEE3.../.2.', pwd: 'Cy33E..I//3/    // 入力するたびに別のcryptになる
+InLogin incorrect
+login: zuki
+Password:
+namep: 'Cy3FI.3/22EFE', pwd: 'Cy33E..I//3/    //
+InLogin incorrect
+login:
+```
+
+#### 解決2-2; muslのcrypt()を使うようにした
+
+- v7版crypt(pw, salt)はpw, salt共に同じ値を指定しても連続して呼び出すとその度に違う結果となる
+- 作業配列をstatic arrayで確保しているが、これを実行毎に初期化していないので前回の実行結果が残っていて結果に影響するのではないかと思われる
+  - 以下の結果で初期化後のblock変数は両者で同じだが、初期化していない作業配列を使ったencrypt後のblockの値が変化している
+- musl版crypt()を使用するよう変更したところ、問題なく実行できて、上記の問題もなかったのでこれを使うことにする
+
+```
+// 正しく判定された場合
+crypt: pw='password', salt='Cy33E..I//3/I'
+block: 010101010001000001010100010001000101000100010100010100010000010000010100000100000001010000010000000101000001010000000000000000000000
+encry: 000000010001000000010001000100000000000000000000000000000000000100010000000000000001000000000001000000010001000000000001000100010000
+namep: 'Cy33E..I//3/I', passwd: 'Cy33E..I//3/I'
+
+// 正しく判定されない場合
+crypt: pw='password', salt='Cy33E..I//3/I'
+block: 010101010001000001010100010001000101000100010100010100010000010000010100000100000001010000010000000101000001010000000000000000000000
+encry: 000000010001000100000001000100010000000000000000000000010001000000000001000000010000000000010000000100000000000100000001000100000000
+namep: 'Cy3FI.3/22EFE', passwd: 'Cy33E..I//3/I'
+```
+
+```
+Welcome to xv6 2022-06-26 (musl) mini tty
+
+mini login: zuki
+Password:
+Login incorrect
+login: zuki
+Password:                                       // パスワード再入力
+[0]fileopen: cant namei /etc/profile
+[3]fileopen: cant namei /.profile
+$                                               // ログイン成功
+```
+
+## musl版crypt()は、saltの先頭数バイトも見てハッシュ化の方法を判定している
+
+```c
+// libc/src/crypt/crypt_r.c
+char *__crypt_r(const char *key, const char *salt, struct crypt_data *data)
+...
+    if (salt[0] == '$' && salt[1] && salt[2]) {
+        if (salt[1] == '1' && salt[2] == '$')
+            return __crypt_md5(key, salt, output);
+        if (salt[1] == '2' && salt[3] == '$')
+            return __crypt_blowfish(key, salt, output);
+        if (salt[1] == '5' && salt[2] == '$')
+            return __crypt_sha256(key, salt, output);
+        if (salt[1] == '6' && salt[2] == '$')
+            return __crypt_sha512(key, salt, output);
+    }
+    return __crypt_des(key, salt, output);
+```
+
 ## passwdコマンドで"Temporary file busy; try again later"と言われる場合
 
 - `/etc/ptmp`を削除する

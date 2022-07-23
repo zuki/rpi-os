@@ -338,7 +338,7 @@ int main(int argc, char **argv)
 	 */
 	stty(speed);
 	getty(tty, name, sizeof(name));
-    //printf("call login: %s\n", name);
+    //printf("call login: '%s'\n", name);
 	return login(name);
 }
 

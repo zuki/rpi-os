@@ -28,6 +28,7 @@ size_t   read(int, void *, size_t);
 ssize_t  write(int, const void *, size_t);
 int      unlink(const char *);
 int      close(int);
+char *crypt(const char *, const char *);
 
 // <time.h>
 time_t   time(time_t *);
@@ -172,11 +173,12 @@ tryagn:
  *    copy temp back to passwd file
  */
 
-    if ((fi = open(temp, 0)) < 0) {
+    if ((fi = open(temp, 00)) < 0) {            // O_RDONLY
         printf("Temp file disappeared!\n");
         goto out;
     }
     if((fo = creat(_PATH_PASSWD, 0644)) < 0) {
+    //if ((fo = open(_PATH_PASSWD, 02 | 01000, 0666)) < 0) {    // O_WRONLY | O_TRUNC
         printf("Cannot recreat passwd file.\n");
         goto out;
     }

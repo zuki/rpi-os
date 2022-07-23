@@ -24,6 +24,7 @@ char    *envinit[] = {homedir, "PATH=:/bin:/usr/bin", 0};
 struct passwd *pwd;
 
 // <unistd.h>
+char    *getpass(const char *);
 char *ttyname(int);
 int close(int);
 unsigned int alarm(unsigned int);
@@ -35,6 +36,7 @@ int chown(const char *, uid_t, gid_t);
 int setuid(uid_t);
 int setgid(gid_t);
 int execlp(const char *, const char *, ... /* (char  *) NULL */);
+char *crypt(const char *, const char *);
 
 // <stdlib.h>
 void exit(int);
@@ -79,6 +81,7 @@ loop:
     while (utmp.ut_name[0] == '\0') {
         namep = utmp.ut_name;
         printf("login: ");
+        fflush(stdout);
         while ((c = getchar()) != '\n') {
             if(c == ' ')
                 c = '_';
@@ -87,13 +90,8 @@ loop:
             if (namep < utmp.ut_name+8)
                 *namep++ = c;
         }
+        *namep = 0;
     }
-/*
-    while(((pwd = getpwent()) != NULL)
-        && (strcmp(pwd->pw_name, utmp.ut_name) != 0));
-    if (pwd == NULL) pwd = &nouser;
-    endpwent();
-*/
 
     if ((pwd = getpwnam(utmp.ut_name)) == NULL) {
         pwd = &nouser;
@@ -125,29 +123,23 @@ loop:
         close(f);
     }
 */
-    //printf("ttyn=%s\n", ttyn);
     chown(ttyn, pwd->pw_uid, pwd->pw_gid);
-    //printf("setid: gid=%d, uid=%d\n", pwd->pw_gid, pwd->pw_uid);
     setgid(pwd->pw_gid);
     setuid(pwd->pw_uid);
     if (*pwd->pw_shell == '\0')
         pwd->pw_shell = _PATH_DASH;
     environ = envinit;
-    //printf("environ[0]: %s\n", environ ? environ[0] : "-");
     strncat(homedir, pwd->pw_dir, sizeof(homedir)-6);
-    //printf("homedir: %s\n", homedir);
     if ((namep = rindex(pwd->pw_shell, '/')) == NULL)
         namep = pwd->pw_shell;
     else
         namep++;
     strcat(minusnam, namep);
-    //printf("minus: %s\n", minusnam);
     alarm(0);
     umask(02);
 
     signal(SIGQUIT, SIG_DFL);
     signal(SIGINT, SIG_DFL);
-    //printf("execlp: %s\n", pwd->pw_shell);
     execlp(pwd->pw_shell, minusnam, NULL);
     printf("No shell\n");
     exit(0);
