@@ -44,7 +44,7 @@ static void flush_old_exec(void)
         cap_set_full(p->cap_permitted);
     }
 
-    if (p->euid == 0)
+    if (p->euid == 0 || p->fsuid == 0)
         cap_set_full(p->cap_effective);
 }
 

@@ -1,2 +1,3 @@
 chmod 04755 /bin/passwd
+chmod 04755 /bin/su
 /bin/getty

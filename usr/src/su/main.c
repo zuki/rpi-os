@@ -52,10 +52,10 @@ main(int argc, char *argv[])
 
 ok:
     endpwent();
-    printf("su before: uid: %d, gid: %d\n", getuid(), getgid());
+    //printf("su before: uid: %d, gid: %d\n", getuid(), getgid());
     setgid(pwd->pw_gid);
     setuid(pwd->pw_uid);
-    printf("su after : uid: %d, gid: %d\n", getuid(), getgid());
+    //printf("su after : uid: %d, gid: %d\n", getuid(), getgid());
     if (pwd->pw_shell && *pwd->pw_shell)
         shell = pwd->pw_shell;
     for (p = environ; *p; p++) {

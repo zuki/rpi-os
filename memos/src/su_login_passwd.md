@@ -23,6 +23,25 @@ root
 #
 ```
 
+### 問題1 解決
+
+- suコマンドをsuidし、execve()でproc->effectiveを変更
+
+```
+mini login: zuki
+Password:
+$ su root
+Password:
+su before: uid: 1000, gid: 1000
+su after : uid: 0, gid: 0
+# whoami
+root
+# su zuki
+su before: uid: 0, gid: 0
+su after : uid: 1000, gid: 1000
+$
+```
+
 ## passwd
 
 - Robert Nordier氏の[v7/x86](https://www.nordier.com/)経由で

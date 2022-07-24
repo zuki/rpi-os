@@ -340,6 +340,10 @@ sys_setuid()
     old_ruid = new_ruid = p->uid;
     new_suid = old_suid = p->suid;
 
+    debug("uid: %d, old: euid=%d ruid=%d suid=%d, new: ruid=%d suid=%d",
+        uid, old_euid, old_ruid, old_suid, new_ruid, new_suid);
+    debug("p[%d] cap_effective=%d", p->pid, p->cap_effective);
+
     if (capable(CAP_SETUID)) {
         if (uid != old_ruid) {
             p->uid = uid;
