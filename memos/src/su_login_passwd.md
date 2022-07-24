@@ -122,7 +122,7 @@ root::0:0:root:/:/usr/bin/dash
 zuki:0yRewojthvtQ2:1000:1000:,,,:/home/zuki:/usr/bin/dash
 ```
 
-### 課題2: zukiユーザでpasswd変更ができない
+### 問題2: zukiユーザでpasswd変更ができない
 
 ```
 $ passwd zuki
@@ -142,7 +142,7 @@ Retype new password:
 Cannot recreat passwd file.
 ```
 
-### 課題2 解決
+### 問題2 解決
 
 1. exec.cでSet-uid Set-gidの処理を追加
 2. fs.c$permission()を修正

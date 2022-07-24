@@ -44,6 +44,7 @@ Raspberry Pi 3A+, 3B+, 4Bでテストしています。
 - [x] システムコールの追加（23 -> 83)
 - [x] Dashのサポート
 - [x] Coreutilsのサポート
+- [x] login, passwd, suコマンドのサポート
 
 ## 前提条件
 
