@@ -1,4 +1,5 @@
 #include "types.h"
+#include "linux/auxvec.h"
 #include "linux/elf.h"
 #include "linux/capability.h"
 #include "trap.h"
