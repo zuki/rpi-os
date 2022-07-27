@@ -198,6 +198,10 @@ main(int argc, char *argv[])
     // /etc/passwd, group, inittab
     copy_file(0, nelms(etc_files), etc_files, etcino, 0, 0, S_IFREG|0644);
 
+    // /lib  (musl)
+    copy_file(0, nelms(lib_files), lib_files, libino, 0, 0, S_IFREG|0755);
+
+
     // fix size of root inode dir
     rinode(rootino, &din);
     off = xint(din.size);

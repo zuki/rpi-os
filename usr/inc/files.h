@@ -121,6 +121,11 @@ char *etc_files[] = {
     NULL
 };
 
+char *lib_files[] = {
+    "usr/lib/libc.so",
+    NULL
+};
+
 char *text_files[] = {
     "usr/test.txt",
     NULL

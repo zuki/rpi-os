@@ -19,6 +19,7 @@
   - [パイプ処理でストール](dash_pipe.md)
 - [タイマー機能を追加](timer.md)
 - [su, login, passwdコマンドを追加](su_login_passwd.md)
+- [ダイナミックリンク機能を追加](dynamic.md)
 
 # 翻訳
 
