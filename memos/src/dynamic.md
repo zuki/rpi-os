@@ -185,3 +185,26 @@ $ hello-dyn
 [0]vm_stat: va: 0xfffffffff000, pa: 0xffff00003ac77000, pte: 0x3ac77747, PTE_ADDR(pte): 0x3ac77000, P2V(...): 0xffff00003ac77000
 [0]vm_stat: va: [0xffffffff6000 ~ 0x1000000000000)
 ```
+
+## 変更履歴
+
+```
+$ git status
+On branch mac
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   Makefile
+	new file:   dyn/Makefile
+	new file:   dyn/src/hello-dyn/main.c
+	new file:   inc/exec.h
+	new file:   inc/linux/elf-em.h
+	modified:   inc/linux/elf.h
+	modified:   kern/exec.c
+	modified:   memos/src/SUMMARY.md
+	new file:   memos/src/dynamic.md
+	modified:   mksd.mk
+	modified:   usr/etc/inittab
+	modified:   usr/inc/files.h
+	new file:   usr/lib/libc.so
+	modified:   usr/src/mkfs/main.c
+```
