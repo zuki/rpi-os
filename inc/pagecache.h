@@ -5,7 +5,7 @@
 #include "sleeplock.h"
 #include "types.h"
 
-#define NPAGECACHE 1024
+#define NPAGECACHE 10240
 
 struct cached_page {
     char *page;
@@ -19,4 +19,5 @@ struct cached_page {
 void pagecache_init(void);
 void update_page(off_t, uint32_t, uint32_t, char *, size_t);
 long copy_page(struct inode *, off_t, char *, size_t, off_t);
+long copy_pages(struct inode *, char *, size_t, off_t);
 #endif

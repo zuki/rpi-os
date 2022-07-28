@@ -47,6 +47,7 @@ Raspberry Pi 3A+, 3B+, 4Bでテストしています。
 - [x] login, passwd, suコマンドのサポート
 - [x] Dynamic Link機能を実装
 - [x] Binutilsをdynamic linkでビルドして導入
+- [x] ファイル読み込みにpagecacheを使う
 
 ## 前提条件
 

@@ -43,7 +43,7 @@ static struct cached_page *find_page(uint32_t inum, off_t offset, uint32_t dev)
         if (pagecache.pages[i].inum == inum &&
             pagecache.pages[i].offset == offset &&
             pagecache.pages[i].dev == dev) {
-            debug("- found page %d", i);
+            debug("found page [%d]", i);
             return &pagecache.pages[i];
         }
     }
@@ -77,13 +77,13 @@ static struct cached_page *get_page(struct inode *ip, off_t offset)
     cached_page->dev = ip->dev;
     cached_page->inum = ip->inum;
     cached_page->offset = offset;
-    debug("alloc new cached page [%d]", pagecache.total_count - 1);
+    debug("alloc new cached page[%d]: ip=%d, offset=0x%llx", pagecache.total_count - 1, cached_page->inum, cached_page->offset);
     return cached_page;
 }
 
 long copy_page(struct inode *ip, off_t offset, char *dest, size_t size, off_t dest_offset)
 {
-    trace("copy_page: inum=%d, offset=%d, dest=0x%p, size=0x%x, dest_offset=%ld",
+    trace("inum=%d, offset=0x%llx, dest=0x%p, size=0x%x, dest_offset=0x%llx",
             ip->inum, offset, dest, size, dest_offset);
     struct cached_page *page = get_page(ip, offset);
     if (page == (struct cached_page *)-1) {
@@ -92,10 +92,33 @@ long copy_page(struct inode *ip, off_t offset, char *dest, size_t size, off_t de
     }
     if (!holdingsleep(&page->lock))
         panic("copy_page: not locked\n");
-    debug("copy_page: memove from 0x%p to 0x%p with 0x%x bytes",
+    trace("memove from 0x%p to 0x%p with 0x%x bytes",
         page->page + dest_offset, dest, size);
     memmove(dest, page->page + dest_offset, size);
     releasesleep(&page->lock);
+    return 0;
+}
+
+long
+copy_pages(struct inode *ip, char *dest, size_t size, off_t offset)
+{
+    char *addr = dest;
+    off_t ioff = offset < PGSIZE ? 0 : offset & ~(PGSIZE - 1);
+    off_t doff = offset & (uint64_t)(PGSIZE - 1);
+    uint64_t sz = (doff + size) > PGSIZE ? PGSIZE - doff : size;
+    int pages = (size + doff + PGSIZE - 1) / PGSIZE;
+    debug("pages: %d", pages);
+
+    long error;
+    for (int i = 0; i < pages; i++) {
+        if ((error = copy_page(ip, ioff, addr, sz, doff)) < 0)
+            return error;
+        ioff += PGSIZE;
+        addr += sz;
+        size -= sz;
+        sz = size > PGSIZE ? PGSIZE : size;
+        doff = 0;
+    }
     return 0;
 }
 

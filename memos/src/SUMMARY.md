@@ -21,6 +21,7 @@
 - [su, login, passwdコマンドを追加](su_login_passwd.md)
 - [ダイナミックリンク機能を追加](dynamic.md)
 - [binutilsをdynamic linkで導入](bintuils.md)
+- [ファイル読み込みにpagecacheを使う](pagecache.md)
 
 # 翻訳
 

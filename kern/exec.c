@@ -17,6 +17,7 @@
 #include "memlayout.h"
 #include "mmap.h"
 #include "kmalloc.h"
+#include "pagecache.h"
 #include "syscall1.h"
 
 // elf_bssからページ境界までゼロクリアする
@@ -155,18 +156,19 @@ load_interpreter(char *path, uint64_t *base)
     void *mapped;                           // elf_mmapしたアドレス
     size_t size;
     int i, set = 0;
-    uint64_t error = -ENOEXEC;
+    long error = -ENOEXEC;
 
     f = get_file(path);
     if (IS_ERR(f))
         return (uint64_t)f;
-
-    if (readi(f->ip, (char *)&elf, 0, sizeof(elf)) != sizeof(elf)) {
+    //if (readi(f->ip, (char *)&elf, 0, sizeof(elf)) != sizeof(elf)) {
+    if ((error = copy_page(f->ip, 0, (char *)&elf, sizeof(elf), 0)) < 0) {
         warn("readelf bad");
         goto out;
     }
 
     /* 簡単な正当性チェック */
+    error = -ENOEXEC;
     if (elf.e_type != ET_DYN && elf.e_type != ET_EXEC)
         goto out;
     if (!ELF_CHECK_ARCH(&elf))
@@ -183,7 +185,8 @@ load_interpreter(char *path, uint64_t *base)
     if (!phdata)
         goto out;
 
-    if (readi(f->ip, (char *)phdata, elf.e_phoff, size) != size)
+    //if (readi(f->ip, (char *)phdata, elf.e_phoff, size) != size)
+    if ((error = copy_page(f->ip, 0, (char *)phdata, size, elf.e_phoff)) < 0)
         goto free_phdata;
 
     phdr = phdata;
@@ -249,16 +252,21 @@ free_phdata:
         kmfree((char *)phdata);
 out:
     fileclose(f);
-    return error;
+    return (uint64_t)error;
 }
 
 int
 execve(const char *path, char *const argv[], char *const envp[])
 {
-    if (thisproc()->pid ==11) debug("[%d] parse %s", thisproc()->pid, path);
+    trace("[%d] parse %s", thisproc()->pid, path);
     char *s, *interp;
     int has_interp = 0;
     uint64_t interp_entry, interp_base;
+    long error = -EACCES;
+    Elf64_Ehdr elf;                         // ELFヘッダ
+    Elf64_Phdr *phdr;                       // プログラムヘッダ作業用
+    Elf64_Phdr *phdata;                     // 全プログラムヘッダ読み込み用
+
     if (thisproc()->pid == 11) {
         debug("argv[0]: %s, envp[0]: %s, envp[1]: %s", argv[0], envp[0], envp[1]);
     }
@@ -272,7 +280,7 @@ execve(const char *path, char *const argv[], char *const envp[])
     struct inode *ip = 0;
 
     if (pgdir == 0) {
-        debug("vm init failed");
+        warn("vm init failed");
         goto bad;
     }
 
@@ -280,27 +288,29 @@ execve(const char *path, char *const argv[], char *const envp[])
     ip = namei(path);
     if (ip == 0) {
         end_op();
-        debug("namei bad");
+        warn("namei bad");
         goto bad;
     }
     ilock(ip);
 
     trace("path='%s', proc: uid=%d, gid=%d, ip: inum=%d, mode=0x%x, uid=%d, gid=%d", s, curproc->uid, curproc->gid, ip->inum, ip->mode, ip->uid, ip->gid);
 
-    Elf64_Ehdr elf;
-    if (readi(ip, (char *)&elf, 0, sizeof(elf)) != sizeof(elf)) {
-        debug("readelf bad");
+    //if (readi(ip, (char *)&elf, 0, sizeof(elf)) != sizeof(elf)) {
+    if ((error = copy_page(ip, 0, (char *)&elf, sizeof(elf), 0)) < 0) {
+        warn("readelf bad");
         goto bad;
     }
+
+    error = -EACCES;
     if (!
         (elf.e_ident[EI_MAG0] == ELFMAG0 && elf.e_ident[EI_MAG1] == ELFMAG1
          && elf.e_ident[EI_MAG2] == ELFMAG2
          && elf.e_ident[EI_MAG3] == ELFMAG3)) {
-        debug("elf header magic invalid");
+        warn("elf header magic invalid");
         goto bad;
     }
     if (elf.e_ident[EI_CLASS] != ELFCLASS64) {
-        debug("64 bit program not supported");
+        warn("64 bit program not supported");
         goto bad;
     }
     // ELF 64-bit LSB pie executableのe_typeはET_DYN
@@ -310,9 +320,15 @@ execve(const char *path, char *const argv[], char *const envp[])
     }
     trace("check elf header finish");
 
-    int i;
-    uint64_t off;
-    Elf64_Phdr ph;
+    size_t size = elf.e_phentsize * elf.e_phnum;
+    if (size > ELF_MIN_ALIGN)
+        goto bad;
+    phdata = (Elf64_Phdr *)kmalloc(size);
+    if (!phdata)
+        goto bad;
+
+    if ((error = copy_page(ip, 0, (char *)phdata, size, elf.e_phoff)) < 0)
+        goto free_phdata;
 
     curproc->pgdir = pgdir;     // Required since readi(sdrw) involves context switch(switch page table).
 
@@ -331,70 +347,67 @@ execve(const char *path, char *const argv[], char *const envp[])
     // Load program into memory.
     size_t sz = 0, base = 0, stksz = 0;
     int first = 1;
-    for (i = 0, off = elf.e_phoff; i < elf.e_phnum; i++, off += sizeof(ph)) {
-        if (readi(ip, (char *)&ph, off, sizeof(ph)) != sizeof(ph)) {
-            debug("readi bad");
-            goto bad;
-        }
+    error = -EACCES;
+
+    phdr = phdata;
+    for (int i = 0; i < elf.e_phnum; i++, phdr++) {
         // interpreterの文字列取得
-        if (ph.p_type == PT_INTERP) {
-            if (ph.p_filesz > PGSIZE)       // インタプリタ名が長すぎる
+        if (phdr->p_type == PT_INTERP) {
+            if (phdr->p_filesz > PGSIZE)       // インタプリタ名が長すぎる
                 goto bad;
-            interp = (char *)kmalloc(ph.p_filesz);
+            interp = (char *)kmalloc(phdr->p_filesz);
             if (!interp)
                 goto bad;
-            if (readi(ip, interp, (uint32_t)ph.p_offset, (uint32_t)ph.p_filesz) != ph.p_filesz)
+            if ((error = copy_page(ip, 0, interp, (uint32_t)phdr->p_filesz, (uint32_t)phdr->p_offset)) < 0)
                 goto free_interp;
             has_interp = 1;
             continue;
         }
-        if (ph.p_type != PT_LOAD) {
-            // debug("unsupported type 0x%x, skipped\n", ph.p_type);
+        if (phdr->p_type != PT_LOAD) {
+            debug("unsupported type 0x%x, skipped\n", phdr->p_type);
             continue;
         }
-
-        if (ph.p_memsz < ph.p_filesz) {
-            debug("memsz smaller than filesz");
+        error = -EACCES;
+        if (phdr->p_memsz < phdr->p_filesz) {
+            warn("memsz smaller than filesz");
             goto bad;
         }
 
-        if (ph.p_vaddr + ph.p_memsz < ph.p_vaddr) {
-            debug("vaddr + memsz overflow");
+        if (phdr->p_vaddr + phdr->p_memsz < phdr->p_vaddr) {
+            warn("vaddr + memsz overflow");
             goto bad;
         }
 
         if (first) {
             first = 0;
-            sz = base = ph.p_vaddr;
+            sz = base = phdr->p_vaddr;
             if (base % PGSIZE != 0) {
-                debug("first section should be page aligned!");
+                warn("first section should be page aligned!");
                 goto bad;
             }
         }
 
-        if ((sz =
-             uvm_alloc(pgdir, base, stksz, sz,
-                       ph.p_vaddr + ph.p_memsz)) == 0) {
-            debug("uvm_alloc bad");
+        if ((sz = uvm_alloc(pgdir, base, stksz, sz, phdr->p_vaddr + phdr->p_memsz)) == 0) {
+            warn("uvm_alloc bad");
             goto bad;
         }
 
         uvm_switch(pgdir);
-
-        if (readi(ip, (char *)ph.p_vaddr, ph.p_offset, ph.p_filesz) !=
-            ph.p_filesz) {
-            debug("read section bad");
+        debug("vaddr: 0x%llx, filesz: 0x%llx, offset: 0x%llx", phdr->p_vaddr, phdr->p_filesz, phdr->p_offset);
+        if ((error = (copy_pages(ip, (char *)phdr->p_vaddr, phdr->p_filesz, phdr->p_offset))) < 0) {
+            warn("copy_pages failed");
             goto bad;
         }
+
         // Initialize BSS.
-        memset((void *)ph.p_vaddr + ph.p_filesz, 0,
-               ph.p_memsz - ph.p_filesz);
+        memset((void *)phdr->p_vaddr + phdr->p_filesz, 0,
+               phdr->p_memsz - phdr->p_filesz);
 
         // Flush dcache to memory so that icache can retrieve the correct one.
-        dccivac((void *)ph.p_vaddr, ph.p_memsz);
+        dccivac((void *)phdr->p_vaddr, phdr->p_memsz);
 
-        debug("init bss [0x%p, 0x%p)", ph.p_vaddr + ph.p_filesz,
-              ph.p_vaddr + ph.p_memsz);
+        debug("init bss [0x%p, 0x%p)", phdr->p_vaddr + phdr->p_filesz,
+              phdr->p_vaddr + phdr->p_memsz);
     }
 
     iunlockput(ip);
@@ -427,7 +440,7 @@ execve(const char *path, char *const argv[], char *const envp[])
         for (; in_user((void *)(argv + argc), sizeof(*argv)) && argv[argc];
              argc++) {
             if ((len = fetchstr((uint64_t) argv[argc], &s)) < 0) {
-                debug("argv fetchstr bad");
+                warn("argv fetchstr bad");
                 goto free_interp;
             }
             trace("argv[%d] = '%s', len: %d", argc, argv[argc], len);
@@ -440,7 +453,7 @@ execve(const char *path, char *const argv[], char *const envp[])
         for (; in_user((void *)(envp + envc), sizeof(*envp)) && envp[envc];
              envc++) {
             if ((len = fetchstr((uint64_t) envp[envc], &s)) < 0) {
-                debug("envp fetchstr bad");
+                warn("envp fetchstr bad");
                 goto free_interp;
             }
             trace("envp[%d] = '%s', len: %d", envc, envp[envc], len);
@@ -584,6 +597,9 @@ execve(const char *path, char *const argv[], char *const envp[])
 free_interp:
     if (has_interp && interp)
         kmfree((void *)interp);
+free_phdata:
+    if (phdata)
+        kmfree((void *)phdata);
 bad:
     if (pgdir)
         vm_free(pgdir);
@@ -593,7 +609,7 @@ bad:
     }
     thisproc()->pgdir = oldpgdir;
     warn("bad");
-    return -EACCES;
+    return error;
 }
 
 /* 1. 引数文字列をプッシュ
