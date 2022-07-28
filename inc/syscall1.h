@@ -27,6 +27,7 @@ long sys_clock_settime();
 long sys_ppoll();
 long sys_getitimer();
 long sys_setitimer();
+long sys_madvise();
 long syscall1(struct trapframe *);
 
 // kern/sysproc.c

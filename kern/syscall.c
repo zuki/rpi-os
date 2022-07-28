@@ -331,6 +331,22 @@ sys_getrandom()
     return getrandom(buf, buflen);
 }
 
+long
+sys_madvise()
+{
+    uint64_t addr;
+    size_t   length;
+    int      advice;
+
+    if (argu64(0, &addr) < 0 || argu64(1, (uint64_t *)&length) < 0
+     || argint(2, &advice) < 0)
+        return -EINVAL;
+
+    trace("addr: 0x%llx, length: 0x%llx, advice: %d", addr, length, advise);
+    // 何もしない
+    return 0;
+}
+
 static func syscalls[] = {
     [SYS_getcwd] = (func)sys_getcwd,            // 17
     [SYS_dup] = sys_dup,                        // 23
@@ -417,7 +433,7 @@ static func syscalls[] = {
     [SYS_fadvise64] = sys_fadvise64,            // 223
 //    [SYS_mprotect] = sys_mprotect,              // 226
     [SYS_msync] = sys_msync,                    // 227
-//    [SYS_madvise] = sys_madvise,                // 233
+    [SYS_madvise] = sys_madvise,                // 233
     [SYS_wait4] = sys_wait4,                    // 260
     [SYS_prlimit64] = sys_prlimit64,            // 261
     [SYS_renameat2] = sys_renameat2,            // 276

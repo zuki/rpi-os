@@ -111,6 +111,22 @@ char *usrbins[] = {
     "usr/bin/paste",
     "usr/bin/nohup",
     "usr/bin/dash",
+    "usr/bin/addr2line",
+    "usr/bin/as",
+    "usr/bin/elfedit",
+    "usr/bin/ld",
+    "usr/bin/nm",
+    "usr/bin/objdump",
+    "usr/bin/readelf",
+    "usr/bin/strings",
+    "usr/bin/ar",
+    "usr/bin/c++filt",
+    "usr/bin/gprof",
+    "usr/bin/ld.bfd",
+    "usr/bin/objcopy",
+    "usr/bin/ranlib",
+    "usr/bin/size",
+    "usr/bin/strip",
     NULL
 };
 

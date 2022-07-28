@@ -20,6 +20,7 @@
 - [タイマー機能を追加](timer.md)
 - [su, login, passwdコマンドを追加](su_login_passwd.md)
 - [ダイナミックリンク機能を追加](dynamic.md)
+- [binutilsをdynamic linkで導入](bintuils.md)
 
 # 翻訳
 
