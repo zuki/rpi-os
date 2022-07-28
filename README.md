@@ -45,6 +45,8 @@ Raspberry Pi 3A+, 3B+, 4Bでテストしています。
 - [x] Dashのサポート
 - [x] Coreutilsのサポート
 - [x] login, passwd, suコマンドのサポート
+- [x] Dynamic Link機能を実装
+- [x] Binutilsをdynamic linkでビルドして導入
 
 ## 前提条件
 
