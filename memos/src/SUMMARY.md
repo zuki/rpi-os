@@ -22,6 +22,7 @@
 - [ダイナミックリンク機能を追加](dynamic.md)
 - [binutilsをdynamic linkで導入](bintuils.md)
 - [ファイル読み込みにpagecacheを使う](pagecache.md)
+- [BSIZEを4096に変更](4Kblock.md)
 
 # 翻訳
 

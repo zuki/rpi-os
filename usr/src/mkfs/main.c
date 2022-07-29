@@ -29,12 +29,12 @@ extern int clock_gettime (clockid_t, struct timespec *);
 
 // Disk layout:
 // [ boot block | sb block | log | inode blocks | free bit map | data blocks ]
-// [          1 |        1 |  90 |          257 |          196 |      799455 ]
-int nbitmap = FSSIZE / (BSIZE * 8) + 1; // 196 = 800000 / (512 * 8) + 1
-int ninodeblocks = NINODE / IPB + 1;    // 257 = 1024 / 4 + 1
-int nlog = LOGSIZE;                     // 90
-int nmeta;                      // 545 = メタブロック数 (boot, sb, nlog, inode, bitmap)
-int nblocks;                    // 799455 = データブロック数
+// [          1 |        1 | 126 |           33 |            4 |      799455 ]
+int nbitmap = FSSIZE / (BSIZE * 8) + 1; // 4 = 100000 / (4096 * 8) + 1
+int ninodeblocks = NINODE / IPB + 1;    // 33 = 1024 / 32 + 1
+int nlog = LOGSIZE;                     // 126
+int nmeta;                      // 165 = メタブロック数 (boot, sb, nlog, inode, bitmap)
+int nblocks;                    // 99835 = データブロック数
 
 int fsfd;
 struct superblock sb;

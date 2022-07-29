@@ -82,9 +82,9 @@ dev_start()
         struct buf *b =
             container_of(list_front(&devque), struct buf, dlink);
         assert(b->blockno < nblocks);
-        uint32_t bno = b->blockno + first_bno;
-
-        emmc_seek(&card, bno * BSIZE);
+        uint32_t bno = b->blockno * 8 + first_bno;
+        debug("b->block: 0x%x, first: 0x%x, bno: 0x%x, seek: 0x%llx", b->blockno, first_bno, bno, bno * BSIZE / 8);
+        emmc_seek(&card, bno * SD_BLOCK_SIZE);
         if (b->flags & B_DIRTY) {
             assert(emmc_write(&card, b->data, BSIZE) == BSIZE);
         } else {

@@ -46,8 +46,8 @@ struct dinode {
 
 #define MAXOPBLOCKS     42
 #define NINODE          1024
-#define FSSIZE          800000
-#define BSIZE           512
+#define FSSIZE          100000
+#define BSIZE           4096
 #define LOGSIZE         (MAXOPBLOCKS*3)
 #define IPB             (BSIZE / sizeof(struct dinode))
 
@@ -65,7 +65,7 @@ struct superblock sb;
 void get_superblock(FILE *f) {
     int n;
 
-    fseek(f, FS_ADDR + SECTOR_SIZE * 1, SEEK_SET);
+    fseek(f, FS_ADDR + BSIZE * 1, SEEK_SET);
     n = fread(&sb, sizeof(struct superblock), 1, f);
     if (n != 1) {
         perror("super block read");
@@ -111,7 +111,7 @@ void dump(FILE *f, char type, int arg1, int arg2) {
 
     switch(type) {
     case 's':
-        seek = FS_ADDR + SECTOR_SIZE;
+        seek = FS_ADDR + BSIZE;
         printf("SUPER BLOCK:\n");
         printf(" size     : %d (0x%08x)\n", sb.size, sb.size);
         printf(" nblocks  : %d (0x%08x)\n", sb.nblocks, sb.nblocks);
@@ -121,10 +121,10 @@ void dump(FILE *f, char type, int arg1, int arg2) {
         printf(" bmapstart: %d (0x%08x)\n", sb.bmapstart, sb.bmapstart);
         break;
     case 'l':
-        seek = FS_ADDR + SECTOR_SIZE * 2;
+        seek = FS_ADDR + BSIZE * 2;
         fseek(f, seek, SEEK_SET);
-        n = fread(buf, sizeof(char), SECTOR_SIZE, f);
-        if (n != SECTOR_SIZE) {
+        n = fread(buf, sizeof(char), BSIZE, f);
+        if (n != BSIZE) {
             perror("log read");
             exit(1);
         }
@@ -132,7 +132,7 @@ void dump(FILE *f, char type, int arg1, int arg2) {
         dump_hex(seek, buf, 128);
         break;
     case 'i':
-        seek = FS_ADDR + SECTOR_SIZE * sb.inodestart;
+        seek = FS_ADDR + BSIZE * sb.inodestart;
         for (i = arg1; i <= arg2; i++) {
             iseek = seek + sizeof(struct dinode) * i;
             fseek(f, iseek, SEEK_SET);
@@ -160,10 +160,10 @@ void dump(FILE *f, char type, int arg1, int arg2) {
         }
         break;
     case 'b':
-        seek = FS_ADDR + SECTOR_SIZE * sb.bmapstart;
+        seek = FS_ADDR + BSIZE * sb.bmapstart;
         fseek(f, seek, SEEK_SET);
-        n = fread(buf, sizeof(char), SECTOR_SIZE, f);
-        if (n != SECTOR_SIZE) {
+        n = fread(buf, sizeof(char), BSIZE, f);
+        if (n != BSIZE) {
             perror("bitmap read");
             exit(1);
         }
@@ -172,15 +172,15 @@ void dump(FILE *f, char type, int arg1, int arg2) {
         break;
     case 'd':
         for (i = 0; i < arg2; i++) {
-            seek = FS_ADDR + SECTOR_SIZE * (arg1 + i);
+            seek = FS_ADDR + BSIZE * (arg1 + i);
             fseek(f, seek, SEEK_SET);
-            n = fread(buf, sizeof(char), SECTOR_SIZE, f);
-            if (n != SECTOR_SIZE) {
+            n = fread(buf, sizeof(char), BSIZE, f);
+            if (n != BSIZE) {
                 perror("data read");
                 exit(1);
             }
             printf("SECTOR: %d\n", arg1 + i);
-            dump_hex(seek, buf, SECTOR_SIZE);
+            dump_hex(seek, buf, BSIZE);
         }
         break;
     default:
@@ -233,11 +233,11 @@ int main(int argc, char *argv[]) {
 
     if (type == 'o') {
         printf("Boot      : 0x%08x (%d)\n", FS_ADDR, 1);
-        printf("SuperBlock: 0x%08x (%d)\n", FS_ADDR + SECTOR_SIZE, 1);
-        printf("Log       : 0x%08x (%d)\n", FS_ADDR + SECTOR_SIZE * 2, sb.nlog);
-        printf("INode     : 0x%08x (%d)\n", FS_ADDR + SECTOR_SIZE * sb.inodestart, sb.ninodes);
-        printf("Bitmap    : 0x%08x (%d)\n", FS_ADDR + SECTOR_SIZE * sb.bmapstart, nbitmap);
-        printf("Data      : 0x%08x\n\n", FS_ADDR + SECTOR_SIZE * (sb.bmapstart + nbitmap));
+        printf("SuperBlock: 0x%08x (%d)\n", FS_ADDR + BSIZE, 1);
+        printf("Log       : 0x%08x (%d)\n", FS_ADDR + BSIZE * 2, sb.nlog);
+        printf("INode     : 0x%08x (%d)\n", FS_ADDR + BSIZE * sb.inodestart, sb.ninodes);
+        printf("Bitmap    : 0x%08x (%d)\n", FS_ADDR + BSIZE * sb.bmapstart, nbitmap);
+        printf("Data      : 0x%08x\n\n", FS_ADDR + BSIZE * (sb.bmapstart + nbitmap));
     } else {
          dump(sdimg, type, arg1, arg2);
     }

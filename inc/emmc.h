@@ -3,6 +3,8 @@
 
 #include "sdhost.h"
 
+#define SD_BLOCK_SIZE        512
+
 struct tscr // SD configuration register
 {
 	uint32_t	scr[2];

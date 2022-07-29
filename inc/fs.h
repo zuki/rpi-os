@@ -22,14 +22,15 @@
 #define MAXBSIZE        4096                // maximum BSIZE
 
 // mkfs only
-#define FSSIZE          800000              // Size of file system in blocks
+#define FSSIZE          100000              // Size of file system in blocks
+                                            // fs.img のサイズ (BSIZE * FSSIZE = 409,600,000)
 
 // Belows are used by both
 #define LOGSIZE         (MAXOPBLOCKS*3)     // Max data blocks in on-disk log
 #define ROOTDEV         1                   // Device number of file system root disk
 #define ROOTINO         1                   // Root i-number
 
-#define BSIZE           512                 // Block size
+#define BSIZE           4096                // Block size
 
 /* Disk layout:
  * [ boot block | super block | log | inode blocks | free bit map | data blocks ]
@@ -58,8 +59,8 @@ struct superblock {
 #define MAY_READ    4
 
 #define NDIRECT 11
-#define NINDIRECT (BSIZE / sizeof(uint32_t))    // 128
-#define MAXFILE (NDIRECT + NINDIRECT + NINDIRECT * NINDIRECT)   // (11 + 128 + 128 * 128) * 512 = 8261 KB
+#define NINDIRECT (BSIZE / sizeof(uint32_t))    // 1024
+#define MAXFILE (NDIRECT + NINDIRECT + NINDIRECT * NINDIRECT)   // (11 + 1024 + 1024 * 1024) * 4096 = 4100 MB
 
 /* On-disk inode structure. */
 struct dinode {
@@ -79,13 +80,13 @@ struct dinode {
 };
 
 /* Inodes per block. */
-#define IPB           (BSIZE / sizeof(struct dinode))   // 4
+#define IPB           (BSIZE / sizeof(struct dinode))   // 32 = 4096 / 128
 
 /* Block containing inode i. */
 #define IBLOCK(i, sb)     ((i) / IPB + sb.inodestart)
 
 /* Bitmap bits per block. */
-#define BPB           (BSIZE*8)                         // 4096
+#define BPB           (BSIZE*8)                         // 32,768
 
 /* Block of free map containing bit for block b. */
 #define BBLOCK(b, sb) (b/BPB + sb.bmapstart)

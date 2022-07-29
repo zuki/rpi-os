@@ -449,8 +449,6 @@ const uint32_t sd_acommands[] = {
 
 #endif
 
-#define SD_BLOCK_SIZE        512
-
 
 static int emmc_ensure_data_mode(struct emmc *self);
 static int emmc_do_data_command(struct emmc *self, int is_write,
@@ -531,7 +529,7 @@ emmc_read(struct emmc *self, void *buf, size_t cnt)
         return -1;
     }
     uint32_t nblock = self->ull_offset / SD_BLOCK_SIZE;
-
+    debug("nblock: 0x%x, ull_offset: 0x%llx", nblock, self->ull_offset);
     if (emmc_do_read(self, (uint8_t *) buf, cnt, nblock) != cnt) {
         return -1;
     }
