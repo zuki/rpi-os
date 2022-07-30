@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 
-char *argv[] = { "dash", "/etc/inittab", 0 };
+char *argv[] = { "sh", "/etc/inittab", 0 };
 //char *envp[] = { "TEST_ENV=FROM_INIT", "TZ=JST-9", 0 };
 char *envp[] = { "TZ=JST-9", 0 };
 
@@ -35,7 +35,7 @@ main()
         if (pid == 0) {
             //execve("/bin/sh", argv, envp);
             if (init)
-                execve("/usr/bin/dash", argv, envp);
+                execve("/usr/bin/sh", argv, envp);
             else
                 execve("/bin/getty", 0, 0);
             printf("init: exec sh failed\n");

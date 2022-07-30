@@ -23,6 +23,7 @@
 - [binutilsをdynamic linkで導入](bintuils.md)
 - [ファイル読み込みにpagecacheを使う](pagecache.md)
 - [BSIZEを4096に変更](4Kblock.md)
+- [dashをdynamic linkでビルド](dash_dynamic.md)
 
 # 翻訳
 

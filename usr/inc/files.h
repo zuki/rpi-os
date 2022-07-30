@@ -127,6 +127,7 @@ char *usrbins[] = {
     "usr/bin/ranlib",
     "usr/bin/size",
     "usr/bin/strip",
+    "usr/bin/sh",
     NULL
 };
 
