@@ -24,6 +24,7 @@
 - [ファイル読み込みにpagecacheを使う](pagecache.md)
 - [BSIZEを4096に変更](4Kblock.md)
 - [dashをdynamic linkでビルド](dash_dynamic.md)
+- [各種コマンドの追加](new_commands.md)
 
 # 翻訳
 

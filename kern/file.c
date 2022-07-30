@@ -231,6 +231,23 @@ fileread(struct file *f, char *addr, ssize_t n)
     return -EINVAL;
 }
 
+long
+filepread64(struct file *f, void *buf, size_t count, off_t offset)
+{
+    long error;
+    off_t old_off;
+    ssize_t n;
+
+    if ((old_off = filelseek(f, 0, SEEK_CUR)) < 0)
+        return old_off;
+    if ((error = filelseek(f, offset, SEEK_SET)) < 0)
+        return error;
+    n = fileread(f, (char *)buf, count);
+    if ((error = filelseek(f, old_off, SEEK_SET)) < 0)
+        return error;
+    return n;
+}
+
 /* Write to file f. */
 ssize_t
 filewrite(struct file *f, char *addr, ssize_t n)

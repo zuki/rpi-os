@@ -947,3 +947,19 @@ sys_renameat()
     return filerename(oldpath, newpath);
 
 }
+
+long
+sys_pread64()
+{
+    void *buf;
+    size_t count;
+    off_t offset;
+    struct file *f;
+
+    if (argfd(0, 0, &f) < 0 || argu64(2, &count) < 0
+     || argptr(1, (char **)&buf, count) < 0 || argu64(3, (uint64_t *)&offset) < 0) {
+        return -EINVAL;
+    }
+
+    return filepread64(f, buf, count, offset);
+}

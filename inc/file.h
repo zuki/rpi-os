@@ -101,6 +101,7 @@ ssize_t         filereadlink(char *path, char *buf, size_t bufsize);
 long            filerename(char *path1, char *path2);
 long            filechmod(char *path, mode_t mode);
 long            filechown(struct file *f, char *path, uid_t owner, gid_t group);
+long            filepread64(struct file *f, void *buf, size_t count, off_t offset);
 
 long            fsync(struct file *f, int type);
 long            fdalloc(struct file *f, int from);

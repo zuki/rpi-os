@@ -143,6 +143,16 @@ char *lib_files[] = {
     NULL
 };
 
+char *local_bin_files[] = {
+    "usr/local/bin/file",
+    NULL
+};
+
+char *local_share_misc_files[] = {
+    "usr/local/share/misc/magic.mgc",
+    NULL
+};
+
 char *text_files[] = {
     "usr/test.txt",
     NULL

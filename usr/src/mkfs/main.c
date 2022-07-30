@@ -100,7 +100,8 @@ main(int argc, char *argv[])
 {
     int i;
     uint off;
-    uint rootino, devino, sdino, binino, etcino, libino, homeino, usrino, usrbinino, localino, localbinino;
+    uint rootino, devino, sdino, binino, etcino, libino, homeino, usrino, usrbinino;
+    uint localino, localbinino, locallibino, localincludeino, localshareino, localsharemiscino;
     struct dirent de;
     char buf[BSIZE];
     struct dinode din;
@@ -186,6 +187,14 @@ main(int argc, char *argv[])
     localino = make_dir(usrino, "local", 0, 0, S_IFDIR|0775);
     // create /usr/local/bin
     localbinino = make_dir(localino, "bin", 0, 0, S_IFDIR|0775);
+    // create /usr/local/lib
+    locallibino = make_dir(localino, "lib", 0, 0, S_IFDIR|0775);
+    // create /usr/local/include
+    localincludeino = make_dir(localino, "include", 0, 0, S_IFDIR|0775);
+    // create /usr/local/share
+    localshareino = make_dir(localino, "share", 0, 0, S_IFDIR|0775);
+    // create /usr/local/share/misc
+    localsharemiscino = make_dir(localshareino, "misc", 0, 0, S_IFDIR|0775);
 
     copy_file(2, argc, argv, binino, 0, 0, S_IFREG|0755);
 
@@ -200,6 +209,12 @@ main(int argc, char *argv[])
 
     // /lib  (musl)
     copy_file(0, nelms(lib_files), lib_files, libino, 0, 0, S_IFREG|0755);
+
+    // /usr/local/bin/file
+    copy_file(0, nelms(local_bin_files), local_bin_files, localbinino, 0, 0, S_IFREG|0755);
+
+    // /usr/local/share/misc/magic.mgc
+    copy_file(0, nelms(local_share_misc_files), local_share_misc_files, localsharemiscino, 0, 0, S_IFREG|0755);
 
 
     // fix size of root inode dir

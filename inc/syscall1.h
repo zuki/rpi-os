@@ -112,6 +112,7 @@ long sys_renameat2();
 void *sys_getcwd();
 long sys_fadvise64();
 long sys_utimensat();
+long sys_pread64();
 //int dirunlink(struct inode *, char *, uint32_t);
 //int direntlookup(struct inode *, int, struct dirent *);
 
