@@ -128,6 +128,7 @@ char *usrbins[] = {
     "usr/bin/size",
     "usr/bin/strip",
     "usr/bin/sh",
+    "usr/bin/gawk",
     NULL
 };
 
@@ -157,6 +158,21 @@ char *text_files[] = {
     "usr/test.txt",
     NULL
 };
+
+char *ch08_files[] = {
+    "home/zuki/ch08/grades.awk",
+    "home/zuki/ch08/grades.test",
+    "home/zuki/ch08/bitmap.awk",
+    "home/zuki/ch08/bitmap.test",
+    "home/zuki/ch08/acronyms",
+    "home/zuki/ch08/awkro",
+    "home/zuki/ch08/date-month",
+    "home/zuki/ch08/factorial",
+    "home/zuki/ch08/lookup",
+    "home/zuki/ch08/sample",
+    NULL
+};
+
 
 int nelms(char **ary) {
     int num = 0;

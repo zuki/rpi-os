@@ -170,6 +170,8 @@ sys_clone()
     if (argu64(0, &flag) < 0 || argu64(1, (uint64_t *) & childstk) < 0)
         return -1;
     trace("flags 0x%llx, child stack 0x%p", flag, childstk);
+    // FIXME: vforkの実装
+    // flags = 0x4011の例あり(CLONE_VFORK | SIGCHLD)
     if (flag != 17) {
         warn("flags other than SIGCHLD are not supported");
         return -1;

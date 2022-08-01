@@ -402,32 +402,54 @@ sys_fstatat()
     int dirfd, flags;
     char *path;
     struct stat *st;
+    struct inode *ip;
 
     if (argint(0, &dirfd) < 0 ||
         argstr(1, &path) < 0 ||
         argptr(2, (void *)&st, sizeof(*st)) < 0 || argint(3, &flags) < 0)
         return -EINVAL;
 
+    trace("dirfd: %d, path: %s, st: 0x%p, flags: %d", dirfd, path, st, flags);
+
     if (dirfd != AT_FDCWD) {
         warn("dirfd unimplemented");
         return -EINVAL;
     }
-    // TODO: AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOWは実装する
+    // TODO: AT_EMPTY_PATHは実装する
     /* 当面、無視する: AT_EMPTY_PATH の使用があった
     if (flags != 0) {
         warn("flags unimplemented: flags=%d", flags);
         return -EINVAL;
     }
     */
-
-    struct inode *ip;
+    begin_op();
+loop:
     if ((ip = namei(path)) == 0) {
-        return -ENOENT;
+        end_op();
+        return (void *)-ENOENT;
     }
     ilock(ip);
+
+    if ((flags & AT_SYMLINK_NOFOLLOW) == 0) {
+        if (ip->type == T_SYMLINK) {
+            char buf[512];
+            int n;
+            if ((n = readi(ip, buf, 0, sizeof(buf) - 1)) <= 0) {
+                warn("couldn't read sysmlink target");
+                iunlockput(ip);
+                end_op();
+                return -ENOENT;
+            }
+            buf[n] = 0;
+            path = buf;
+            iunlockput(ip);
+            goto loop;
+        }
+    }
+
     stati(ip, st);
     iunlockput(ip);
-
+    end_op();
     return 0;
 }
 

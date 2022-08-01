@@ -161,7 +161,7 @@ load_interpreter(char *path, uint64_t *base)
     f = get_file(path);
     if (IS_ERR(f))
         return (uint64_t)f;
-    //if (readi(f->ip, (char *)&elf, 0, sizeof(elf)) != sizeof(elf)) {
+
     if ((error = copy_page(f->ip, 0, (char *)&elf, sizeof(elf), 0)) < 0) {
         warn("readelf bad");
         goto out;
@@ -185,7 +185,6 @@ load_interpreter(char *path, uint64_t *base)
     if (!phdata)
         goto out;
 
-    //if (readi(f->ip, (char *)phdata, elf.e_phoff, size) != size)
     if ((error = copy_page(f->ip, 0, (char *)phdata, size, elf.e_phoff)) < 0)
         goto free_phdata;
 
@@ -266,6 +265,7 @@ execve(const char *path, char *const argv[], char *const envp[])
     Elf64_Ehdr elf;                         // ELFヘッダ
     Elf64_Phdr *phdr;                       // プログラムヘッダ作業用
     Elf64_Phdr *phdata;                     // 全プログラムヘッダ読み込み用
+    struct file *f;
 
     if (thisproc()->pid == 11) {
         debug("argv[0]: %s, envp[0]: %s, envp[1]: %s", argv[0], envp[0], envp[1]);
@@ -277,26 +277,19 @@ execve(const char *path, char *const argv[], char *const envp[])
     // Save previous page table.
     struct proc *curproc = thisproc();
     void *oldpgdir = curproc->pgdir, *pgdir = vm_init();
-    struct inode *ip = 0;
 
     if (pgdir == 0) {
         warn("vm init failed");
         goto bad;
     }
 
-    begin_op();
-    ip = namei(path);
-    if (ip == 0) {
-        end_op();
-        warn("namei bad");
-        goto bad;
-    }
-    ilock(ip);
+    f = get_file(path);
+    if (IS_ERR(f))
+        return (long)f;
 
-    trace("path='%s', proc: uid=%d, gid=%d, ip: inum=%d, mode=0x%x, uid=%d, gid=%d", s, curproc->uid, curproc->gid, ip->inum, ip->mode, ip->uid, ip->gid);
+    trace("path='%s', proc: uid=%d, gid=%d, ip: inum=%d, mode=0x%x, uid=%d, gid=%d", s, curproc->uid, curproc->gid, f->ip->inum, f->ip->mode, f->ip->uid, f->ip->gid);
 
-    //if (readi(ip, (char *)&elf, 0, sizeof(elf)) != sizeof(elf)) {
-    if ((error = copy_page(ip, 0, (char *)&elf, sizeof(elf), 0)) < 0) {
+    if ((error = copy_page(f->ip, 0, (char *)&elf, sizeof(elf), 0)) < 0) {
         warn("readelf bad");
         goto bad;
     }
@@ -327,18 +320,18 @@ execve(const char *path, char *const argv[], char *const envp[])
     if (!phdata)
         goto bad;
 
-    if ((error = copy_page(ip, 0, (char *)phdata, size, elf.e_phoff)) < 0)
+    if ((error = copy_page(f->ip, 0, (char *)phdata, size, elf.e_phoff)) < 0)
         goto free_phdata;
 
     curproc->pgdir = pgdir;     // Required since readi(sdrw) involves context switch(switch page table).
 
     // Set-uid, Set-gidの処理
-    if (ip->mode & S_ISUID && curproc->uid != 0)
-        curproc->fsuid = ip->uid;
+    if (f->ip->mode & S_ISUID && curproc->uid != 0)
+        curproc->fsuid = f->ip->uid;
     else
         curproc->fsuid = curproc->uid;
-    if (((ip->mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) && curproc->gid != 0)
-        curproc->fsgid = ip->gid;
+    if (((f->ip->mode & (S_ISGID | S_IXGRP)) == (S_ISGID | S_IXGRP)) && curproc->gid != 0)
+        curproc->fsgid = f->ip->gid;
     else
         curproc->fsgid = curproc->gid;
 
@@ -358,7 +351,7 @@ execve(const char *path, char *const argv[], char *const envp[])
             interp = (char *)kmalloc(phdr->p_filesz);
             if (!interp)
                 goto bad;
-            if ((error = copy_page(ip, 0, interp, (uint32_t)phdr->p_filesz, (uint32_t)phdr->p_offset)) < 0)
+            if ((error = copy_page(f->ip, 0, interp, (uint32_t)phdr->p_filesz, (uint32_t)phdr->p_offset)) < 0)
                 goto free_interp;
             has_interp = 1;
             continue;
@@ -394,7 +387,7 @@ execve(const char *path, char *const argv[], char *const envp[])
 
         uvm_switch(pgdir);
         debug("vaddr: 0x%llx, filesz: 0x%llx, offset: 0x%llx", phdr->p_vaddr, phdr->p_filesz, phdr->p_offset);
-        if ((error = (copy_pages(ip, (char *)phdr->p_vaddr, phdr->p_filesz, phdr->p_offset))) < 0) {
+        if ((error = (copy_pages(f->ip, (char *)phdr->p_vaddr, phdr->p_filesz, phdr->p_offset))) < 0) {
             warn("copy_pages failed");
             goto bad;
         }
@@ -410,9 +403,7 @@ execve(const char *path, char *const argv[], char *const envp[])
               phdr->p_vaddr + phdr->p_memsz);
     }
 
-    iunlockput(ip);
-    end_op();
-    ip = 0;
+    fileclose(f);
 
     if (has_interp) {
         debug("load interpreter");
@@ -603,10 +594,8 @@ free_phdata:
 bad:
     if (pgdir)
         vm_free(pgdir);
-    if (ip) {
-        iunlockput(ip);
-        end_op();
-    }
+    if (f)
+        fileclose(f);
     thisproc()->pgdir = oldpgdir;
     warn("bad");
     return error;

@@ -100,7 +100,7 @@ main(int argc, char *argv[])
 {
     int i;
     uint off;
-    uint rootino, devino, sdino, binino, etcino, libino, homeino, usrino, usrbinino;
+    uint rootino, devino, sdino, binino, etcino, libino, homeino, zukiino, ch08ino, usrino, usrbinino;
     uint localino, localbinino, locallibino, localincludeino, localshareino, localsharemiscino;
     struct dirent de;
     char buf[BSIZE];
@@ -177,7 +177,9 @@ main(int argc, char *argv[])
     // Create /home
     homeino = make_dir(rootino, "home", 0, 0, S_IFDIR|0775);
     // Create /home/zuki
-    make_dir(homeino, "zuki", 1000, 1000, S_IFDIR|0775);
+    zukiino = make_dir(homeino, "zuki", 1000, 1000, S_IFDIR|0775);
+    // Create /home/zuki/ch08
+    ch08ino = make_dir(zukiino, "ch08", 1000, 1000, S_IFDIR|0775);
 
     // create /usr
     usrino = make_dir(rootino, "usr", 0, 0, S_IFDIR|0775);
@@ -216,6 +218,8 @@ main(int argc, char *argv[])
     // /usr/local/share/misc/magic.mgc
     copy_file(0, nelms(local_share_misc_files), local_share_misc_files, localsharemiscino, 0, 0, S_IFREG|0755);
 
+    // /home/zuki/ch08/*
+    copy_file(0, nelms(ch08_files), ch08_files, ch08ino, 0, 0, S_IFREG|0755);
 
     // fix size of root inode dir
     rinode(rootino, &din);

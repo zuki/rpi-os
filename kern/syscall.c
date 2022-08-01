@@ -545,7 +545,7 @@ syscall1(struct trapframe *tf)
     int sysno = tf->x[8];
 
     if (sysno > 0 && sysno < ARRAY_SIZE(syscalls) && syscalls[sysno]) {
-        if (sysno != SYS_sched_yield && thisproc()->pid == 7)
+        if (sysno != SYS_sched_yield && thisproc()->pid == 11)
             debug("proc[%d] %s called", thisproc()->pid, syscall_names[sysno]);
         return syscalls[sysno]();
     } else {
