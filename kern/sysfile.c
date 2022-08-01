@@ -22,7 +22,7 @@
 #include "linux/ioctl.h"
 #include "linux/termios.h"
 
-extern int execve(const char *, char *const, char *const);
+extern long execve(const char *, char *const, char *const);
 
 struct iovec {
     void *iov_base;             /* Starting address. */

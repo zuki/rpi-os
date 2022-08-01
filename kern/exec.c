@@ -255,7 +255,7 @@ out:
     return (uint64_t)error;
 }
 
-int
+long
 execve(const char *path, char *const argv[], char *const envp[])
 {
     trace("[%d] parse %s", thisproc()->pid, path);
