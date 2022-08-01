@@ -71,7 +71,7 @@ Changes to be committed:
 	modified:   usr/src/mkfs/main.c
 ```
 
-## 2. gawk
+## 2. `gawk`
 
 ```
 $ wget https://ftp.jaist.ac.jp/pub/GNU/gawk/gawk-5.1.0.tar.xz
@@ -246,4 +246,61 @@ Changes to be committed:
 	modified:   usr/etc/inittab
 	modified:   usr/inc/files.h
 	modified:   usr/src/mkfs/main.c
+```
+
+## 3. `sed`
+
+### ビルド
+
+```
+$ wget https://ftp.jaist.ac.jp/pub/GNU/sed/sed-4.8.tar.xz
+$ tar Jxf https://ftp.jaist.ac.jp/pub/GNU/sed/sed-4.8.tar.xz
+$ cd sed-4.8
+$ CC=~/musl/bin/musl-gcc ./configure --host=aarch64-elf --disable-nls CFLAGS="-std=gnu99 -O3 -MMD -MP -fpie -I." LDFLAGS="-pie"
+$ make
+$ cp sed/sed XV6/usr/bin
+$ vi usr/inc/files.h
+$ rm -f obj/fs.img
+$ make qemu
+```
+
+### 実行
+
+```
+$ cat sample
+The USGCRP is a comprehensive
+research effort that includes applied
+as well as basic research.
+The NASA program Mission to Planet Earth
+represents the principal space-based component
+of the USGCRP and includes new initiatives
+such as EOS and Earthprobes.
+$ sed -e "s/as/sa/g" sample
+The USGCRP is a comprehensive
+research effort that includes applied
+sa well sa bsaic research.
+The NASA program Mission to Planet Earth
+represents the principal space-bsaed component
+of the USGCRP and includes new initiatives
+such sa EOS and Earthprobes.
+$ sed -e "s/^as/sa/" sample
+The USGCRP is a comprehensive
+research effort that includes applied
+sa well as basic research.
+The NASA program Mission to Planet Earth
+represents the principal space-based component
+of the USGCRP and includes new initiatives
+such as EOS and Earthprobes.
+$
+```
+
+### 3. 更新履歴
+
+```
+$ git status
+On branch mac
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	modified:   memos/src/new_commands.md
+	modified:   usr/inc/files.h
 ```

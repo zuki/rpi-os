@@ -129,6 +129,7 @@ char *usrbins[] = {
     "usr/bin/strip",
     "usr/bin/sh",
     "usr/bin/gawk",
+    "usr/bin/sed",
     NULL
 };
 
