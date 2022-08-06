@@ -100,7 +100,8 @@ main(int argc, char *argv[])
 {
     int i;
     uint off;
-    uint rootino, devino, sdino, binino, etcino, libino, homeino, zukiino, ch08ino, usrino, usrbinino;
+    uint rootino, devino, sdino, binino, etcino, libino, homeino, mntino;
+    uint zukiino, ch08ino, usrino, usrbinino;
     uint localino, localbinino, locallibino, localincludeino, localshareino, localsharemiscino;
     struct dirent de;
     char buf[BSIZE];
@@ -173,6 +174,9 @@ main(int argc, char *argv[])
 
     // create /lib
     libino = make_dir(rootino, "lib", 0, 0, S_IFDIR|0777);
+
+    // Create /mnt
+    mntino = make_dir(rootino, "mnt", 0, 0, S_IFDIR|0775);
 
     // Create /home
     homeino = make_dir(rootino, "home", 0, 0, S_IFDIR|0775);

@@ -147,7 +147,7 @@ void
 kfree(void *va)
 {
     struct run *r;
-    if ((uint64_t)va % PGSIZE || va < end || V2P(va) >= PHYSTOP)
+    if ((uint64_t)va % PGSIZE || va < (void *)end || V2P(va) >= PHYSTOP)
         panic("kfree: va=0x%p", va);
 
     acquire(&kmem.lock);

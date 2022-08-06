@@ -180,7 +180,7 @@ void dump(FILE *f, char type, int arg1, int arg2) {
                 exit(1);
             }
             printf("SECTOR: %d\n", arg1 + i);
-            dump_hex(seek, buf, BSIZE);
+            dump_hex(seek, buf, 512);
         }
         break;
     default:

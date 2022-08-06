@@ -100,4 +100,18 @@ strcmp(const char *p, const char *q)
     return (int) ((uint8_t)*p - (uint8_t)*q);
 }
 
+static inline void *
+memscan(void *addr, int c, size_t size)
+{
+    unsigned char *a = addr;
+
+    while (size) {
+        if (*a == c)
+            return (void *)a;
+        a++;
+        size--;
+    }
+    return (void *)a;
+}
+
 #endif

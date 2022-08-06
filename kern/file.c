@@ -3,7 +3,7 @@
 #include "linux/errno.h"
 
 #include "types.h"
-#include "fs.h"
+#include "vfs.h"
 #include "spinlock.h"
 #include "sleeplock.h"
 #include "file.h"
@@ -13,29 +13,15 @@
 #include "clock.h"
 #include "string.h"
 #include "pagecache.h"
+#include "vfsmount.h"
 #include "linux/stat.h"
 #include "linux/capability.h"
 
-struct devsw devsw[NDEV];
+struct devsw devsw[NMAJOR];
 struct {
     struct spinlock lock;
     struct file file[NFILE];
 } ftable;
-
-/* Is the directory dp empty except for "." and ".." ? */
-static int
-isdirempty(struct inode *dp)
-{
-    struct dirent de;
-
-    for (ssize_t off = 2 * sizeof(de); off < dp->size; off += sizeof(de)) {
-        if (readi(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
-            panic("readi");
-        if (de.inum != 0)
-            return 0;
-    }
-    return 1;
-}
 
 /* Optional since BSS is zero-initialized. */
 void
@@ -98,7 +84,7 @@ fileopen(char *path, int flags, mode_t mode)
                 return -EDQUOT;
             }
         } else {
-            ilock(ip);
+            ip->iops->ilock(ip);
         }
     } else {
 loop:
@@ -107,7 +93,7 @@ loop:
             warn("cant namei %s", path);
             return -ENOENT;
         }
-        ilock(ip);
+        ip->iops->ilock(ip);
         if (ip->type == T_DIR && (flags & O_ACCMODE) != 0) {
             iunlockput(ip);
             end_op();
@@ -115,8 +101,9 @@ loop:
             return -EINVAL;
         }
         if (ip->type == T_SYMLINK) {
-            if ((n = readi(ip, buf, 0, sizeof(buf) - 1)) <= 0) {
+            if ((n = ip->iops->readi(ip, buf, 0, sizeof(buf) - 1)) <= 0) {
                 iunlockput(ip);
+                end_op();
                 warn("couldn't read sysmlink target");
                 return -ENOENT;
             }
@@ -129,18 +116,18 @@ loop:
     }
     int readable = FILE_READABLE((int)flags);
     int writable = FILE_WRITABLE((int)flags);
-    if (readable && ((error = permission(ip, MAY_READ)) < 0))
+    if (readable && ((error = ip->iops->permission(ip, MAY_READ)) < 0))
         goto bad;
-    if (writable && ((error = permission(ip, MAY_WRITE)) < 0))
+    if (writable && ((error = ip->iops->permission(ip, MAY_WRITE)) < 0))
         goto bad;
     if ((f = filealloc()) == 0 || (fd = fdalloc(f, 0)) < 0) {
-        iunlock(ip);
+        ip->iops->iunlock(ip);
         end_op();
         if (f) fileclose(f);
         warn("cant alloc file\n");
         return -ENOSPC;
     }
-    iunlock(ip);
+    ip->iops->iunlock(ip);
     end_op();
 
     f->type     = FD_INODE;
@@ -192,9 +179,9 @@ long
 filestat(struct file *f, struct stat *st)
 {
     if (f->type == FD_INODE) {
-        ilock(f->ip);
-        stati(f->ip, st);
-        iunlock(f->ip);
+        f->ip->iops->ilock(f->ip);
+        f->ip->iops->stati(f->ip, st);
+        f->ip->iops->iunlock(f->ip);
         return 0;
     } else if (f->type == FD_PIPE) {
         memset(st, 0, sizeof(struct stat));
@@ -219,11 +206,11 @@ fileread(struct file *f, char *addr, ssize_t n)
         return piperead(f->pipe, addr, n);
     if (f->type == FD_INODE) {
         begin_op();
-        ilock(f->ip);
-        if ((r = readi(f->ip, addr, f->off, n)) > 0)
+        f->ip->iops->ilock(f->ip);
+        if ((r = f->ip->iops->readi(f->ip, addr, f->off, n)) > 0)
             f->off += r;
         clock_gettime(CLOCK_REALTIME, &f->ip->atime);
-        iunlock(f->ip);
+        f->ip->iops->iunlock(f->ip);
         end_op();
         return r;
     }
@@ -272,15 +259,15 @@ filewrite(struct file *f, char *addr, ssize_t n)
         while (i < n) {
             ssize_t n1 = MIN(max, n - i);
             begin_op();
-            ilock(f->ip);
-            if ((r = writei(f->ip, addr + i, f->off, n1)) > 0
+            f->ip->iops->ilock(f->ip);
+            if ((r = f->ip->iops->writei(f->ip, addr + i, f->off, n1)) > 0
              && (f->ip->type == T_FILE)) {
                 update_page(f->off, f->ip->inum, f->ip->dev, addr + i, r);
                 f->off += r;
              }
             clock_gettime(CLOCK_REALTIME, &ts);
             f->ip->mtime = f->ip->atime = ts;
-            iunlock(f->ip);
+            f->ip->iops->iunlock(f->ip);
             end_op();
 
             if (r < 0) break;
@@ -341,7 +328,7 @@ filelink(char *old, char *new)
         return -ENOENT;
     }
 
-    ilock(ip);
+    ip->iops->ilock(ip);
     if (ip->type == T_DIR) {
         iunlockput(ip);
         end_op();
@@ -349,22 +336,22 @@ filelink(char *old, char *new)
     }
 
     ip->nlink++;
-    iupdate(ip);
-    iunlock(ip);
+    ip->iops->iupdate(ip);
+    ip->iops->iunlock(ip);
 
     if ((dp = nameiparent(new, name)) == 0) {
         error = -ENOENT;
         goto bad;
     }
 
-    ilock(dp);
+    dp->iops->ilock(dp);
     if (dp->dev != ip->dev) {
         error = -EXDEV;
         iunlockput(dp);
         goto bad;
     }
 
-    if ((error = dirlink(dp, name, ip->inum, ip->type)) != 0) {
+    if ((error = dp->iops->dirlink(dp, name, ip->inum, ip->type)) != 0) {
         iunlockput(dp);
         goto bad;
     }
@@ -375,9 +362,9 @@ filelink(char *old, char *new)
     return 0;
 
 bad:
-    ilock(ip);
+    ip->iops->ilock(ip);
     ip->nlink--;
-    iupdate(ip);
+    ip->iops->iupdate(ip);
     iunlockput(ip);
     end_op();
     return error;
@@ -397,14 +384,14 @@ filesymlink(char *old, char *new)
         return -ENOENT;
     }
 
-    ilock(dp);
-    if ((ip = ialloc(dp->dev, T_SYMLINK)) == 0) {
+    dp->iops->ilock(dp);
+    if ((ip = dp->fs_t->ops->ialloc(dp->dev, T_SYMLINK)) == 0) {
         iunlockput(dp);
         end_op();
         return -ENOMEM;
     }
 
-    ilock(ip);
+    ip->iops->ilock(ip);
     ip->major = 0;
     ip->minor = 0;
     ip->nlink = 1;
@@ -412,20 +399,20 @@ filesymlink(char *old, char *new)
     ip->type = T_SYMLINK;
     clock_gettime(CLOCK_REALTIME, &ts);
     ip->atime = ip->mtime = ip->ctime = ts;
-    iupdate(ip);
+    ip->iops->iupdate(ip);
 
-    if ((error = dirlink(dp, name, ip->inum, ip->type)) != 0) {
+    if ((error = dp->iops->dirlink(dp, name, ip->inum, ip->type)) != 0) {
         iunlockput(dp);
         iunlockput(ip);
         end_op();
         return error;
     }
 
-    iupdate(dp);
+    dp->iops->iupdate(dp);
     iunlockput(dp);
 
-    writei(ip, old, 0, strlen(old));
-    iupdate(ip);
+    ip->iops->writei(ip, old, 0, strlen(old));
+    ip->iops->iupdate(ip);
     iunlockput(ip);
     end_op();
     return 0;
@@ -451,14 +438,14 @@ filereadlink(char *path, char *buf, size_t bufsize)
         return -ENOENT;
     }
 
-    ilock(ip);
+    ip->iops->ilock(ip);
     if (ip->type != T_SYMLINK) {
         iunlockput(ip);
         end_op();
         return -EINVAL;
     }
 
-    if ((n = readi(ip, buf, 0, bufsize)) <= 0) {
+    if ((n = ip->iops->readi(ip, buf, 0, bufsize)) <= 0) {
         iunlockput(ip);
         end_op();
         return -EIO;
@@ -483,21 +470,21 @@ fileunlink(char *path, int flags)
         return -ENOENT;
     }
 
-    ilock(dp);
+    dp->iops->ilock(dp);
 
     /* Cannot unlink "." or "..". */
 
-    if (namecmp(name, ".") == 0 || namecmp(name, "..") == 0) {
+    if (dp->fs_t->ops->namecmp(name, ".") == 0 || dp->fs_t->ops->namecmp(name, "..") == 0) {
         error = -EPERM;
         goto baddp;
     }
 
-    if ((ip = dirlookup(dp, name, &off)) == 0) {
+    if ((ip = dp->iops->dirlookup(dp, name, &off)) == 0) {
         error = -ENOENT;
         goto baddp;
     }
 
-    ilock(ip);
+    ip->iops->ilock(ip);
 
     if (ip->nlink < 1) {
         return -EPERM;
@@ -510,7 +497,7 @@ fileunlink(char *path, int flags)
             error = -ENOTDIR;
             goto badip;
         }
-        if (!isdirempty(ip)) {
+        if (!ip->iops->isdirempty(ip)) {
             error = -EPERM;
             goto badip;
         }
@@ -521,7 +508,7 @@ fileunlink(char *path, int flags)
         }
     }
 
-    if (unlink(dp, off) < 0) {
+    if (dp->iops->unlink(dp, off) < 0) {
         error = -EIO;
         goto badip;
         //panic("unlink: unlink");
@@ -529,12 +516,12 @@ fileunlink(char *path, int flags)
 
     if (ip->type == T_DIR) {
         dp->nlink--;
-        iupdate(dp);
+        dp->iops->iupdate(dp);
     }
     iunlockput(dp);
 
     ip->nlink--;
-    iupdate(ip);
+    ip->iops->iupdate(ip);
     iunlockput(ip);
     end_op();
     return 0;
@@ -580,15 +567,15 @@ utimensat(char *path, struct timespec times[2])
         return -ENOENT;
     }
 
-    ilock(dp);
-    if ((ip = dirlookup(dp, name, &off)) == 0) {
+    dp->iops->ilock(dp);
+    if ((ip = dp->iops->dirlookup(dp, name, &off)) == 0) {
         iunlockput(dp);
         end_op();
         return -ENOENT;
     }
     iunlockput(dp);
 
-    ilock(ip);
+    ip->iops->ilock(ip);
     // TODO: 権限チェックが必要
     if (times == NULL) {
         clock_gettime(CLOCK_REALTIME, &ts);
@@ -607,7 +594,7 @@ utimensat(char *path, struct timespec times[2])
             }
         }
     }
-    iupdate(ip);
+    ip->iops->iupdate(ip);
     iunlockput(ip);
     end_op();
     return 0;
@@ -624,9 +611,9 @@ filechmod(char *path, mode_t mode)
         return -ENOENT;
     }
 
-    ilock(ip);
+    ip->iops->ilock(ip);
     ip->mode = (ip->mode & S_IFMT) | mode;
-    iupdate(ip);
+    ip->iops->iupdate(ip);
     iunlockput(ip);
     end_op();
 
@@ -651,7 +638,7 @@ filechown(struct file *f, char *path, uid_t owner, gid_t group)
         }
     }
 
-    ilock(ip);
+    ip->iops->ilock(ip);
 
     if (owner != (uid_t)-1) {
         if (!capable(CAP_CHOWN)) {
@@ -684,7 +671,7 @@ filechown(struct file *f, char *path, uid_t owner, gid_t group)
     if (ip->mode & S_IXUGO && !capable(CAP_CHOWN)) {
         ip->mode &= ~(S_ISUID|S_ISGID);
     }
-    iupdate(ip);
+    ip->iops->iupdate(ip);
     error = 0;
 
 bad:
@@ -769,22 +756,22 @@ rename(struct inode *dp, char *name1, char *name2)
     struct dirent de;
     size_t off;
 
-    ilock(dp);
-    if ((ip = dirlookup(dp, name1, &off)) == 0)
+    dp->iops->ilock(dp);
+    if ((ip = dp->iops->dirlookup(dp, name1, &off)) == 0)
         return -ENOENT;
-    ilock(ip);
+    ip->iops->ilock(ip);
 
     memset(&de, 0, sizeof(de));
     de.inum = ip->inum;
     de.type = ip->type;
     memmove(de.name, name2, DIRSIZ);
-    if (writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de)) {
+    if (dp->iops->writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de)) {
         warn("writei");
         return -ENOSPC;
     }
-    iupdate(dp);
+    dp->iops->iupdate(dp);
     clock_gettime(CLOCK_REALTIME, &ip->ctime);
-    iupdate(ip);
+    ip->iops->iupdate(ip);
     iunlockput(ip);
     iunlockput(dp);
 
@@ -799,22 +786,22 @@ reinode(struct inode *dp, struct inode *old_ip, struct inode *new_ip)
     size_t off;
     struct timespec ts;
 
-    ilock(dp);
-    ilock(old_ip);
-    ilock(new_ip);
-    if (direntlookup(dp, old_ip->inum, &de, &off) < 0)
+    dp->iops->ilock(dp);
+    old_ip->iops->ilock(old_ip);
+    new_ip->iops->ilock(new_ip);
+    if (dp->fs_t->ops->direntlookup(dp, old_ip->inum, &de, &off) < 0)
         return -ENOENT;
 
     de.inum = new_ip->inum;
-    if (writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de)) {
+    if (dp->iops->writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de)) {
         warn("writei");
         return -ENOSPC;
     }
-    iupdate(dp);
+    dp->iops->iupdate(dp);
     clock_gettime(CLOCK_REALTIME, &ts);
     old_ip->ctime = new_ip->ctime = ts;
-    iupdate(old_ip);
-    iupdate(new_ip);
+    old_ip->iops->iupdate(old_ip);
+    new_ip->iops->iupdate(new_ip);
     iunlockput(old_ip);
     iunlockput(new_ip);
     iunlockput(dp);
@@ -865,7 +852,7 @@ filerename(char *path1, char *path2)
     // 異なるディレクトリへのmove
     } else {
         if (ip2 == 0) {
-            if ((error = dirlink(dp2, name2, ip1->inum, ip1->type)) < 0) {
+            if ((error = dp2->iops->dirlink(dp2, name2, ip1->inum, ip1->type)) < 0) {
                 warn("dirlink failed 2");
                 goto bad;
             }
@@ -884,5 +871,134 @@ filerename(char *path1, char *path2)
 
 bad:
     end_op();
+    return error;
+}
+
+long
+mount(char *source, char *target, char *fstype, uint64_t flags, void *data)
+{
+    struct inode *ip, *devi = 0;
+    struct filesystem_type *fs_t;
+    long error;
+
+    begin_op();
+    if ((ip = namei(target)) == 0 || (devi == namei(source)) == 0) {
+        warn("not found: ip=0x%p, devi=0x%p", ip, devi);
+        end_op();
+        return -ENOENT;
+    }
+
+    // 1: fstypeがサポートされているかチェック
+    if ((fs_t = getfs(fstype)) == 0) {
+        warn("fstype %s not found", fstype);
+        return -ENODEV;
+    }
+
+    error = -ENOTDIR;
+    ip->iops->ilock(ip);
+    devi->iops->ilock(devi);
+
+    // 2: マウントポイント ipの妥当性チェック: directoryであること
+    if (ip->type != T_DIR && ip->ref > 1) {
+        warn("target %s is not dir", target);
+        goto bad;
+    }
+
+    // 3: 被マウント deviの妥当性チェック: デバイスファイルであること
+    error = -ENOTBLK;
+    if (devi->type != T_DEV) {
+        warn("source %s is not dev", source);
+        goto bad;
+    }
+
+    // 4: デバイスのオープン（当面SDカードのみで常時オープンのためチェックしない）
+/*
+    error = -EINVAL;
+    if (bdev_open(devi) != 0) {
+        warn("source could not opened\n");
+        goto bad;
+    }
+*/
+    // 5: デバイスファイルの妥当性: VFATでもルートデバイスでもないこと
+    if (devi->minor == FATMINOR || devi->minor == ROOTDEV) {
+        warn("dev %d is vfat or rootdev", devi->minor);
+        goto bad;
+    }
+
+    // 6: vfsリストにデバイスとファイルシステムを登録
+    // Add this to a list to retrieve the filesystem type to current device
+    if (putvfsonlist(devi->major, devi->minor, fs_t) == -1) {
+        warn("failed to add dev to list");
+        goto bad;
+    }
+
+    // 7: ファイルシステム固有のマウント操作
+    if (fs_t->ops->mount(devi, ip) != 0) {
+        warn("failed to mount\n");
+        goto bad;
+    }
+
+    // 8: マウントポイントのファイルタイプを変更
+    ip->type = T_MOUNT;
+
+    error = 0;
+
+bad:
+    iunlockput(devi);
+    iunlockput(ip);
+    end_op();
+    return error;
+
+}
+
+long
+umount(char *target, int flags)
+{
+    struct inode *ip, *devi;
+    struct vfs *vfs;
+    long error;
+
+    begin_op();
+    if ((devi = namei(target)) == 0) {
+        warn("target %s is not found", target);
+        end_op();
+        return -ENOENT;
+    }
+
+    devi->iops->ilock(devi);
+    if ((ip = mtablemntinode(devi)) == 0) {
+        warn("could not get device ip");
+        error = -EINVAL;
+        goto bad2;
+    }
+    ip->iops->ilock(ip);
+
+    if ((vfs = getvfsentry(SDMAJOR, devi->dev)) == 0) {
+        warn("could not get vfsentry");
+        error = -ENOENT;
+        goto bad1;
+    }
+
+    if (vfs->fs_t->ops->unmount(devi) < 0) {
+        warn("could not unmount");
+        error = -EINVAL;
+        goto bad1;
+    }
+
+    if ((error = deletefsfromlist(vfs)) < 0) {
+        warn("error on delete fs from mlist");
+        goto bad1;
+    }
+
+    devi->ref--;
+    ip->type = T_DIR;
+
+    error = 0;
+
+bad1:
+    iunlockput(ip);
+bad2:
+    iunlockput(devi);
+
     return error;
 }

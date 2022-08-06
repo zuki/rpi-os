@@ -1,6 +1,7 @@
 #include "pagecache.h"
 #include "console.h"
 #include "errno.h"
+#include "log.h"
 #include "mmu.h"
 #include "mm.h"
 #include "sleeplock.h"
@@ -37,6 +38,7 @@ void pagecache_init(void)
 
 static struct cached_page *find_page(uint32_t inum, off_t offset, uint32_t dev)
 {
+    trace("inum: %d, offset: %lld, dev: %d", inum, offset, dev);
     if (!pagecache.lock.locked)
         panic("not locked");
     for (int i = 0; i < NPAGECACHE; i++) {
@@ -68,12 +70,15 @@ static struct cached_page *get_page(struct inode *ip, off_t offset)
         pagecache.total_count = 0;
     }
     memset(cached_page->page, 0, PGSIZE);
-    int n = readi(ip, cached_page->page, offset, PGSIZE);
+    begin_op();
+    int n = ip->iops->readi(ip, cached_page->page, offset, PGSIZE);
     if (n < 0) {
         warn("get_page readi failed: n=%d, offset=%ld, size=%d",
             n, offset, PGSIZE);
+        end_op();
         return (struct cached_page *)-1;
     }
+    end_op();
     cached_page->dev = ip->dev;
     cached_page->inum = ip->inum;
     cached_page->offset = offset;

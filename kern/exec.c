@@ -8,6 +8,7 @@
 #include "linux/capability.h"
 #include "trap.h"
 #include "file.h"
+#include "vfs.h"
 #include "log.h"
 #include "string.h"
 #include "console.h"
@@ -69,10 +70,10 @@ loop:
         end_op();
         return (void *)-ENOENT;
     }
-    ilock(ip);
+    ip->iops->ilock(ip);
 
     if (ip->type == T_SYMLINK) {
-        if ((n = readi(ip, buf, 0, sizeof(buf) - 1)) <= 0) {
+        if ((n = ip->iops->readi(ip, buf, 0, sizeof(buf) - 1)) <= 0) {
             warn("couldn't read sysmlink target");
             error = -ENOENT;
             goto bad;
@@ -93,12 +94,9 @@ loop:
         goto bad;
     }
 
-    if ((error = (long)permission(ip, MAY_READ)) < 0) {
+    if ((error = (long)ip->iops->permission(ip, MAY_READ)) < 0) {
         goto bad;
     }
-
-    iunlockput(ip);
-    end_op();
 
     f->type     = FD_INODE;
     f->ref      = 1;
@@ -107,6 +105,9 @@ loop:
     f->flags    = O_RDONLY;
     f->readable = 1;
     f->writable = 0;
+
+    ip->iops->iunlock(ip);  // ここでputするとv6/ext2_inode部分がクリアされる
+    end_op();               // putはfをcloseする際に行われる
     return f;
 
 bad:
@@ -287,7 +288,7 @@ execve(const char *path, char *const argv[], char *const envp[])
     if (IS_ERR(f))
         return (long)f;
 
-    trace("path='%s', proc: uid=%d, gid=%d, ip: inum=%d, mode=0x%x, uid=%d, gid=%d", s, curproc->uid, curproc->gid, f->ip->inum, f->ip->mode, f->ip->uid, f->ip->gid);
+    debug("path='%s', proc: uid=%d, gid=%d, ip: inum=%d, mode=0x%x, uid=%d, gid=%d", s, curproc->uid, curproc->gid, f->ip->inum, f->ip->mode, f->ip->uid, f->ip->gid);
 
     if ((error = copy_page(f->ip, 0, (char *)&elf, sizeof(elf), 0)) < 0) {
         warn("readelf bad");

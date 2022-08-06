@@ -5,6 +5,7 @@
 #include "vm.h"
 #include "mm.h"
 #include "clock.h"
+#include "dev.h"
 #include "timer.h"
 #include "trap.h"
 #include "proc.h"
@@ -14,7 +15,9 @@
 #include "irq.h"
 #include "ds3231.h"
 #include "i2c.h"
+#include "pagecache.h"
 #include "random.h"
+#include "vfs.h"
 
 /*
  * Keep it in data segment by explicitly initializing by zero,
@@ -38,10 +41,14 @@ main()
         console_init();
         clock_init();
         rand_init();
+        binit();
+        init_vfssw();
+        init_vfsmlist();
+        fs_init();
+        install_rootfs();
         pagecache_init();
         proc_init();
         user_init();
-        binit();
 
         // Tests
         mbox_test();

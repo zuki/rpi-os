@@ -25,6 +25,9 @@
 - [BSIZEを4096に変更](4Kblock.md)
 - [dashをdynamic linkでビルド](dash_dynamic.md)
 - [各種コマンドの追加](new_commands.md)
+- [VFSをサポート](vfs.md)
+- [Ext2ファイルシステムをサポート](ext2.md)
+- [mount/umountコマンドをサポート](mount.md)
 
 # 翻訳
 

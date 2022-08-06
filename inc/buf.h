@@ -4,17 +4,18 @@
 #include "types.h"
 #include "list.h"
 #include "sleeplock.h"
-#include "fs.h"
 
 #define B_VALID 0x2     /* Buffer has been read from disk. */
 #define B_DIRTY 0x4     /* Buffer needs to be written to disk. */
+
+#define DSIZE   4096
 
 struct buf {
     int flags;
     uint32_t dev;
     uint32_t blockno;
     uint32_t refcnt;
-    uint8_t data[BSIZE];
+    uint8_t data[DSIZE];
 
     struct sleeplock lock;
     struct list_head clink; /* LRU cache list. */

@@ -23,7 +23,7 @@
 #include "sleeplock.h"
 #include "buf.h"
 #include "console.h"
-#include "fs.h"
+#include "vfs.h"
 #include "dev.h"
 
 struct {

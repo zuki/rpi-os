@@ -49,6 +49,9 @@ Raspberry Pi 3A+, 3B+, 4Bでテストしています。
 - [x] Binutilsをdynamic linkでビルドして導入
 - [x] ファイル読み込みにpagecacheを使用
 - [x] ブロックサイズを4096バイトに変更
+- [x] VFSをサポート
+- [x] Ext2ファイルシステムをサポート
+- [x] mount/umountコマンドをサポート
 
 ## 前提条件
 

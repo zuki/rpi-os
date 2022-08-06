@@ -2,6 +2,7 @@
 #include "linux/errno.h"
 #include "linux/fcntl.h"
 #include "file.h"
+#include "vfs.h"
 #include "mm.h"
 #include "kmalloc.h"
 #include "log.h"
@@ -233,7 +234,7 @@ map_file_pages(void *addr, size_t length, uint64_t perm, struct file *f, off_t o
         mapsize = PGSIZE > size ? size : PGSIZE;
         if ((error = map_file_page(addr + cur, mapsize, perm, f, offset + cur)) < 0) {
             if (cur != 0)
-                uvm_unmap(thisproc()->pgdir, addr, cur/PGSIZE);
+                uvm_unmap(thisproc()->pgdir, (uint64_t)addr, cur/PGSIZE);
             return error;
         }
         size -= mapsize;
@@ -271,7 +272,7 @@ map_anon_pages(void *addr, size_t length, uint64_t perm)
     for (uint64_t cur = 0; cur < length; cur += PGSIZE) {
         if ((ret = map_anon_page(addr + cur, perm)) < 0) {
             if (cur != 0)
-                uvm_unmap(thisproc()->pgdir, addr, cur/PGSIZE);
+                uvm_unmap(thisproc()->pgdir, (uint64_t)addr, cur/PGSIZE);
             return ret;
         }
 
@@ -331,7 +332,7 @@ mmap(void *addr, size_t length, int prot, int flags, struct file *f, off_t offse
                     }
                 }
                 if (mapped == (length / PGSIZE)) {
-                    return addr;
+                    return (long)addr;
                 } else {
                     warn("PROT_NONE invalid addr");
                     return -EINVAL;
@@ -499,7 +500,7 @@ munmap(void *addr, size_t length)
     // ファイルが背後にある共有マップは書き戻し
     if ((region->flags & MAP_SHARED) && region->f && (region->prot & PROT_WRITE)) {
         begin_op();
-        error = writei(region->f->ip, region->addr, region->offset, region->length);
+        error = region->f->ip->iops->writei(region->f->ip, region->addr, region->offset, region->length);
         end_op();
         if (error < 0)
             return error;
@@ -542,7 +543,7 @@ mremap(void *old_addr, size_t old_length, size_t new_length, int flags, void *ne
         if (flags & MREMAP_FIXED) {
             if ((error = munmap(old_addr, old_length)) < 0)
                 return  (void *)error;
-            return mmap(new_addr, new_length, region->prot, (region->flags | MAP_FIXED), region->f,  region->offset);
+            return (void *)mmap(new_addr, new_length, region->prot, (region->flags | MAP_FIXED), region->f,  region->offset);
         } else {
             if ((error = scale_mmap_region(region, new_length)) < 0)
                 return (void *)error;
@@ -598,7 +599,7 @@ msync(void *addr, size_t length, int flags)
             if ((region->flags & MAP_SHARED) && (region->prot & PROT_WRITE) && region->f) {
                 size_t len = region->length < length ? region->length : length;
                 begin_op();
-                error = writei(region->f->ip, region->addr, region->offset, len);
+                error = region->f->ip->iops->writei(region->f->ip, region->addr, region->offset, len);
                 end_op();
                 if (error < 0)
                     return error;
@@ -635,8 +636,7 @@ print_mmap_list(struct proc *p, const char *title)
 long
 copy_mmap_list(struct proc *parent, struct proc *child)
 {
-    uint64_t *ptep, *ptec;
-    long error;
+    //uint64_t *ptep, *ptec;
 
     struct mmap_region *node = parent->regions;
     struct mmap_region *cnode = 0, *tail = 0;

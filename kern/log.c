@@ -1,8 +1,10 @@
 #include "types.h"
+#include "log.h"
 #include "console.h"
 #include "spinlock.h"
 #include "sleeplock.h"
-#include "fs.h"
+#include "vfs.h"
+#include "v6.h"
 #include "buf.h"
 #include "string.h"
 
@@ -45,37 +47,47 @@ struct log {
     int outstanding;            // 実行中のFSシステムコール数
     int committing;             // commit()実行中。待て。
     int dev;
+    int flag;                   // LOGENABLED/
     struct logheader lh;
 };
-struct log log;
+struct log log[NLOG];
 
-extern void readsb(int dev, struct superblock *sb);
+#define LOGENABLED  1
+
+extern struct superblock sb[NMINOR];
 
 static void recover_from_log();
-static void commit();
+static void commit(int dev);
 
+// log機能はV6固有だが、begin_op()する段階ではどのFSを使うか
+// わからないのでログを区別できない。速度的には無駄になるが
+// log_write()はデバイス判定できるので実害はないと思われる
 void
 initlog(int dev)
 {
-    if (sizeof(struct logheader) >= BSIZE)      // ログヘッダはディスクのログ領域の先頭ブロックにある。
-        panic("initlog: too big logheader");    // だから、1ブロック未満でなければならない
-
-    struct superblock sb;
-    initlock(&log.lock, "log");
-    readsb(dev, &sb);
-    log.start = sb.logstart;
-    log.size = sb.nlog;
-    log.dev = dev;
+    // ログヘッダはディスクのログ領域の先頭ブロックにある
+    // だから、1ブロック未満でなければならない
+    if (sizeof(struct logheader) >= sb[dev].blocksize)
+        panic("initlog: too big logheader");
+    initlock(&log[dev].lock, "log");
+    struct v6_superblock *v6sb = sb[dev].fs_info;
+    log[dev].start = v6sb->logstart;
+    log[dev].size = v6sb->nlog;
+    log[dev].dev = dev;
+    log[dev].flag = LOGENABLED;
     recover_from_log();
+    info("init log ok");
 }
 
 /* コミット済みブロックをディスクから本来のblockにコピー */
 static void
-install_trans()
+install_trans(int dev)
 {
-    for (int tail = 0; tail < log.lh.n; tail++) {
-        struct buf *lbuf = bread(log.dev, log.start + tail + 1);    // read log block（先頭はheaderなので+1)
-        struct buf *dbuf = bread(log.dev, log.lh.block[tail]);      // read dst
+    if (dev >= NLOG || !(log[dev].flag & LOGENABLED)) return;
+
+    for (int tail = 0; tail < log[dev].lh.n; tail++) {
+        struct buf *lbuf = bread(log[dev].dev, log[dev].start + tail + 1);    // read log block（先頭はheaderなので+1)
+        struct buf *dbuf = bread(log[dev].dev, log[dev].lh.block[tail]);      // read dst
         memmove(dbuf->data, lbuf->data, BSIZE);                     // copy block to dst
         bwrite(dbuf);                                               // write dst to disk
         brelse(lbuf);
@@ -85,14 +97,15 @@ install_trans()
 
 /* ログヘッダをディスクからメモリに読み込む */
 static void
-read_head()
+read_head(int dev)
 {
-    struct buf *buf = bread(log.dev, log.start);                    // log headerを読み込み
+    if (dev >= NLOG || !(log[dev].flag & LOGENABLED)) return;
+
+    struct buf *buf = bread(log[dev].dev, log[dev].start);  // log headerを読み込み
     struct logheader *lh = (struct logheader *)(buf->data);
-    int i;
-    log.lh.n = lh->n;
-    for (i = 0; i < log.lh.n; i++) {
-        log.lh.block[i] = lh->block[i];
+    log[dev].lh.n = lh->n;
+    for (int i = 0; i < log[dev].lh.n; i++) {
+        log[dev].lh.block[i] = lh->block[i];
     }
     brelse(buf);
 }
@@ -103,14 +116,15 @@ read_head()
  * コミッションポイント
  */
 static void
-write_head()
+write_head(int dev)
 {
-    struct buf *buf = bread(log.dev, log.start);
+    if (dev >= NLOG || !(log[dev].flag & LOGENABLED)) return;
+
+    struct buf *buf = bread(log[dev].dev, log[dev].start);
     struct logheader *hb = (struct logheader *)(buf->data);
-    int i;
-    hb->n = log.lh.n;
-    for (i = 0; i < log.lh.n; i++) {
-        hb->block[i] = log.lh.block[i];
+    hb->n = log[dev].lh.n;
+    for (int i = 0; i < log[dev].lh.n; i++) {
+        hb->block[i] = log[dev].lh.block[i];
     }
     bwrite(buf);
     brelse(buf);
@@ -119,30 +133,37 @@ write_head()
 static void
 recover_from_log()
 {
-    read_head();
-    install_trans();            // if committed, copy from log to disk
-    log.lh.n = 0;
-    write_head();               // clear the log
+    for (int i = 0; i < NLOG; i++) {
+        read_head(i);
+        install_trans(i);            // if committed, copy from log to disk
+        log[i].lh.n = 0;
+        write_head(i);               // clear the log
+    }
 }
 
 /* FSシステムコールを開始する際に呼ばれる */
 void
 begin_op()
 {
-    acquire(&log.lock);
-    while (1) {
-        if (log.committing) {
-            sleep(&log, &log.lock);
-        } else if (log.lh.n + (log.outstanding + 1) * MAXOPBLOCKS >
-                   LOGSIZE) {
-            // ログが枯渇する恐れがあるのでコミットされるのを待機する
-            sleep(&log, &log.lock);
-        } else {
-            log.outstanding += 1;
-            release(&log.lock);
-            break;
+    for (int i = 0; i < NLOG; i++) {
+        if (!log[i].flag & LOGENABLED) continue;
+
+        acquire(&log[i].lock);
+        while (1) {
+            if (log[i].committing) {
+                sleep(&log[i], &log[i].lock);
+            } else if (log[i].lh.n + (log[i].outstanding + 1) * MAXOPBLOCKS >
+                    LOGSIZE) {
+                // ログが枯渇する恐れがあるのでコミットされるのを待機する
+                sleep(&log[i], &log[i].lock);
+            } else {
+                log[i].outstanding += 1;
+                release(&log[i].lock);
+                break;
+            }
         }
     }
+
 }
 
 /*
@@ -152,40 +173,47 @@ begin_op()
 void
 end_op()
 {
-    int do_commit = 0;
+    for (int i = 0; i < NLOG; i++) {
+        if (!log[i].flag & LOGENABLED) continue;
 
-    acquire(&log.lock);
-    log.outstanding -= 1;
-    if (log.committing)
-        panic("log.committing");
-    if (log.outstanding == 0) {
-        do_commit = 1;
-        log.committing = 1;
-    } else {
-        // begin_op()がログスペースが空くのを待っている可能性がある。
-        // また、log.outstandingを減ずることで予約スペースが減じた可能性がある
-        wakeup(&log);
-    }
-    release(&log.lock);
+        int do_commit = 0;
 
-    if (do_commit) {
-        // commit()はロックせずに実行する。なぜなら、
-        // ロックも持ってsleepすることが許されないから。
-        commit();
-        acquire(&log.lock);
-        log.committing = 0;
-        wakeup(&log);
-        release(&log.lock);
+        acquire(&log[i].lock);
+        log[i].outstanding -= 1;
+        if (log[i].committing)
+            panic("log committing");
+        if (log[i].outstanding == 0) {
+            do_commit = 1;
+            log[i].committing = 1;
+        } else {
+            // begin_op()がログスペースが空くのを待っている可能性がある。
+            // また、log[i].outstandingを減ずることで予約スペースが減じた可能性がある
+            wakeup(&log[i]);
+        }
+        release(&log[i].lock);
+
+        if (do_commit) {
+            // commit()はロックせずに実行する。なぜなら、
+            // ロックも持ってsleepすることが許されないから。
+            commit(i);
+            acquire(&log[i].lock);
+            log[i].committing = 0;
+            wakeup(&log[i]);
+            release(&log[i].lock);
+        }
     }
+
 }
 
 /* 変更されたブロックをキャッシュからログへコピーする */
 static void
-write_log()
+write_log(int dev)
 {
-    for (int tail = 0; tail < log.lh.n; tail++) {
-        struct buf *to = bread(log.dev, log.start + tail + 1);  // log block
-        struct buf *from = bread(log.dev, log.lh.block[tail]);  // cache block
+    if (dev >= NLOG || !(log[dev].flag & LOGENABLED)) return;
+
+    for (int tail = 0; tail < log[dev].lh.n; tail++) {
+        struct buf *to = bread(log[dev].dev, log[dev].start + tail + 1);  // log block
+        struct buf *from = bread(log[dev].dev, log[dev].lh.block[tail]);  // cache block
         memmove(to->data, from->data, BSIZE);
         bwrite(to);                                             // write the log
         brelse(from);
@@ -194,16 +222,18 @@ write_log()
 }
 
 static void
-commit()
+commit(int dev)
 {
-    if (log.lh.n > 0) {
-        write_log();            // Write modified blocks from cache to log
-        write_head();           // Write header to disk -- the real commit
-        install_trans();        // Now install writes to home locations
+    if (dev >= NLOG || !(log[dev].flag & LOGENABLED)) return;
+
+    if (log[dev].lh.n > 0) {
+        write_log(dev);            // Write modified blocks from cache to log
+        write_head(dev);           // Write header to disk -- the real commit
+        install_trans(dev);        // Now install writes to home locations
         disb();
-        log.lh.n = 0;
+        log[dev].lh.n = 0;
         disb();
-        write_head();           // Erase the transaction from the log
+        write_head(dev);           // Erase the transaction from the log
     }
 }
 
@@ -220,21 +250,24 @@ commit()
 void
 log_write(struct buf *b)
 {
+    if (b->dev >= NLOG || !log[b->dev].flag & LOGENABLED) return;
+
     int i;
 
-    if (log.lh.n >= LOGSIZE || log.lh.n >= log.size - 1)
+    if (log[b->dev].lh.n >= LOGSIZE || log[b->dev].lh.n >= log[b->dev].size - 1)
         panic("too big a transaction");
-    if (log.outstanding < 1)
-        panic("log_write outside of trans");
+    if (log[b->dev].outstanding < 1)
+        panic("log_write outside of trans: dev: %d, blockno: %d, outstanding: %d\n",
+            b->dev, b->blockno, log[b->dev].outstanding);
 
-    acquire(&log.lock);
-    for (i = 0; i < log.lh.n; i++) {
-        if (log.lh.block[i] == b->blockno)      // すでにログにあればそのまま使う
+    acquire(&log[b->dev].lock);
+    for (i = 0; i < log[b->dev].lh.n; i++) {
+        if (log[b->dev].lh.block[i] == b->blockno)      // すでにログにあればそのまま使う
             break;
     }
-    log.lh.block[i] = b->blockno;
-    if (i == log.lh.n)                          // なかった場合は新たに追加
-        log.lh.n++;
+    log[b->dev].lh.block[i] = b->blockno;
+    if (i == log[b->dev].lh.n)                          // なかった場合は新たに追加
+        log[b->dev].lh.n++;
     b->flags |= B_DIRTY;                        // prevent eviction
-    release(&log.lock);
+    release(&log[b->dev].lock);
 }

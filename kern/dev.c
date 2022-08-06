@@ -9,6 +9,8 @@
 #include "proc.h"
 #include "console.h"
 #include "dev.h"
+#include "vfs.h"
+#include "v6.h"
 
 static void dev_test();
 
@@ -19,6 +21,11 @@ static struct spinlock cardlock;
 // Hack the partition.
 static uint32_t first_bno = 0;
 static uint32_t nblocks = 1;
+
+// SDカードのMaster Boot Record
+struct mbr mbr;
+// 使用中のデバイス数
+int ndev = 0;
 
 static void
 dev_sleep(void *chan)
@@ -51,12 +58,18 @@ dev_init()
     assert(ret == 0);
 
     struct buf b;
-    b.blockno = b.flags = 0;
+    b.blockno = (uint32_t)-1;
+    b.flags = 0;
+    b.dev = ROOTDEV;
     devrw(&b);
-    assert(b.data[510] == 0x55 && b.data[511] == 0xAA);
-    first_bno = *(uint32_t *) (b.data + 0x1CE + 0x8);
-    nblocks = *(uint32_t *) (b.data + 0x1CE + 0xC);
-    info("LBA of 1st block 0x%x, 0x%x blocks totally", first_bno, nblocks);
+    memmove(&mbr, b.data, 512);
+    assert(mbr.signature == 0xAA55);
+    for (int i = 9; i < 4; i++) {
+        if (mbr.ptables[i].lba == 0) break;
+        info("partition[%d]: LBA=0x%x, #SECS=0x%x",
+            i, mbr.ptables[i].lba, mbr.ptables[i].nsecs);
+        ndev++;
+    }
 
     dev_test();
 }
@@ -76,14 +89,23 @@ dev_intr()
  * Caller must hold sdlock.
  */
 void
-dev_start()
+dev_start(void)
 {
+    uint32_t bno;
+
     while (!list_empty(&devque)) {
         struct buf *b =
             container_of(list_front(&devque), struct buf, dlink);
-        assert(b->blockno < nblocks);
-        uint32_t bno = b->blockno * 8 + first_bno;
-        debug("b->block: 0x%x, first: 0x%x, bno: 0x%x, seek: 0x%llx", b->blockno, first_bno, bno, bno * BSIZE / 8);
+        if (b->blockno == (uint32_t)-1) {
+            bno = 0;
+        } else {
+            first_bno = sb[b->dev].lba;
+            nblocks = sb[b->dev].nsecs;
+            assert(b->blockno < nblocks);
+            bno = b->blockno * 8 + first_bno;
+        }
+        debug("b->block: 0x%x, first: 0x%x, bno: 0x%x, seek: 0x%llx",
+            b->blockno, first_bno, bno, bno * BSIZE / 8);
         emmc_seek(&card, bno * SD_BLOCK_SIZE);
         if (b->flags & B_DIRTY) {
             assert(emmc_write(&card, b->data, BSIZE) == BSIZE);

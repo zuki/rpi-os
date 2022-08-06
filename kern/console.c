@@ -5,6 +5,7 @@
 #include "irq.h"
 #include "spinlock.h"
 #include "file.h"
+#include "vfs.h"
 #include "mm.h"
 #include "linux/termios.h"
 
@@ -61,26 +62,26 @@ consputc(int c)
 static ssize_t
 console_write(struct inode *ip, char *buf, ssize_t n)
 {
-    iunlock(ip);
+    ip->iops->iunlock(ip);
     acquire(&conslock);
     for (size_t i = 0; i < n; i++)
         consputc(buf[i] & 0xff);
     release(&conslock);
-    ilock(ip);
+    ip->iops->ilock(ip);
     return n;
 }
 
 static ssize_t
 console_read(struct inode *ip, char *dst, ssize_t n)
 {
-    iunlock(ip);
+    ip->iops->iunlock(ip);
     size_t target = n;
     acquire(&conslock);
     while (n > 0) {
         while (input.r == input.w) {
             if (thisproc()->killed) {
                 release(&conslock);
-                ilock(ip);
+                ip->iops->ilock(ip);
                 return -1;
             }
             sleep(&input.r, &conslock);
@@ -88,7 +89,7 @@ console_read(struct inode *ip, char *dst, ssize_t n)
         int c = input.buf[input.r++ % INPUT_BUF];
         if (!islbuf) {
             release(&conslock);
-            ilock(ip);
+            ip->iops->ilock(ip);
             *dst = c;
             return 1;
         }
@@ -106,7 +107,7 @@ console_read(struct inode *ip, char *dst, ssize_t n)
             break;
     }
     release(&conslock);
-    ilock(ip);
+    ip->iops->ilock(ip);
 
     return target - n;
 }

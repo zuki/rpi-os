@@ -47,9 +47,10 @@ typedef uint32_t        tcflag_t;
 typedef uint32_t        speed_t;
 typedef uint8_t         cc_t;
 typedef int32_t         clockid_t;
-typedef int64_t         ino64_t;
+typedef uint64_t        ino64_t;
 typedef off_t           off64_t;
 typedef uint32_t        kernel_cap_t;
+
 
 /* Efficient min and max operations */
 #define MIN(_a, _b)                 \

@@ -1,7 +1,7 @@
 #include "pipe.h"
 #include "types.h"
 #include "proc.h"
-#include "fs.h"
+#include "vfs.h"
 #include "spinlock.h"
 #include "file.h"
 #include "mm.h"

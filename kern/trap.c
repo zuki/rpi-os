@@ -93,7 +93,7 @@ static long
 pf_handler(int dfs, uint64_t far)
 {
     struct proc *p = thisproc();
-    uint64_t *pte;
+    //uint64_t *pte;
     struct mmap_region *region;
 
     far = ROUNDDOWN(far, PGSIZE);

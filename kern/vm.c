@@ -244,7 +244,7 @@ uvm_dealloc(uint64_t * pgdir, size_t base, size_t oldsz, size_t newsz)
             assert(pa);
             dec_kmem_ref(pa);
             if (get_kmem_ref(pa) == 0)
-                kfree(pa);
+                kfree((void *)pa);
             *pte = 0;
         } else {
             warn("attempt to free unallocated page");
@@ -399,7 +399,7 @@ uvm_unmap(uint64_t *pgdir, uint64_t va, uint64_t npages)
         panic("not aligned");
     debug("va=0x%x, length=0x%x", va, npages * PGSIZE);
     for (a = va; a < va + npages * PGSIZE; a += PGSIZE) {
-        if ((pte = pgdir_walk(pgdir, (const void *)a, 0)) == 0)
+        if ((pte = pgdir_walk(pgdir, (void *)a, 0)) == 0)
             panic("pgdir_walk\n");
         if ((*pte & PTE_VALID) == 0)
             panic("not mapped\n");

@@ -15,7 +15,8 @@
 #include "string.h"
 #include "console.h"
 #include "log.h"
-#include "fs.h"
+#include "vfs.h"
+#include "vfsmount.h"
 #include "file.h"
 #include "pipe.h"
 #include "linux/fcntl.h"
@@ -426,15 +427,15 @@ sys_fstatat()
 loop:
     if ((ip = namei(path)) == 0) {
         end_op();
-        return (void *)-ENOENT;
+        return -ENOENT;
     }
-    ilock(ip);
+    ip->iops->ilock(ip);
 
     if ((flags & AT_SYMLINK_NOFOLLOW) == 0) {
         if (ip->type == T_SYMLINK) {
             char buf[512];
             int n;
-            if ((n = readi(ip, buf, 0, sizeof(buf) - 1)) <= 0) {
+            if ((n = ip->iops->readi(ip, buf, 0, sizeof(buf) - 1)) <= 0) {
                 warn("couldn't read sysmlink target");
                 iunlockput(ip);
                 end_op();
@@ -447,7 +448,7 @@ loop:
         }
     }
 
-    stati(ip, st);
+    ip->iops->stati(ip, st);
     iunlockput(ip);
     end_op();
     return 0;
@@ -660,13 +661,13 @@ sys_chdir()
         end_op();
         return -ENOENT;
     }
-    ilock(ip);
+    ip->iops->ilock(ip);
     if (ip->type != T_DIR && ip->type != T_MOUNT) {
         iunlockput(ip);
         end_op();
         return -ENOTDIR;
     }
-    iunlock(ip);
+    ip->iops->iunlock(ip);
     iput(curproc->cwd);
     end_op();
     curproc->cwd = ip;
@@ -715,20 +716,10 @@ sys_getdents64()
 
     if (argfd(0, &fd, &f) < 0 || argu64(2, &count) < 0 || argptr(1, &dirp, count) < 0)
         return -EINVAL;
-    if (!in_user(dirp, count))
-        return -EFAULT;
 
     trace("fd: %d, dirp: 0x%p, count: 0x%llx", fd, dirp, count);
 
-/*
-    if (strcmp("ext2", f->ip->fs_t->name) == 0)
-        ret = ext2_getdents(f, dirp, count);
-    else if (strcmp("v6", f->ip->fs_t->name) == 0)
-        ret = v6_getdents(f, dirp, count);
-    else
-        ret = -ENOENT;
-*/
-    return getdents(f, dirp, count);
+    return f->ip->fs_t->ops->getdents(f, dirp, count);
 }
 
 long
@@ -854,16 +845,16 @@ sys_getcwd()
     cwd = idup(p->cwd);
     if (cwd->inum == ROOTINO) goto root;
     while (1) {
-        dp = dirlookup(cwd, "..", 0);
-        ilock(dp);
-        if (direntlookup(dp, cwd->inum, &de, 0) < 0)
+        dp = cwd->iops->dirlookup(cwd, "..", 0);
+        dp->iops->ilock(dp);
+        if (dp->fs_t->ops->direntlookup(dp, cwd->inum, &de, 0) < 0)
             goto bad;
         n = strlen(de.name);
         if ((n + pos + 2) > size)
             goto bad;
 
         iput(cwd);
-        iunlock(dp);
+        dp->iops->iunlock(dp);
         for (i = 0; i < n; i++) {
             buf[pos + i] = de.name[n - i - 1];  // bufに逆順に詰める
         }
@@ -984,4 +975,30 @@ sys_pread64()
     }
 
     return filepread64(f, buf, count, offset);
+}
+
+long
+sys_mount(void)
+{
+    char *source, *target, *fstype, *data;
+    uint64_t flags;
+
+    if (argstr(0, &source) < 0 || argstr(1, &target) < 0
+     || argstr(2, &fstype) < 0 || argu64(3, &flags) < 0
+     || argstr(4, &data) < 0)
+        return -EINVAL;
+
+    return mount(source, target, fstype, flags, data);
+}
+
+long
+sys_umount2(void)
+{
+    char *target;
+    int flags;
+
+    if (argstr(0, &target) < 0 || argint(1, &flags) < 0)
+        return -EINVAL;
+
+    return umount(target, flags);
 }

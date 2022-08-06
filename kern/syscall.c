@@ -218,7 +218,7 @@ sys_getitimer()
     int which;
     struct itimerval *curr_value;
 
-    if (argint(0, &which) < 0 || argptr(1, &curr_value, sizeof(struct itimerval)) < 0)
+    if (argint(0, &which) < 0 || argptr(1, (char **)&curr_value, sizeof(struct itimerval)) < 0)
         return -EINVAL;
 
     trace("which: %d, curr_value: 0x%p", which, curr_value);
@@ -233,8 +233,8 @@ sys_setitimer()
     struct itimerval *new_value, *old_value;
 
     if (argint(0, &which) < 0
-     || argptr(1, &new_value, sizeof(struct itimerval)) < 0
-     || argptr(2, &old_value, sizeof(struct itimerval)) < 0)
+     || argptr(1, (char **)&new_value, sizeof(struct itimerval)) < 0
+     || argptr(2, (char **)&old_value, sizeof(struct itimerval)) < 0)
         return -EINVAL;
 
     trace("which: &d, new_value: 0x%p, old_value: 0x%p", which, new_value, old_value);
@@ -359,8 +359,8 @@ static func syscalls[] = {
     [SYS_symlinkat] = sys_symlinkat,            // 36
     [SYS_linkat] = sys_linkat,                  // 37
     [SYS_renameat] = sys_renameat,              // 38
-//    [SYS_umount2] = sys_umount2,                // 39
-//    [SYS_mount] = sys_mount,                    // 40
+    [SYS_umount2] = sys_umount2,                // 39
+    [SYS_mount] = sys_mount,                    // 40
     [SYS_faccessat] = sys_faccessat,            // 48
     [SYS_chdir] = sys_chdir,                    // 49
     [SYS_fchmodat] = sys_fchmodat,              // 53
