@@ -364,5 +364,5 @@ int           ext2_unlink(struct inode *dp, uint32_t off);
 int           ext2_isdirempty(struct inode *dp);
 
 int           init_ext2fs(void);
-
+int           ext2_fill_inode(struct inode *ip);
 #endif

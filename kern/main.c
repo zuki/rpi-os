@@ -18,6 +18,7 @@
 #include "pagecache.h"
 #include "random.h"
 #include "vfs.h"
+#include "vfsmount.h"
 
 /*
  * Keep it in data segment by explicitly initializing by zero,
@@ -44,6 +45,7 @@ main()
         binit();
         init_vfssw();
         init_vfsmlist();
+        mount_init();
         fs_init();
         install_rootfs();
         pagecache_init();

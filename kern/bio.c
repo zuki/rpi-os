@@ -40,7 +40,7 @@ binit()
 {
     struct buf *b;
 
-    // initlock(&bcache.lock, "bcache");
+    initlock(&bcache.lock, "bcache");
 
     // Create linked list of buffers
     list_init(&bcache.head);
@@ -60,14 +60,17 @@ bget(uint32_t dev, uint32_t blockno)
     struct buf *b;
 
     acquire(&bcache.lock);
-
     // Is the block already cached?
+loop:
     LIST_FOREACH_ENTRY(b, &bcache.head, clink) {
         if (b->dev == dev && b->blockno == blockno) {
-            b->refcnt++;
-            release(&bcache.lock);
-            acquiresleep(&b->lock);
-            return b;
+            if (!(b->flags & B_BUSY)) {
+                b->flags |= B_BUSY;
+                release(&bcache.lock);
+                return b;
+            }
+            sleep(b, &bcache.lock);
+            goto loop;
         }
     }
 
@@ -77,13 +80,11 @@ bget(uint32_t dev, uint32_t blockno)
     // Even if refcnt==0, B_DIRTY indicates a buffer is in use
     // because log.c has modified it but not yet committed it.
     LIST_FOREACH_ENTRY_REVERSE(b, &bcache.head, clink) {
-        if (b->refcnt == 0 && (b->flags & B_DIRTY) == 0) {
+        if ((b->flags & B_BUSY) == 0 /* b->refcnt == 0 */ && (b->flags & B_DIRTY) == 0) {
             b->dev = dev;
             b->blockno = blockno;
-            b->flags = 0;
-            b->refcnt = 1;
+            b->flags = B_BUSY;
             release(&bcache.lock);
-            acquiresleep(&b->lock);
             return b;
         }
     }
@@ -106,8 +107,10 @@ bread(uint32_t dev, uint32_t blockno)
 void
 bwrite(struct buf *b)
 {
-    if (!holdingsleep(&b->lock))
-        panic("bwrite");
+    if ((b->flags & B_BUSY) == 0) {
+        panic("bwrite: not locked dev: %d, blockno: 0x%x, flags=%d\n",
+            b->dev, b->blockno, b->flags);
+    }
     b->flags |= B_DIRTY;
     devrw(b);
 }
@@ -119,17 +122,13 @@ bwrite(struct buf *b)
 void
 brelse(struct buf *b)
 {
-    if (!holdingsleep(&b->lock))
+    if ((b->flags & B_BUSY) == 0)
         panic("brelse");
 
-    releasesleep(&b->lock);
-
     acquire(&bcache.lock);
-    b->refcnt--;
-    if (b->refcnt == 0) {
-        // no one is waiting for it.
-        list_drop(&b->clink);
-        list_push_back(&bcache.head, &b->clink);
-    }
+    list_drop(&b->clink);
+    list_push_back(&bcache.head, &b->clink);
+    b->flags &= ~B_BUSY;
+    wakeup(b);
     release(&bcache.lock);
 }

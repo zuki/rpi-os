@@ -64,7 +64,7 @@ dev_init()
     devrw(&b);
     memmove(&mbr, b.data, 512);
     assert(mbr.signature == 0xAA55);
-    for (int i = 9; i < 4; i++) {
+    for (int i = 0; i < 4; i++) {
         if (mbr.ptables[i].lba == 0) break;
         info("partition[%d]: LBA=0x%x, #SECS=0x%x",
             i, mbr.ptables[i].lba, mbr.ptables[i].nsecs);
@@ -104,8 +104,6 @@ dev_start(void)
             assert(b->blockno < nblocks);
             bno = b->blockno * 8 + first_bno;
         }
-        debug("b->block: 0x%x, first: 0x%x, bno: 0x%x, seek: 0x%llx",
-            b->blockno, first_bno, bno, bno * BSIZE / 8);
         emmc_seek(&card, bno * SD_BLOCK_SIZE);
         if (b->flags & B_DIRTY) {
             assert(emmc_write(&card, b->data, BSIZE) == BSIZE);

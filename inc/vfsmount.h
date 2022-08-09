@@ -26,6 +26,6 @@ extern struct mtable mtable;
 struct inode *mtablertinode(struct inode *ip);
 struct inode *mtablemntinode(struct inode *ip);
 int isinoderoot(struct inode *ip);
-void mountinit(void);
+void mount_init(void);
 
 #endif

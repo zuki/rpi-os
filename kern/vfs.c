@@ -636,7 +636,6 @@ create(char *path, uint16_t type, uint16_t major, uint16_t minor, mode_t mode)
     // ファイルなし、作成
     if ((ip = dp->fs_t->ops->ialloc(dp->dev, type)) == 0)
         panic("create: no inodes\n");
-
     ip->iops->ilock(ip);
     ip->major = major;
     ip->minor = minor;
@@ -648,7 +647,6 @@ create(char *path, uint16_t type, uint16_t major, uint16_t minor, mode_t mode)
     ip->uid = thisproc()->uid;
     ip->gid = thisproc()->gid;
     ip->iops->iupdate(ip);
-
     if (type == T_DIR) {
         dp->nlink++;
         dp->iops->iupdate(dp);

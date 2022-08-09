@@ -3,6 +3,7 @@
 #include "mmu.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "sleeplock.h"
 #include "buf.h"
 #include "clock.h"
 #include "file.h"
@@ -14,8 +15,6 @@
 #include "linux/stat.h"
 #include "linux/find_bits.h"
 #include "linux/ilog2.h"
-
-struct ext2_superblock ext2_sb;
 
 #define in_range(b, first, len) ((b) >= (first) && (b) <= (first) + (len) - 1)
 #define ext2_find_next_zero_bit find_next_zero_bit
@@ -55,31 +54,6 @@ verify_chain(Indirect *from, Indirect *to)
         from++;
     return (from > to);
 }
-
-static struct {
-    struct spinlock lock;
-    struct ext2_inode_info ei[EXT2_NINODE];
-} ext2_ei_pool;     // It is a pool of ext2 filesystem inode info
-
-struct ext2_inode_info *
-alloc_ext2_inode_info(void)
-{
-    struct ext2_inode_info *ei;
-
-    acquire(&ext2_ei_pool.lock);
-    for (ei = ext2_ei_pool.ei; ei < &ext2_ei_pool.ei[EXT2_NINODE]; ei++) {
-        if (ei->flags == INODE_FREE) {
-            ei->flags = INODE_USED;
-            release(&ext2_ei_pool.lock);
-
-            return ei;
-        }
-    }
-    release(&ext2_ei_pool.lock);
-
-    return 0;
-}
-
 
 struct vfs_operations ext2_ops ={
     .fs_init    = &ext2fs_init,
@@ -126,15 +100,14 @@ struct filesystem_type ext2fs = {
 /**
  * It is called because the icache lookup failed
  */
-static int
+int
 ext2_fill_inode(struct inode *ip) {
     struct ext2_inode_info *ei;
     struct ext2_inode *raw_inode;
     struct buf *bh;
 
-    ei = alloc_ext2_inode_info();
-
-    if (ei == 0)
+    ei = (struct ext2_inode_info *)kmalloc(sizeof(struct ext2_inode_info));
+    if (ei == NULL)
         panic("ext2_fill_inode: no memory to alloc");
 
     raw_inode = ext2_get_inode(&sb[ip->dev], ip->inum, &bh);
@@ -151,8 +124,7 @@ ext2_fill_inode(struct inode *ip) {
     } else if (S_ISCHR(ei->i_ei.i_mode) || S_ISBLK(ei->i_ei.i_mode)) {
         ip->type = T_DEV;
     } else {
-        cprintf("ext2_fill_inode: i_mode: %d\n", ei->i_ei.i_mode);
-        panic("ext2: invalid file mode");
+        panic("ext2: invalid file mode %d\n", ei->i_ei.i_mode);
     }
 
     ip->nlink = ei->i_ei.i_links_count;
@@ -199,14 +171,12 @@ found_slot:
             mp->pdata = &sb[devi->minor];
             mp->flag = MOUNT_USED;
             mp->m_rtinode = devrtip;
-            //cprintf("ext2_mount: mp: m_innode->dev: %d, inum: %d, m_rtinode->dev: %d, inum: %d\n",
-            //    mp->m_inode->dev, mp->m_inode->inum, mp->m_rtinode->dev, mp->m_rtinode->inum);
             release(&mtable.lock);
             return 0;
         } else {
             // The disk is already mounted
             if (mp->dev == devi->minor) {
-                cprintf("ext2_mount: disk is already mounted: dev: %d\n", devi->minor);
+                warn("disk is already mounted: dev: %d", devi->minor);
                 release(&mtable.lock);
                 return -1;
             }
@@ -216,7 +186,7 @@ found_slot:
         }
     }
     release(&mtable.lock);
-    cprintf("ext2_mount: no free mount point\n");
+    warn("no free mount point");
     return -1;
 }
 
@@ -292,13 +262,13 @@ ext2_get_group_desc(struct superblock *sb,
     struct ext2_sb_info *sbi = EXT2_SB(sb);
 
     if (block_group >= sbi->s_groups_count) {
-        panic("Block group # is too large");
+        panic("Block group # is too large\n");
     }
 
     group_desc = block_group >> EXT2_DESC_PER_BLOCK_BITS(sb);
     offset = block_group % (EXT2_DESC_PER_BLOCK(sb) - 1);
     if (!sbi->s_group_desc[group_desc]) {
-        panic("Accessing a group descriptor not loaded");
+        panic("Accessing a group descriptor not loaded\n");
     }
 
     desc = (struct ext2_group_desc *)sbi->s_group_desc[group_desc]->data;
@@ -320,7 +290,7 @@ descriptor_loc(struct superblock *sb,
 
     if (!EXT2_HAS_INCOMPAT_FEATURE(sb, EXT2_FEATURE_INCOMPAT_META_BG) ||
         nr < first_meta_bg)
-        return (logic_sb_block + nr + 1);                   // 前者がturu, ここでreturn 2
+        return (logic_sb_block + nr + 1);    // 前者がturu, ここでreturn 2
 
     bg = EXT2_SB(sb)->s_desc_per_block + nr;    // 129 = 128 + 1
     if (ext2_bg_has_super(sb, bg))
@@ -344,7 +314,7 @@ ext2_readsb(uint32_t dev, struct superblock *sb)
     if (sb->flags == SB_INITIALIZED) return;
 
     sbi = (struct ext2_sb_info *)kmalloc(sizeof(struct ext2_sb_info));
-    if (sbi == NULL) panic("memory exhaust");
+    if (sbi == NULL) panic("memory exhaust\n");
 
     // These sets are needed becuase of bread
     sb->major = SDMAJOR;
@@ -354,8 +324,8 @@ ext2_readsb(uint32_t dev, struct superblock *sb)
     sb_set_blocksize(sb, blocksize);
     sb->fs_info = sbi;
     sb->flags = SB_INITIALIZED;
-                                                // 2回めのmountはここでスタック
-    // subperblokはblockno 0のoffset 1024にあり(blocksize=4096)
+
+    // ext2のsubperblokはblockno 0のoffset 1024にあり(blocksize=4096)
     bp = ext2_ops.bread(dev, logic_sb_block);
     es = (struct ext2_superblock *)(bp->data + 1024);
 
@@ -363,7 +333,7 @@ ext2_readsb(uint32_t dev, struct superblock *sb)
     sbi->s_sbh = bp;
     if (es->s_magic != EXT2_SUPER_MAGIC) {
         ext2_ops.brelse(bp);
-        panic("Try to mount a non ext2 fs as an ext2 fs");
+        panic("Try to mount a non ext2 fs as an ext2 fs\n");
     }
 
     blocksize = EXT2_MIN_BLKSIZE << es->s_log_block_size;   // 4096
@@ -377,17 +347,18 @@ ext2_readsb(uint32_t dev, struct superblock *sb)
         logic_sb_block = EXT2_MIN_BLKSIZE / blocksize;      // 0
         offset = EXT2_MIN_BLKSIZE % blocksize;              // 1024
         bp = ext2_ops.bread(dev, logic_sb_block);           // 改めて先頭ブロックを読み込み
-
         if (!bp) {
-            panic("Error on second ext2 superblock read");
+            panic("Error on second ext2 superblock read\n");
         }
 
-        es = (struct ext2_superblock *)(((char *)bp->data) + offset);   // offset 1024にsuperblock
-        sbi->s_es = es;                                     // es, sbi->s_esにsuperblock
+        // offset 1024にsuperblock
+        es = (struct ext2_superblock *)(((char *)bp->data) + offset);
+        // es, sbi->s_esにsuperblock
+        sbi->s_es = es;
 
         if (es->s_magic != EXT2_SUPER_MAGIC) {
-            cprintf("ext2 magic: 0x%x -> 0x%x\n", EXT2_SUPER_MAGIC, es->s_magic);
-            panic("error: ext2 magic mismatch");
+            warn("0x%x -> 0x%x\n", EXT2_SUPER_MAGIC, es->s_magic);
+            panic("error: ext2 magic mismatch\n");
         }
     }
 
@@ -410,11 +381,11 @@ ext2_readsb(uint32_t dev, struct superblock *sb)
     sbi->s_desc_per_block_bits = ilog2(EXT2_DESC_PER_BLOCK(sb));    //  7
 
     if (sbi->s_blocks_per_group > sb->blocksize * 8) {
-        panic("error: #blocks per group too big");
+        panic("error: #blocks per group too big\n");
     }
 
     if (sbi->s_inodes_per_group > sb->blocksize * 8) {
-        panic("error: #inodes per group too big");
+        panic("error: #inodes per group too big\n");
     }
 
     sbi->s_groups_count = ((es->s_blocks_count - es->s_first_data_block - 1)
@@ -423,20 +394,39 @@ ext2_readsb(uint32_t dev, struct superblock *sb)
                 sbi->s_desc_per_block;                              // 1 = (1 + 128 - 1) / 128
 
     if (db_count > EXT2_MAX_BGC) {
-        panic("error: not enough memory to storage s_group_desc. Consider change the EXT2_MAX_BGC constnat");
+        panic("error: not enough memory to storage s_group_desc. Consider change the EXT2_MAX_BGC constnat\n");
 
     }
 
-    // bgl_lock_init(sbi->s_blockgroup_lock);
-
     for (i = 0; i < db_count; i++) {
-        block = descriptor_loc(sb, logic_sb_block, 0);          // ここが間違い、1 であるべきなのに2 になっている
-        sbi->s_group_desc[i] = ext2_ops.bread(dev, block);      // 1 => 0 に変更
+        block = descriptor_loc(sb, logic_sb_block, 0);
+        sbi->s_group_desc[i] = ext2_ops.bread(dev, block);
         if (!sbi->s_group_desc[i]) {
-            panic("error on read ext2 group descriptor");
+            panic("error on read ext2 group descriptor\n");
         }
     }
     sbi->s_gdb_count = db_count;
+/*
+    info("sb: major=%d, minor=%d, blksize=%d, lba=0x%x, nescs: 0x%x, bits=%d, flags=%d", sb->major, sb->minor, sb->blocksize, sb->lba, sb->nsecs, sb->s_blocksize_bits, sb->flags);
+    info("sbi: s_inodes_per_block=%lld", sbi->s_inodes_per_block);
+    info("sbi: s_blocks_per_group=%lld", sbi->s_blocks_per_group);
+    info("sbi: s_inodes_per_group=%lld", sbi->s_inodes_per_group);
+    info("sbi: s_itb_per_group=%lld", sbi->s_itb_per_group);
+    info("sbi: s_gdb_count=%lld", sbi->s_gdb_count);
+    info("sbi: s_desc_per_block=%lld", sbi->s_desc_per_block);
+    info("sbi: s_groups_count=%lld", sbi->s_groups_count);
+    info("sbi: s_overhead_last=%lld", sbi->s_overhead_last);
+    info("sbi: s_blocks_last=%lld", sbi->s_blocks_last);
+    info("sbi: s_sbh=0x%p", sbi->s_sbh);
+    info("sbi: s_es=0x%p", sbi->s_es);
+    info("sbi: s_group_desc=0x%p", sbi->s_group_desc[0]);
+    info("sbi: s_sb_block=%lld", sbi->s_sb_block);
+    info("sbi: s_addr_per_block_bits=%d", sbi->s_addr_per_block_bits);
+    info("sbi: s_desc_per_block_bits=%d", sbi->s_desc_per_block_bits);
+    info("sbi: s_inode_size=%d", sbi->s_inode_size);
+    info("sbi: s_first_ino=%d", sbi->s_first_ino);
+    info("sbi: s_dir_count=%lld", sbi->s_dir_count);
+*/
 }
 
 /**
@@ -453,11 +443,11 @@ read_inode_bitmap(struct superblock *sb, unsigned long block_group)
 
     desc = ext2_get_group_desc(sb, block_group, 0);
     if (!desc)
-        panic("read_inode_bitmap: error on get group desc");
+        panic("read_inode_bitmap: error on get group desc\n");
 
     bh = ext2_ops.bread(sb->minor, desc->bg_inode_bitmap);
     if (!bh)
-        panic("read_inode_bitmap: error on read ext2 inode bitmap");
+        panic("read_inode_bitmap: error on read ext2 inode bitmap\n");
     return bh;
 }
 
@@ -515,7 +505,7 @@ repeat_in_this_group:
     }
 
     // Scanned all blockgroups
-    panic("ext2_ialloc: no space to alloc inode");
+    panic("ext2_ialloc: no space to alloc inode\n");
 
 got:
     ext2_ops.bwrite(bitmap_bh);
@@ -523,7 +513,7 @@ got:
 
     ino += group * EXT2_INODES_PER_GROUP(&sb[dev]) + 1;
     if (ino < EXT2_FIRST_INO(&sb[dev]) || ino > sbi->s_es->s_inodes_count) {
-        panic("ext2_ialloc: invalid inode number allocated");
+        panic("ext2_ialloc: invalid inode number allocated\n");
     }
 
     gdp->bg_free_inodes_count -= 1;
@@ -541,7 +531,7 @@ got:
         raw_inode->i_mode = S_IFREG;
     } else {
         // We did not treat char and block devices with difference.
-        panic("ext2_ialloc: invalid inode mode");
+        panic("ext2_ialloc: invalid inode mode\n");
     }
 
     ext2_ops.bwrite(ibh);
@@ -920,6 +910,7 @@ void
 ext2_cleanup(struct inode *ip)
 {
     memset(ip->i_private, 0, sizeof(struct ext2_inode_info));
+    kmfree(ip->i_private);
 }
 
 /**
@@ -1724,7 +1715,7 @@ got_it:
     partial = chain + depth - 1;  /* the whole chain */
     /* cleanup: */
     while (partial > chain) {
-        brelse(partial->bh);
+        ext2_ops.brelse(partial->bh);
         partial--;
     }
 
@@ -1738,10 +1729,10 @@ ext2_ilock(struct inode *ip)
     struct ext2_inode *raw_inode;
     struct ext2_inode_info *ei;
 
-    ei = ip->i_private;
+    ei = (struct ext2_inode_info *)ip->i_private;
 
     if (ip == 0 || ip->ref < 1)
-        panic("ext2_ilock");
+        panic("ext2_ilock\n");
 
     acquiresleep(&ip->lock);
     if (ip->valid == 0) {
@@ -1754,7 +1745,7 @@ ext2_ilock(struct inode *ip)
         } else if (S_ISCHR(raw_inode->i_mode) || S_ISBLK(raw_inode->i_mode)) {
             ip->type = T_DEV;
         } else {
-            panic("ext2_ilock: invalid file mode");
+            panic("ext2_ilock: invalid file mode 0x%x\n", raw_inode->i_mode);
         }
         ip->nlink = raw_inode->i_links_count;
         ip->size = raw_inode->i_size;
@@ -1769,7 +1760,7 @@ ext2_ilock(struct inode *ip)
         ext2_ops.brelse(bp);
         ip->valid = 1;
         if (ip->type == 0)
-            panic("ext2_ilock: no type");
+            panic("ext2_ilock: no type\n");
     }
 }
 
@@ -1835,14 +1826,15 @@ ext2_dirlink(struct inode *dp, char *name, uint32_t inum, uint16_t type)
     int n;
     int numblocks = (dp->size + chunk_size - 1) / chunk_size;
     char *kaddr;
+    trace("dp=%d, name=%s, inum=%d, type=%d", dp->inum, name, inum, type);
 
     // すでに同名のファイルが存在する場合はエラー
     if (ext2_iops.dirlookup(dp, name, 0) != 0) {
         return -1;
     }
-
     for (n = 0; n <= numblocks; n++) {
         bh = ext2_ops.bread(dp->dev, ext2_iops.bmap(dp, n));
+        debug("[%d] bread bh blockno=0x%x", n, bh->blockno);
         kaddr = (char *) bh->data;
         de = (struct ext2_dir_entry_2 *) kaddr;
         dir_end = kaddr + ext2_last_byte(dp, n);
@@ -1865,12 +1857,12 @@ ext2_dirlink(struct inode *dp, char *name, uint32_t inum, uint16_t type)
             name_len = EXT2_DIR_REC_LEN(de->name_len);
             rec_len = de->rec_len;
             if (!de->inode && rec_len >= reclen)
-                    goto got_it;
+                goto got_it;
             if (rec_len >= name_len + reclen)
-                    goto got_it;
+                goto got_it;
             de = (struct ext2_dir_entry_2 *) ((char *) de + rec_len);
         }
-
+        debug("brease");
         ext2_ops.brelse(bh);
     }
 
@@ -1894,9 +1886,10 @@ got_it:
         de->file_type = EXT2_FT_REG_FILE;
     } else {
         // We did not treat char and block devices with difference.
-        panic("ext2: invalid inode mode");
+        panic("ext2: invalid type %d\n", type);
     }
 
+    debug("bwrite bh: blockno=0x%x", bh->blockno);
     ext2_ops.bwrite(bh);
     ext2_ops.brelse(bh);
 

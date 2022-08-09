@@ -880,9 +880,9 @@ mount(char *source, char *target, char *fstype, uint64_t flags, void *data)
     struct inode *ip, *devi = 0;
     struct filesystem_type *fs_t;
     long error;
-
+    info("source: %s, target: %s, type: %s, flags: 0x%llx", source, target, fstype, flags);
     begin_op();
-    if ((ip = namei(target)) == 0 || (devi == namei(source)) == 0) {
+    if ((ip = namei(target)) == 0 || (devi = namei(source)) == 0) {
         warn("not found: ip=0x%p, devi=0x%p", ip, devi);
         end_op();
         return -ENOENT;
@@ -940,15 +940,17 @@ mount(char *source, char *target, char *fstype, uint64_t flags, void *data)
 
     // 8: マウントポイントのファイルタイプを変更
     ip->type = T_MOUNT;
-
-    error = 0;
+    //ip->iops->iupdate(ip);    // これを活かすとconsoleでcntl-Dが効かなくなる
+    devi->iops->iunlock(devi);
+    ip->iops->iunlock(ip);
+    end_op();
+    return 0;
 
 bad:
     iunlockput(devi);
     iunlockput(ip);
     end_op();
     return error;
-
 }
 
 long
@@ -999,6 +1001,6 @@ bad1:
     iunlockput(ip);
 bad2:
     iunlockput(devi);
-
+    end_op();
     return error;
 }

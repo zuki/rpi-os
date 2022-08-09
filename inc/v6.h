@@ -101,4 +101,5 @@ int             v6_isdirempty(struct inode *dp);
 
 // V6 Specific function
 int             init_v6fs(void);
+int             v6_fill_inode(struct inode *ip);
 #endif

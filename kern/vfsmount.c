@@ -16,7 +16,7 @@ mtablertinode(struct inode *ip)
 
     acquire(&mtable.lock);
     for (mp = mtable.mpoint; mp < &mtable.mpoint[MOUNTSIZE]; mp++) {
-        if (mp->m_inode->dev == ip->dev && mp->m_inode->inum == ip->inum) {
+        if (mp->m_inode && mp->m_inode->dev == ip->dev && mp->m_inode->inum == ip->inum) {
             rtinode = mp->m_rtinode;
 
             release(&mtable.lock);
@@ -36,7 +36,7 @@ mtablemntinode(struct inode *ip)
 
     acquire(&mtable.lock);
     for (mp = mtable.mpoint; mp < &mtable.mpoint[MOUNTSIZE]; mp++) {
-        if (mp->m_rtinode->dev == ip->dev && mp->m_rtinode->inum == ip->inum) {
+        if (mp->m_rtinode && mp->m_rtinode->dev == ip->dev && mp->m_rtinode->inum == ip->inum) {
             mntinode = mp->m_inode;
             release(&mtable.lock);
 
@@ -54,18 +54,17 @@ isinoderoot(struct inode *ip)
 
     acquire(&mtable.lock);
     for (mp = mtable.mpoint; mp < &mtable.mpoint[MOUNTSIZE]; mp++) {
-        if (mp->m_rtinode->dev == ip->dev && mp->m_rtinode->inum == ip->inum) {
+        if (mp->m_rtinode && mp->m_rtinode->dev == ip->dev && mp->m_rtinode->inum == ip->inum) {
             release(&mtable.lock);
             return 1;
         }
     }
     release(&mtable.lock);
-
     return 0;
 }
 
 void
-mountinit(void)
+mount_init(void)
 {
     initlock(&mtable.lock, "mtable");
     cprintf("mountinit ok \n");

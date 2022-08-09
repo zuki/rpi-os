@@ -14,7 +14,7 @@ memset(void *str, int c, size_t n)
 }
 
 static inline void *
-memmove(void *dst, const void *src, size_t n)
+memmove(void *dst, const void *src, ssize_t n)
 {
     const char *s = (const char *)src;
     char *d = (char *)dst;
@@ -29,7 +29,7 @@ memmove(void *dst, const void *src, size_t n)
 }
 
 static inline int
-memcmp(const void *v1, const void *v2, size_t n)
+memcmp(const void *v1, const void *v2, ssize_t n)
 {
     for (const uint8_t *s1 = (const uint8_t*)v1, *s2 = (const uint8_t*)v2;
          n-- > 0; s1++, s2++)
@@ -39,7 +39,7 @@ memcmp(const void *v1, const void *v2, size_t n)
 }
 
 static inline int
-strncmp(const char *p, const char *q, size_t n)
+strncmp(const char *p, const char *q, ssize_t n)
 {
     while (n > 0 && *p && *p == *q)
         n--, p++, q++;
@@ -49,7 +49,7 @@ strncmp(const char *p, const char *q, size_t n)
 }
 
 static inline char *
-strncpy(char *s, const char *t, size_t n)
+strncpy(char *s, const char *t, ssize_t n)
 {
     char *os = s;
     while (n-- > 0 && (*s++ = *t++) != 0)
@@ -61,7 +61,7 @@ strncpy(char *s, const char *t, size_t n)
 
 // Like strncpy but guaranteed to NUL-terminate.
 static inline char *
-safestrcpy(char *s, const char *t, size_t n)
+safestrcpy(char *s, const char *t, ssize_t n)
 {
     char *os = s;
     if (n <= 0)

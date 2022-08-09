@@ -79,7 +79,7 @@ init_v6fs(void)
     return register_fs(&v6fs);
 }
 
-static int
+int
 v6_fill_inode(struct inode *ip)
 {
     struct v6_inode *v6ip = (struct v6_inode *)kmalloc(sizeof(struct v6_inode));
@@ -470,6 +470,7 @@ void
 v6_cleanup(struct inode *ip)
 {
     memset(ip->i_private, 0, sizeof(struct v6_inode));
+    kmfree(ip->i_private);
 }
 
 /* Inode content
