@@ -502,3 +502,58 @@ GROUP DESC: 0x1d102000
  used_dirs_count   : 0x0000
  block_bitmap      : 0x0000
 ```
+
+## 更新履歴 (vfs, ext2, mountを含む)
+
+```
+$ git diff --compact-summary ca02803
+ README.md                   |    3 +
+ inc/buf.h                   |    8 +-
+ inc/dev.h                   |   12 +
+ inc/ext2.h (new)            |  368 ++++++++
+ inc/file.h                  |   51 +-
+ inc/find_bits.h (new)       |  162 ++++
+ inc/fs.h (gone)             |  115 ---
+ inc/linux/find_bits.h (new) |  162 ++++
+ inc/linux/ilog2.h (new)     |  108 +++
+ inc/log.h                   |    6 +-
+ inc/string.h                |   24 +-
+ inc/types.h                 |    3 +-
+ inc/v6.h (new)              |  105 +++
+ inc/vfs.h (new)             |  238 +++++
+ inc/vfsmount.h (new)        |   31 +
+ kern/bio.c                  |   43 +-
+ kern/console.c              |   13 +-
+ kern/dev.c                  |   38 +-
+ kern/exec.c                 |   15 +-
+ kern/ext2.c (new)           | 2183 +++++++++++++++++++++++++++++++++++++++++++
+ kern/file.c                 |  280 ++++--
+ kern/find_bits.c (new)      |   42 +
+ kern/fs.c (gone)            |  958 -------------------
+ kern/log.c                  |  213 +++--
+ kern/main.c                 |   11 +-
+ kern/mm.c                   |    2 +-
+ kern/mmap.c                 |   16 +-
+ kern/pagecache.c            |    7 +-
+ kern/pipe.c                 |    2 +-
+ kern/syscall.c              |   12 +-
+ kern/sysfile.c              |   61 +-
+ kern/trap.c                 |    2 +-
+ kern/v6.c (new)             |  725 ++++++++++++++
+ kern/vfs.c (new)            |  661 +++++++++++++
+ kern/vfsmount.c (new)       |   71 ++
+ kern/vm.c                   |    4 +-
+ memos/src/SUMMARY.md        |    3 +
+ memos/src/ext2.md (new)     |  504 ++++++++++
+ memos/src/mount.md (new)    |   10 +
+ memos/src/vfs.md (new)      |  241 +++++
+ mksd.mk                     |   25 +-
+ tools/dump.c                |    2 +-
+ tools/ext2 (new +x)         |  Bin 0 -> 50264 bytes
+ tools/ext2.c (new)          |  424 +++++++++
+ usr/etc/inittab             |    1 +
+ usr/src/mkfs/main.c         |    6 +-
+ usr/src/mount/main.c (new)  |   18 +
+ usr/src/umount/main.c (new) |   18 +
+ 48 files changed, 6606 insertions(+), 1401 deletions(-)
+```
