@@ -28,6 +28,7 @@
 - [VFSをサポート](vfs.md)
 - [Ext2ファイルシステムをサポート](ext2.md)
 - [mount/umountコマンドをサポート](mount.md)
+- [USBをサポート](usb.md)
 
 # 翻訳
 

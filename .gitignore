@@ -5,6 +5,7 @@ bin/
 .vscode/
 *.o
 back
+*.org
 
 boot/*
 memos/book/*

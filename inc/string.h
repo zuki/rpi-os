@@ -28,6 +28,12 @@ memmove(void *dst, const void *src, ssize_t n)
     return dst;
 }
 
+static inline void *
+memcpy(void *dst, const void *src, ssize_t n)
+{
+    return memmove(dst, src, n);
+}
+
 static inline int
 memcmp(const void *v1, const void *v2, ssize_t n)
 {
