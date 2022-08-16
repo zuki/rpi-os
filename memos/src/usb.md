@@ -1,4 +1,4 @@
-# USBを追加
+# USB機能の追加の試み
 
 ```
 [1]HCDInitialise: VenderID=0x4f54294a, UserID=0x0

@@ -28,7 +28,8 @@
 - [VFSをサポート](vfs.md)
 - [Ext2ファイルシステムをサポート](ext2.md)
 - [mount/umountコマンドをサポート](mount.md)
-- [USBをサポート](usb.md)
+- [USB機能の追加の試み](usb.md)
+- [VIM追加の試み](vim.md)
 
 # 翻訳
 
