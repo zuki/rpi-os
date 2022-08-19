@@ -557,3 +557,41 @@ $ git diff --compact-summary ca02803
  usr/src/umount/main.c (new) |   18 +
  48 files changed, 6606 insertions(+), 1401 deletions(-)
 ```
+
+## e2fsprogsをコンパイル
+
+- static版
+
+```
+$ mkdir -p ~/gnu/e2fsprogs
+$ wget https://mirrors.edge.kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/v1.46.5/e2fsprogs-1.46.5.tar.xz
+$ tar Jxf e2fsprogs-1.46.5.tar.xz
+$ e2fsprogs-1.46.5
+$ mkdir build && cd build
+$ CC=~/musl/bin/musl-gcc ../configure --host=aarch64-elf --disable-tls --enable-fsck --disable-debugfs --disable-testio-debug --without-pthread --prefix=~/gnu/e2fsprogs CFLAGS="-O2"
+$ make LDFLAGS="-static"
+$ make install
+$ ls ~/gnu/e2fsprogs/sbin
+badblocks  e2freefrag  e2label      filefrag  fsck.ext2  logsave    mkfs.ext3     resize2fs
+blkid      e2fsck      e2mmpstatus  findfs    fsck.ext3  mke2fs     mkfs.ext4     tune2fs
+dumpe2fs   e2image     e2undo       fsck      fsck.ext4  mkfs.ext2  mklost+found  uuidd
+$ file ~/gnu/e2fsprogs/sbin/e2fsck
+~/gnu/e2fsprogssbin/e2fsck: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically linked, with debug_info, not stripped
+```
+
+- dynamic link版
+
+```
+$ CC=~/musl/bin/musl-gcc ../configure --host=aarch64-elf --disable-tls --enable-fsck --disable-debugfs --disable-testio-debug --without-pthread --prefix=~/gnu/e2fsprogs CFLAGS="-O2 -fpie"
+$ make LDFLAGS="-pie"
+$ file e2fsck/e2fsck
+e2fsck/e2fsck: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-musl-aarch64.so.1, not stripped
+```
+
+- CLALGSを指定しないとデフォルトは"-O2 -g"で、これだとリンクエラーが発生する
+- libgはdebug情報付きのlibcだそうだ(--enable-debugでconfigureした際に作成されていたかは未確認)
+
+```
+	LD uuid_time
+/usr/local/opt/aarch64-elf-binutils/bin/aarch64-elf-ld: cannot find -lg: No such file or directory
+```
