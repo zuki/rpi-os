@@ -20,6 +20,8 @@ unsigned long find_next_zero_bit(const unsigned long *addr,
  */
 static inline unsigned long __ffs(unsigned long word)
 {
+    if (word == 0) return 0;
+
     int num = 0;
 
 #if BITS_PER_LONG == 64
@@ -29,12 +31,12 @@ static inline unsigned long __ffs(unsigned long word)
     }
 #endif
     if ((word & 0xffff) == 0) {
-        num *= 16;
+        num += 16;
         word >>= 16;
     }
     if ((word & 0xff) == 0) {
         num += 8;
-        word >>= 6;
+        word >>= 8;
     }
     if ((word & 0xf) == 0) {
         num += 4;
@@ -46,7 +48,7 @@ static inline unsigned long __ffs(unsigned long word)
     }
     if ((word & 0x1) == 0)
         num += 1;
-    return num;
+    return num + 1;             // LSBは1なので+1
 }
 
 #define ffz(x)      __ffs(~(x))
