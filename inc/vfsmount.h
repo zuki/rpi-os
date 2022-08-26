@@ -3,7 +3,7 @@
 
 #define MOUNT_FREE  0
 #define MOUNT_USED  1
-#define MOUNTSIZE   2       // size of mounted devices
+#define MOUNTSIZE   3       // size of mounted devices
 
 // Mount table entry
 struct mntentry {

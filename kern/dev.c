@@ -96,19 +96,21 @@ dev_start(void)
     while (!list_empty(&devque)) {
         struct buf *b =
             container_of(list_front(&devque), struct buf, dlink);
+        uint32_t blks = b->dev == FATMINOR ? 512 : 4096;
         if (b->blockno == (uint32_t)-1) {
             bno = 0;
         } else {
             first_bno = sb[b->dev].lba;
             nblocks = sb[b->dev].nsecs;
             assert(b->blockno < nblocks);
-            bno = b->blockno * 8 + first_bno;
+            bno = b->blockno * (blks / 512) + first_bno;
         }
         emmc_seek(&card, bno * SD_BLOCK_SIZE);
+
         if (b->flags & B_DIRTY) {
-            assert(emmc_write(&card, b->data, BSIZE) == BSIZE);
+            assert(emmc_write(&card, b->data, blks) == blks);
         } else {
-            assert(emmc_read(&card, b->data, BSIZE) == BSIZE);
+            assert(emmc_read(&card, b->data, blks) == blks);
         }
 
         b->flags |= B_VALID;
