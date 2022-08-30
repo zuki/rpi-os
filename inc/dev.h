@@ -8,7 +8,10 @@ void dev_init();
 void dev_intr();
 void devrw(struct buf *);
 
-/* assumes size > 256 */
+/*
+ * log_2(size): 512 = 9, 4096 = 12
+ * assumes size > 256
+ */
 static inline uint8_t blksize_bits(uint32_t size)
 {
   uint8_t bits = 8;
