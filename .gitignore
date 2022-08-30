@@ -6,6 +6,7 @@ bin/
 *.o
 back
 *.org
+kern/fat/*
 
 boot/*
 memos/book/*
