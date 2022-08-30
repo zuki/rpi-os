@@ -61,7 +61,7 @@ clock_reset()
     put32(TIMER_CLR, TIMER_CLR_INT);
 }
 
-// 現在痔の更新
+// 現在時の更新
 static void update_wall_time(uint64_t ticks)
 {
     do {
