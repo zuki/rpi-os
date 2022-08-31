@@ -70,10 +70,9 @@ kmalloc(size_t nbytes)
     Header *p, *prevp;
     uint64_t nunits;
 
-    //panic if we try to allocate more than PGSIZE bytes
-    //4088 + 8 bytes (Header )
-    if (nbytes > PGSIZE)
-        panic("kmalloc: Cannot allocate the requested size of memory ( > PGSIZE )\n");
+    // panic if we try to allocate more than 4080
+    if (nbytes > (PGSIZE - sizeof(Header)))
+        panic("kmalloc: Cannot allocate the requested size of memory %d ( > 4080 )\n", nbytes);
     nunits = (nbytes + sizeof(Header) - 1)/sizeof(Header) + 1;
 
     if((prevp = freep) == 0){
