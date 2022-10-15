@@ -9,22 +9,23 @@
 #include "proc.h"
 
 /* Local timer */
-#define TIMER_ROUTE             (LOCAL_BASE + 0x24)
-#define TIMER_IRQ2CORE(i)       (i)
+#define LOCAL_TIMER_ROUTE       (LOCAL_BASE + 0x24)
+#define ROUTING_BITS(i)         (i)
 
-#define TIMER_CTRL              (LOCAL_BASE + 0x34)
-#define TIMER_INTENA            (1 << 29)
-#define TIMER_ENABLE            (1 << 28)
+#define LOCAL_TIMER_CTRL        (LOCAL_BASE + 0x34)
+    #define LOCAL_TIMER_CTRL_INTERA      (1 << 29)
+    #define LOCAL_TIMER_CTRL_ENABLE      (1 << 28)
 
 #if RASPI <= 3
-#define TIMER_RELOAD_SEC        (38400000 / HZ)      /* 2 * 19.2 MHz = 1 sec, /HZ = 10 ms*/
+// ローカルタイマーは10ミリ秒でタイムアウト(jiffies単位)
+#define LOCAL_TIMER_RELOAD_VALUE    (38400000 / HZ)      /* 2 * 19.2 MHz = 1 sec, / HZ = 10 ms */
 #elif RASPI == 4
-#define TIMER_RELOAD_SEC        (108000000)     /* 2 * 54 MHz */
+#define LOCAL_TIMER_RELOAD_VALUE    (108000000)     /* 2 * 54 MHz */
 #endif
 
-#define TIMER_CLR               (LOCAL_BASE + 0x38)
-#define TIMER_CLR_INT           (1 << 31)
-#define TIMER_RELOAD            (1 << 30)
+#define LOCAL_TIMER_CLR         (LOCAL_BASE + 0x38)
+    #define LOCAL_TIMER_CLR_INT     (1 << 31)
+    #define LOCAL_TIMER_CLR_RELOAD  (1 << 30)
 
 #define TICK_USEC (10000UL)
 #define TICK_NSEC (10000000UL)
@@ -42,9 +43,9 @@ unsigned long wall_jiffies = INITIAL_JIFFIES;
 void
 clock_init()
 {
-    put32(TIMER_CTRL, TIMER_INTENA | TIMER_ENABLE | TIMER_RELOAD_SEC);
-    put32(TIMER_ROUTE, TIMER_IRQ2CORE(0));
-    put32(TIMER_CLR, TIMER_RELOAD | TIMER_CLR_INT);
+    put32(LOCAL_TIMER_CTRL, LOCAL_TIMER_CTRL_INTERA | LOCAL_TIMER_CTRL_ENABLE | LOCAL_TIMER_RELOAD_VALUE);
+    put32(LOCAL_TIMER_ROUTE, ROUTING_BITS(0));
+    put32(LOCAL_TIMER_CLR, LOCAL_TIMER_CLR_RELOAD | LOCAL_TIMER_CLR_INT);
 #ifdef USE_GIC
     irq_enable(IRQ_LOCAL_TIMER);
     irq_register(IRQ_LOCAL_TIMER, clock_intr);
@@ -58,7 +59,7 @@ clock_init()
 static void
 clock_reset()
 {
-    put32(TIMER_CLR, TIMER_CLR_INT);
+    put32(LOCAL_TIMER_CLR, LOCAL_TIMER_CLR_INT);
 }
 
 // 現在時の更新
@@ -87,18 +88,20 @@ static inline void update_times(void)
 }
 
 /*
- * Real time clock (local timer) interrupt. It gets impluse from crystal clock,
- * thus independent of the variant cpu clock.
+ * リアルタイムクロック（ローカルタイマー）割り込みハンドラ。
+ * このクロックはクリスタルクロックなので様々なCPUクロックとは
+ * 独立している。（10msごとに呼び出される）
  */
 void
 clock_intr()
 {
-    ++jiffies;
+    ++jiffies;                  // 1. jiffies更新
+    // FIXME: これはおかしい
     thisproc()->stime = jiffies * 1000000000 / HZ;
     trace("c: %d", jiffies);
-    update_times();
-    run_timer_list();
-    clock_reset();
+    update_times();             // 2. 時計更新
+    run_timer_list();           // 3. カーネルタイマー実行
+    clock_reset();              // 4. ローカルタイマーリセット
 }
 
 long
@@ -114,6 +117,7 @@ clock_gettime(clockid_t clk_id, struct timespec *tp)
             tp->tv_sec = xtime.tv_sec;
             break;
         case CLOCK_PROCESS_CPUTIME_ID:
+            // FIXME: これはおかしい
             ptime = thisproc()->stime + thisproc()->utime;
             tp->tv_nsec = ptime % 1000000000;
             tp->tv_sec  = ptime / 1000000000;
@@ -142,5 +146,10 @@ long clock_settime(clockid_t clk_id, const struct timespec *tp)
 
 long get_uptime(void)
 {
-    return xtime.tv_sec;
+    return jiffies * HZ;
+}
+
+long get_ticks(void)
+{
+    return jiffies;
 }

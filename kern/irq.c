@@ -10,9 +10,10 @@
 #include "clock.h"
 #include "console.h"
 
+// BCM2835割り込みレジスタ
 #define IRQ_BASIC_PENDING       (MMIO_BASE + 0xB200)
-#define IRQ_PENDING_1           (MMIO_BASE + 0xB204)
-#define IRQ_PENDING_2           (MMIO_BASE + 0xB208)
+#define PENDING_IRQS_1          (MMIO_BASE + 0xB204)
+#define PENDING_IRQS_2          (MMIO_BASE + 0xB208)
 #define FIQ_CONTROL             (MMIO_BASE + 0xB20C)
 #define ENABLE_IRQS_1           (MMIO_BASE + 0xB210)
 #define ENABLE_IRQS_2           (MMIO_BASE + 0xB214)
@@ -40,21 +41,22 @@
 #define IRQ_STATUS0             (MMIO_BASE + 0xB230)
 #define IRQ_STATUS1             (MMIO_BASE + 0xB234)
 #define IRQ_STATUS2             (MMIO_BASE + 0xB238)
-#endif
+#endif  /* RASPI == 4 */
 
-/* ARM Local Peripherals */
-#define GPU_INT_ROUTE           (LOCAL_BASE + 0xC)
+/* BCM2837 ARMローカルペリフェラル */
+#define GPU_INT_ROUTE           (LOCAL_BASE + 0xC)  /* GPU割り込みルーティング */
 #if RASPI <= 3
-#define GPU_IRQ2CORE(i)         (i)
+#define GPU_IRQ2CORE(i)         (i)                 /* Core iのIRQにルーティング*/
 #elif RASPI == 4
 #define GPU_IRQ2CORE(i)         ((i) << 4)
 #endif
 
-#define IRQ_SRC_CORE(i)         (LOCAL_BASE + 0x60 + 4*(i))
-#define IRQ_SRC_TIMER           (1 << 11)       /* Local Timer */
-#define IRQ_SRC_GPU             (1 << 8)
-#define IRQ_SRC_CNTPNSIRQ       (1 << 1)        /* Core Timer */
-#define FIQ_SRC_CORE(i)         (LOCAL_BASE + 0x70 + 4*(i))
+#define IRQ_SRC_CORE(i)         (LOCAL_BASE + 0x60 + 4*(i)) /* 割り込みのソース */
+#define IRQ_SRC_TIMER           (1 << 11)       /* ローカルタイマー(clockで使用) */
+#define IRQ_SRC_GPU             (1 << 8)        /* GPU割り込み */
+#define IRQ_SRC_CNTPNSIRQ       (1 << 1)        /* 物理カウンタ割り込み  */
+
+#define FIQ_SRC_CORE(i)         (LOCAL_BASE + 0x70 + 4*(i)) /* 高速割り込みのソース */
 
 #ifdef USE_GIC
 /*
@@ -120,8 +122,10 @@
 #define GICC_EOIR_CPUID__SHIFT      10
 #define GICC_EOIR_CPUID__MASK       (3 << 10)
 
-#endif
+#endif /* USE_GIC */
 
+// 割り込みハンドラの型定義
+// TODO: 引数（割り込み元）を追加する
 static void (*handler[IRQ_LINES])();
 
 static void
@@ -145,7 +149,7 @@ irq_debug()
 #endif
 }
 
-/* Route all global interrupt to cpu 0. */
+/* グローバルな割り込みはすべてCPU 0にルーティング */
 void
 irq_init()
 {
@@ -188,10 +192,10 @@ irq_init()
     put32(GICC_PMR, GICC_PMR_PRIORITY);
     put32(GICC_CTLR, GICC_CTLR_ENABLE);
 
-#endif
+#endif /* USE_GIC*/
 }
 
-/* Enable interrupt i. */
+/* 割り込み i を有効に */
 void
 irq_enable(int i)
 {
@@ -206,6 +210,7 @@ void
 irq_disable(int i)
 {
 #ifndef USE_GIC
+    // TODO: 実装する
     panic("todo");
 #else
     put32(GICD_ICENABLER0 + 4 * (i / 32), 1 << (i % 32));
@@ -213,8 +218,9 @@ irq_disable(int i)
 }
 
 /*
- * Register an interrupt handler.
- * When interrupt i happens, it will call function f.
+ * 割り込みハンドラを登録する。
+ * 割り込みiが発生した際、ハンドラfが呼び出される。
+ * TODO: 引数を追加
  */
 void
 irq_register(int i, void (*f)())
@@ -222,6 +228,7 @@ irq_register(int i, void (*f)())
     handler[i] = f;
 }
 
+// 実際の割り込みハンドラの呼び出し
 static int
 handle1(int i)
 {
@@ -234,17 +241,24 @@ handle1(int i)
     return 0;
 }
 
+// 割り込みハンドラ
 void
 irq_handler()
 {
     int nack = 0;
 #ifndef USE_GIC
+    // 割り込みソースの取得
     int src = get32(IRQ_SRC_CORE(cpuid()));
+    // 現在実装している割り込み以外はエラー
     assert(!(src & ~(IRQ_SRC_CNTPNSIRQ | IRQ_SRC_GPU | IRQ_SRC_TIMER)));
+    // 1. 物理カウンター割り込み（コアタイマー割り込み: タイマーで使用）
+    // FIXME: 実際はエンプションにしか使用していない
     if (src & IRQ_SRC_CNTPNSIRQ) {
         timer_intr();
         nack++;
     }
+    // 2. ローカルタイマー割り込み（clockで使用）
+    // FIXME: 現在はこちらでカーネルタイマーを動かしている
     if (src & IRQ_SRC_TIMER) {
         clock_intr();
         nack++;
@@ -253,16 +267,18 @@ irq_handler()
     uint64_t irq =
         get32(IRQ0_PENDING0) | (((uint64_t) get32(IRQ0_PENDING1)) << 32);
 #else
+    // 3. GPU割り込み（割り込み保留ビットを取得）
     uint64_t irq =
-        get32(IRQ_PENDING_1) | (((uint64_t) get32(IRQ_PENDING_2)) << 32);
+        get32(PENDING_IRQS_1) | (((uint64_t) get32(PENDING_IRQS_2)) << 32);
 #endif
+    // 保留されている登録済みの割り込みハンドラを降順に実行する
     for (int i = 0; i < IRQ_LINES && irq; i++) {
         if (irq & 1) {
             nack += handle1(i);
         }
         irq >>= 1;
     }
-#else
+#else /* USE_GIC */
     uint32_t iar = get32(GICC_IAR);
     uint32_t i = iar & GICC_IAR_INTERRUPT_ID__MASK;
     if (i < IRQ_LINES) {
@@ -282,7 +298,8 @@ irq_handler()
         trace("spurious interrupt %u, src 0x%x", i,
               get32(IRQ_SRC_CORE(cpuid())));
     }
-#endif
+#endif /* USE_GIC */
+    // ハンドラが呼び出された場合、nack > 0 になる
     if (nack == 0) {
         trace("unexpected interrupt, maybe sdhost or EC_UNKNOWN");
     }

@@ -1,17 +1,27 @@
 #ifndef INC_IRQ_H
 #define INC_IRQ_H
 
+#undef USE_GIC
+
 #if RASPI == 4
-// #define USE_GIC
+ #define USE_GIC
 #endif
 
 #ifndef USE_GIC
 
+// APMペリファラル割り込み番号（GPU IRQ 0-63）
+#define SYSTIMER_MATCH_1    1
+#define SYSTIMER_MATCH_3    3
+#define IRQ_USB_HC          9
 #define IRQ_AUX             29
 #define IRQ_SDIO            56
 #define IRQ_ARASANSDIO      62
 
 #define IRQ_LINES           64
+
+#define IRQ_BASIC_PENDING_TIMER             0
+#define IRQ_BASIC_PENDING_PENDING_IRQS_1    8
+#define IRQ_BASIC_PENDING_PENDING_IRQS_2    9
 
 #else
 
