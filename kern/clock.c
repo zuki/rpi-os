@@ -95,9 +95,8 @@ static inline void update_times(void)
 void
 clock_intr()
 {
-    ++jiffies;                  // 1. jiffies更新
-    // FIXME: これはおかしい
-    thisproc()->stime = jiffies * 1000000000 / HZ;
+    ++jiffies;
+    //thisproc()->stime = jiffies * 1000000000 / HZ;
     trace("c: %d", jiffies);
     update_times();             // 2. 時計更新
     run_timer_list();           // 3. カーネルタイマー実行
@@ -117,8 +116,8 @@ clock_gettime(clockid_t clk_id, struct timespec *tp)
             tp->tv_sec = xtime.tv_sec;
             break;
         case CLOCK_PROCESS_CPUTIME_ID:
-            // FIXME: これはおかしい
-            ptime = thisproc()->stime + thisproc()->utime;
+            struct proc *p = thisproc();
+            ptime = (p->stime + p->utime) * TICK_NSEC;
             tp->tv_nsec = ptime % 1000000000;
             tp->tv_sec  = ptime / 1000000000;
             break;

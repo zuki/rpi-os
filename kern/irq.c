@@ -243,7 +243,7 @@ handle1(int i)
 
 // 割り込みハンドラ
 void
-irq_handler()
+irq_handler(int user_mode)
 {
     int nack = 0;
 #ifndef USE_GIC
@@ -254,7 +254,7 @@ irq_handler()
     // 1. 物理カウンター割り込み（コアタイマー割り込み: タイマーで使用）
     // FIXME: 実際はエンプションにしか使用していない
     if (src & IRQ_SRC_CNTPNSIRQ) {
-        timer_intr();
+        timer_intr(user_mode);
         nack++;
     }
     // 2. ローカルタイマー割り込み（clockで使用）

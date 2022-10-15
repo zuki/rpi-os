@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "list.h"
 #include "spinlock.h"
+#include "rtc.h"
 
 /* Core Timer */
 #define CORE_TIMER_CTRL(i)      (LOCAL_BASE + 0x40 + 4*(i))
@@ -15,13 +16,26 @@
 static uint64_t dt;
 static uint64_t cnt;
 
+static update_proc_time(int user_mode)
+{
+    struct proc *p = thisproc();
+    if (user_mode)
+        p->utime++;
+    else
+        p->stime++;
+}
+
 void
 timer_init()
 {
-    dt = timerfreq() / HZ;       // 10 ms
+#ifdef USING_RASPI
+    dt = timerfreq() / HZ;       // 10 ms = 19.2 * 10^6 / 100
+#else
+    dt = 62500000UL / HZ;       // QEMUはtimerfreq()で得られる値が実機と違う
+#endif
+    info("timerfreq = 0x%llx", timerfreq());
     asm volatile ("msr cntp_ctl_el0, %[x]"::[x] "r"(1));    // Physical Timer enable
     asm volatile ("msr cntp_tval_el0, %[x]"::[x] "r"(dt));  // Set counter of physica timer
-// asm volatile ("msr cntp_cval_el0, %[x]"::[x] "r"(ct));   // Set compare time
     put32(CORE_TIMER_CTRL(cpuid()), CORE_TIMER_ENABLE);     // core timer enable
 #ifdef USE_GIC
     irq_enable(IRQ_LOCAL_CNTPNS);
@@ -40,10 +54,15 @@ timer_reset()
  * which is determined by cpu clock (may be tuned for power saving).
  */
 void
-timer_intr()
+timer_intr(int user_mode)
 {
-    trace("t: %d", ++cnt);
+#if 0
+    if (cpuid() == 0 && ++cnt % 100) {
+        info("cnt=%lld, jif=%lld", cnt, jiffies);
+    }
+#endif
     timer_reset();
+    update_proc_time(user_mode);
     // プリエンプション
     yield();
 }

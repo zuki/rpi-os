@@ -18,6 +18,12 @@ extern long syscall1(struct trapframe *);
 static long pf_handler(int dfs, uint64_t far);
 void trap_error(uint64_t type);
 
+#define PSR_MODE_EL0t   0x00000000
+#define PSR_MODE_MASK   0x0000000F
+
+#define user_mode(tf) \
+    (((int)((tf)->spsr) & PSR_MODE_MASK) == PSR_MODE_EL0t)
+
 void
 trap_init()
 {
@@ -42,7 +48,7 @@ trap(struct trapframe *tf)
         if (il) {
             debug("IL bit on");
         } else {
-            irq_handler();
+            irq_handler(user_mode(tf));
         }
         check_pending_signal();
         break;
