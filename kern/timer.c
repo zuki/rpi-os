@@ -10,7 +10,7 @@
 
 /* Core Timer */
 #define CORE_TIMER_CTRL(i)      (LOCAL_BASE + 0x40 + 4*(i))
-#define CORE_TIMER_ENABLE       (1 << 1)        /* CNTPNSIRQ */
+#define CORE_TIMER_ENABLE       (1 << 1)    // CNTPNSIRQ: 非セキュアな物理カウンタ
 
 static uint64_t dt;
 static uint64_t cnt;
@@ -19,8 +19,9 @@ void
 timer_init()
 {
     dt = timerfreq() / HZ;       // 10 ms
-    asm volatile ("msr cntp_ctl_el0, %[x]"::[x] "r"(1));    // Timer enable
-    asm volatile ("msr cntp_tval_el0, %[x]"::[x] "r"(dt));  // Set counter
+    asm volatile ("msr cntp_ctl_el0, %[x]"::[x] "r"(1));    // Physical Timer enable
+    asm volatile ("msr cntp_tval_el0, %[x]"::[x] "r"(dt));  // Set counter of physica timer
+// asm volatile ("msr cntp_cval_el0, %[x]"::[x] "r"(ct));   // Set compare time
     put32(CORE_TIMER_CTRL(cpuid()), CORE_TIMER_ENABLE);     // core timer enable
 #ifdef USE_GIC
     irq_enable(IRQ_LOCAL_CNTPNS);
@@ -43,6 +44,7 @@ timer_intr()
 {
     trace("t: %d", ++cnt);
     timer_reset();
+    // プリエンプション
     yield();
 }
 
@@ -54,19 +56,19 @@ struct spinlock timerlock;
  */
 #define TVN_BITS 6
 #define TVR_BITS 8
-#define TVN_SIZE (1 << TVN_BITS)
-#define TVR_SIZE (1 << TVR_BITS)
+#define TVN_SIZE (1 << TVN_BITS)        /*  64 */
+#define TVR_SIZE (1 << TVR_BITS)        /* 256 */
 #define TVN_MASK (TVN_SIZE - 1)
 #define TVR_MASK (TVR_SIZE - 1)
 
 struct timer_vec {
     int index;
-    struct list_head vec[TVN_SIZE];
+    struct list_head vec[TVN_SIZE];     /* 64 */
 };
 
 struct timer_vec_root {
     int index;
-    struct list_head vec[TVR_SIZE];
+    struct list_head vec[TVR_SIZE];     /* 256 */
 };
 
 static struct timer_vec tv5;
@@ -104,7 +106,7 @@ static inline void
 internal_add_timer(struct timer_list *timer)
 {
     /*
-     * must be cli-ed when calling this
+     * これを呼び出す際は割り込み禁止(cli)になっている必要あり
      */
     uint64_t expires = timer->expires;
     uint64_t idx = expires - timer_jiffies;
@@ -145,7 +147,7 @@ void
 add_timer(struct timer_list *timer)
 {
     acquire(&timerlock);
-    if (timer_pending(timer))
+    if (timer_pending(timer))   // 二重登録
         goto bug;
     internal_add_timer(timer);
     release(&timerlock);
@@ -159,9 +161,9 @@ bug:
 static inline int
 detach_timer(struct timer_list *timer)
 {
-    if (!timer_pending(timer))
+    if (!timer_pending(timer))  // 未登録
         return 0;
-    list_drop(&timer->list);
+    list_drop(&timer->list);    // リストから自分を外す
     return 1;
 }
 
@@ -171,9 +173,9 @@ mod_timer(struct timer_list *timer, uint64_t expires)
     int ret;
 
     acquire(&timerlock);
-    timer->expires = expires;
-    ret = detach_timer(timer);
-    internal_add_timer(timer);
+    timer->expires = expires;       // 1. expiresを再設定
+    ret = detach_timer(timer);      // 2. リストから削除
+    internal_add_timer(timer);      // 3. リストに再度追加
     release(&timerlock);
     return ret;
 }
@@ -184,12 +186,13 @@ del_timer(struct timer_list * timer)
     int ret;
 
     acquire(&timerlock);
-    ret = detach_timer(timer);
-    timer->list.next = timer->list.prev = NULL;
+    ret = detach_timer(timer);                      // 1. リストから削除
+    timer->list.next = timer->list.prev = NULL;     // 2. 内部リストをクリア
     release(&timerlock);
     return ret;
 }
 
+// タイマーベクトルを更新
 static inline void
 cascade_timers(struct timer_vec *tv)
 {
@@ -221,19 +224,21 @@ run_timer_list(void)
     acquire(&timerlock);
     while ((int64_t)(jiffies - timer_jiffies) >= 0) {
         struct list_head *head, *curr;
+        // tv1がなかったらベクトルを更新
         if (!tv1.index) {
             int n = 1;
             do {
                 cascade_timers(tvecs[n]);
             } while (tvecs[n]->index == 1 && ++n < NOOF_TVECS);
         }
+        // tv1に設定があるうちは実行
 repeat:
         head = tv1.vec + tv1.index;
         curr = head->next;
         if (curr != head) {
             struct timer_list *timer;
             void (*fn)(uint64_t);
-            uint64_t data;
+            uint64_t data;              // データには(void +)が設定可能
 
             timer = list_entry(curr, struct timer_list, list);
             fn = timer->function;
@@ -247,6 +252,7 @@ repeat:
             //timer_exit();
             goto repeat;
         }
+        // FIXME: これで正しいか？
         ++timer_jiffies;
         tv1.index = (tv1.index + 1) & TVR_MASK;
     }

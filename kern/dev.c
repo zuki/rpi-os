@@ -46,6 +46,7 @@ dev_init()
     list_init(&devque);
     initlock(&cardlock, "dev");
 
+// FIXME: これは不要か? EMMCは割り込みなしで動作、dev_intr()はnoop
 #if RASPI == 3
     irq_enable(IRQ_SDIO);
     irq_register(IRQ_SDIO, dev_intr);
