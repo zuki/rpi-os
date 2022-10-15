@@ -235,14 +235,14 @@ handle1(int i)
 }
 
 void
-irq_handler()
+irq_handler(int user_mode)
 {
     int nack = 0;
 #ifndef USE_GIC
     int src = get32(IRQ_SRC_CORE(cpuid()));
     assert(!(src & ~(IRQ_SRC_CNTPNSIRQ | IRQ_SRC_GPU | IRQ_SRC_TIMER)));
     if (src & IRQ_SRC_CNTPNSIRQ) {
-        timer_intr();
+        timer_intr(user_mode);
         nack++;
     }
     if (src & IRQ_SRC_TIMER) {

@@ -94,7 +94,7 @@ void
 clock_intr()
 {
     ++jiffies;
-    thisproc()->stime = jiffies * 1000000000 / HZ;
+    //thisproc()->stime = jiffies * 1000000000 / HZ;
     trace("c: %d", jiffies);
     update_times();
     run_timer_list();
@@ -114,7 +114,8 @@ clock_gettime(clockid_t clk_id, struct timespec *tp)
             tp->tv_sec = xtime.tv_sec;
             break;
         case CLOCK_PROCESS_CPUTIME_ID:
-            ptime = thisproc()->stime + thisproc()->utime;
+            struct proc *p = thisproc();
+            ptime = (p->stime + p->utime) * TICK_NSEC;
             tp->tv_nsec = ptime % 1000000000;
             tp->tv_sec  = ptime / 1000000000;
             break;
