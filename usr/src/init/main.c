@@ -16,7 +16,7 @@ main()
 {
     int pid, wpid;
     int status;
-    static init = 1;
+    static int init = 1;
 
     if (open("/dev/tty", O_RDWR) < 0) {
         mknod("/dev/tty", (S_IFCHR | 0777), makedev(1, 0));

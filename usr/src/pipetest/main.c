@@ -9,7 +9,7 @@ char *cmd3[] = {"/usr/bin/wc", "-l", NULL};
 char **cmds[] = {cmd1, cmd2, cmd3};
 int cmd_n = 3;
 
-void dopipes(i) {
+void dopipes(int i) {
   pid_t ret;
   int pp[2] = {};
   fprintf(stderr, "dopipes(%d)\n", i);
