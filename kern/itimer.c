@@ -50,29 +50,28 @@ getitimer(int which, struct itimerval *value)
 
     switch (which) {
     case ITIMER_REAL:
+        acquire(&p->time_lock);
         interval = p->it_real_incr;
         val = 0;
-        /*
-         * FIXME! This needs to be atomic, in case the kernel timer happens!
-         */
         if (timer_pending(&p->real_timer)) {
             val = p->real_timer.expires - jiffies;
             if ((int64_t) val <= 0)
                 val = 1;
         }
+        release(&p->time_lock);
         break;
     case ITIMER_VIRTUAL:
-    /*
+/*
         val = p->it_virt_value;
         interval = p->it_virt_incr;
-    */
+*/
         return -EFAULT;
         break;
     case ITIMER_PROF:
-    /*
+/*
         val = p->it_prof_value;
         interval = p->it_prof_incr;
-    */
+*/
         return (-EFAULT);
         break;
     default:

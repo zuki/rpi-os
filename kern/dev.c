@@ -41,7 +41,7 @@ dev_sleep(void *chan)
  * See https://en.wikipedia.org/wiki/Master_boot_record
  */
 void
-dev_init()
+dev_init(void)
 {
     list_init(&devque);
     initlock(&cardlock, "dev");
@@ -49,7 +49,7 @@ dev_init()
 // FIXME: これは不要か? EMMCは割り込みなしで動作、dev_intr()はnoop
 #if RASPI == 3
     irq_enable(IRQ_SDIO);
-    irq_register(IRQ_SDIO, dev_intr);
+    irq_register(IRQ_SDIO, dev_intr, 0);
 #elif RASPI == 4
 #endif
 
@@ -76,7 +76,7 @@ dev_init()
 }
 
 void
-dev_intr()
+dev_intr(void *params)
 {
     acquire(&cardlock);
     emmc_intr(&card);

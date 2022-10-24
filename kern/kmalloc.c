@@ -3,6 +3,7 @@
 #include "kmalloc.h"
 #include "mmu.h"
 #include "string.h"
+#include "console.h"
 
 // Memory allocator by Kernighan and Ritchie,
 // The C programming Language, 2nd ed.    Section 8.7.

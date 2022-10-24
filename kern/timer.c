@@ -14,9 +14,11 @@
 #define CORE_TIMER_ENABLE       (1 << 1)    // CNTPNSIRQ: 非セキュアな物理カウンタ
 
 static uint64_t dt;
-static uint64_t cnt;
+//static uint64_t cnt;
 
-static update_proc_time(int user_mode)
+static uint64_t timer_jiffies;
+
+static void update_proc_time(int user_mode)
 {
     struct proc *p = thisproc();
     if (user_mode)
@@ -26,7 +28,7 @@ static update_proc_time(int user_mode)
 }
 
 void
-timer_init()
+timer_init(void)
 {
 #ifdef USING_RASPI
     dt = timerfreq() / HZ;       // 10 ms = 19.2 * 10^6 / 100
@@ -39,8 +41,9 @@ timer_init()
     put32(CORE_TIMER_CTRL(cpuid()), CORE_TIMER_ENABLE);     // core timer enable
 #ifdef USE_GIC
     irq_enable(IRQ_LOCAL_CNTPNS);
-    irq_register(IRQ_LOCAL_CNTPNS, timer_intr);
+    irq_register(IRQ_LOCAL_CNTPNS, timer_intr, 0);
 #endif
+    timer_jiffies = INITIAL_JIFFIES;
 }
 
 static void
@@ -118,8 +121,6 @@ init_timervecs(void)
 
     initlock(&timerlock, "timerlock");
 }
-
-static uint64_t timer_jiffies;
 
 static inline void
 internal_add_timer(struct timer_list *timer)
@@ -257,7 +258,7 @@ repeat:
         if (curr != head) {
             struct timer_list *timer;
             void (*fn)(uint64_t);
-            uint64_t data;              // データには(void +)が設定可能
+            uint64_t data;              // データには(void *)が設定可能
 
             timer = list_entry(curr, struct timer_list, list);
             fn = timer->function;
@@ -271,7 +272,6 @@ repeat:
             //timer_exit();
             goto repeat;
         }
-        // FIXME: これで正しいか？
         ++timer_jiffies;
         tv1.index = (tv1.index + 1) & TVR_MASK;
     }

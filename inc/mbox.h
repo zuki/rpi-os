@@ -22,5 +22,6 @@ int mbox_set_sdhost_clock(uint32_t msg[3]);
 int mbox_set_gpio_state(uint32_t npgio, uint32_t state);
 int mbox_set_power_state(uint32_t devid, uint32_t on, uint32_t wait);
 void mbox_test();
+boolean mbox_get_macaddr(char *address);
 
 #endif

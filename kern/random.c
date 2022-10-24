@@ -1,11 +1,15 @@
 #include "arm.h"
 #include "console.h"
 #include "random.h"
+#include "spinlock.h"
 
+static struct spinlock randlock;
 void
 rand_init(void)
 {
+    initlock(&randlock, "random");
     // mask interrupt
+    acquire(&randlock);
     uint32_t mask = get32(RNG_INT_MASK);
     mask |= RNG_INT_OFF;
     put32(RNG_INT_MASK, mask);
@@ -13,14 +17,20 @@ rand_init(void)
     put32(RNG_STATUS, RNG_WARMUP_COUNT);
     // enable
     put32(RNG_CTRL, RNG_RBGEN);
+    release(&randlock);
     info("rand_init ok");
 }
 
 uint32_t
 rand(void)
 {
+    uint32_t rand;
+
+    acquire(&randlock);
     while (!(get32(RNG_STATUS) >> 24)) nop();
-    return get32(RNG_DATA);
+    rand = get32(RNG_DATA);
+    release(&randlock);
+    return rand;
 }
 
 long
@@ -29,6 +39,7 @@ getrandom(void *buf, size_t buflen)
     uint32_t max_words = (buflen + 3 ) / sizeof(uint32_t);
     uint32_t num_words, count;
 
+    acquire(&randlock);
     while (!(get32(RNG_STATUS) >> 24)) nop();
     num_words = get32(RNG_STATUS) >> 24;
     if (num_words > max_words)
@@ -36,6 +47,7 @@ getrandom(void *buf, size_t buflen)
 
     for (count = 0; count < num_words; count++)
         ((uint32_t *)buf)[count] = get32(RNG_DATA);
+    release(&randlock);
 
     return num_words * sizeof(uint32_t);
 }

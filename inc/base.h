@@ -3,6 +3,8 @@
 
 #include "memlayout.h"
 
+//#define RASPI   3
+
 #if RASPI == 3
 #define MMIO_BASE   (KERNBASE + 0x3F000000)
 #define LOCAL_BASE  (KERNBASE + 0x40000000)

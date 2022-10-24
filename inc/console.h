@@ -1,11 +1,12 @@
 #ifndef INC_CONSOLE_H
 #define INC_CONSOLE_H
 
+#include "arm.h"
 #include "spinlock.h"
 
 extern struct spinlock dbglock;
 
-void console_init();
+void console_init(void);
 void cprintf1(const char *fmt, ...);
 void cprintf(const char *fmt, ...);
 void panic(const char *fmt, ...);

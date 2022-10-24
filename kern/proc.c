@@ -132,6 +132,8 @@ proc_initx(char *name, char *code, size_t len)
     p->sz = PGSIZE;
     p->base = 0;
 
+    initlock(&p->time_lock, "timelock");
+
     p->pgid = p->sid = p->pid;
     p->fdflag = 0;
     p->umask = 0002;

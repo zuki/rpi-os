@@ -1,9 +1,9 @@
 /* See https://github.com/raspberrypi/firmware/wiki. */
 #include "mbox.h"
 #include "base.h"
-
 #include "arm.h"
 #include "console.h"
+#include "string.h"
 
 #define MBOX_BASE       (MMIO_BASE + 0x0000B880)
 #define MBOX_READ       (MBOX_BASE + 0x00)
@@ -24,6 +24,7 @@
 #define MBOX_TAG_GET_CLOCK_RATE     0x00030002
 #define MBOX_TAG_SET_GPIO_STATE     0x00038041
 #define MBOX_TAG_SET_SDHOST_CLOCK   0x00038042
+#define MBOX_TAG_GET_MAC_ADDRESS    0x00010003
 #define MBOX_TAG_END                0x0
 #define MBOX_TAG_REQUEST            0x0
 
@@ -220,4 +221,27 @@ mbox_test()
     assert(x != 0);
     info("pass");
 #endif
+}
+
+boolean
+mbox_get_macaddr(char *address)
+{
+    __attribute__((aligned(16)))
+    volatile uint32_t buf[] =
+        { 0, 0, MBOX_TAG_GET_MAC_ADDRESS, 8, MBOX_TAG_REQUEST, 0, 0,
+        MBOX_TAG_END
+    };
+    buf[0] = sizeof(buf);
+    asserts((V2P(buf) & 0xF) == 0, "Buffer should align to 16 bytes. ");
+
+    if (mbox_send(buf, sizeof(buf)) < 0)
+        return false;
+
+    if ((buf[4] >> 31) == 0) {
+        debug("unexpected tag resp %d", buf[4]);
+        return false;
+    }
+    assert((buf[4] & 0x3FFFFFFF) == 8);
+    memmove(address, ((char *)buf)+20, 6);
+    return true;
 }

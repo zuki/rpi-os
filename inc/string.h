@@ -120,4 +120,12 @@ memscan(void *addr, int c, size_t size)
     return (void *)a;
 }
 
+static inline void format(uint8_t c, char *sc) {
+    const char digit[] = "0123456789abcdef";
+    sc[0] = digit[c >> 4];
+    sc[1] = digit[c & 0xf];
+}
+
+int sprintf(char *str, const char *fmt, ...);
+
 #endif

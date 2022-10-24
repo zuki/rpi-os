@@ -41,14 +41,14 @@ struct timespec xtime  __attribute__ ((aligned (16)));
 unsigned long wall_jiffies = INITIAL_JIFFIES;
 
 void
-clock_init()
+clock_init(void)
 {
     put32(LOCAL_TIMER_CTRL, LOCAL_TIMER_CTRL_INTERA | LOCAL_TIMER_CTRL_ENABLE | LOCAL_TIMER_RELOAD_VALUE);
     put32(LOCAL_TIMER_ROUTE, ROUTING_BITS(0));
     put32(LOCAL_TIMER_CLR, LOCAL_TIMER_CLR_RELOAD | LOCAL_TIMER_CLR_INT);
 #ifdef USE_GIC
     irq_enable(IRQ_LOCAL_TIMER);
-    irq_register(IRQ_LOCAL_TIMER, clock_intr);
+    irq_register(IRQ_LOCAL_TIMER, clock_intr, 0);
 #endif
     if (rtc_gettime(&xtime) < 0) {
         xtime.tv_nsec = 0L;
@@ -93,7 +93,7 @@ static inline void update_times(void)
  * 独立している。（10msごとに呼び出される）
  */
 void
-clock_intr()
+clock_intr(void)
 {
     ++jiffies;
     //thisproc()->stime = jiffies * 1000000000 / HZ;

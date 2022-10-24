@@ -87,10 +87,11 @@ struct proc {
     kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;   // capabilities
     mode_t umask;               // umask
 
+    struct spinlock time_lock;  // timer関連を保護
     uint64_t stime, utime;      // ticks for system and user
-    uint64_t it_real_value, it_prof_value, it_virt_value;   /* timer interval value: REAL, PROF, VIRTUAL */
-    uint64_t it_real_incr, it_prof_incr, it_virt_incr;      /* timer increment: REAL, PROF, VIRTUAL */
-    struct timer_list real_timer;                           /* Real time timer */
+    uint64_t it_real_value, it_prof_value, it_virt_value;   /* タイマーインターバル値: REAL, PROF, VIRTUAL */
+    uint64_t it_real_incr, it_prof_incr, it_virt_incr;      /* タイマー増分: REAL, PROF, VIRTUAL */
+    struct timer_list real_timer;                           /* リアルタイムタイマー */
 
     struct trapframe *tf;       /* Trap frame for current syscall. */
     struct context *context;    /* swtch() here to run process. */

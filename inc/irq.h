@@ -41,7 +41,7 @@
 void irq_init();
 void irq_enable(int);
 void irq_disable(int);
-void irq_register(int, void (*)());
+void irq_register(int, void (*)(void *), void *);
 void irq_handler(int);
 
 #endif

@@ -126,7 +126,8 @@
 
 // 割り込みハンドラの型定義
 // TODO: 引数（割り込み元）を追加する
-static void (*handler[IRQ_LINES])();
+static void (*handler[IRQ_LINES])(void *);
+static void *params[IRQ_LINES];
 
 static void
 irq_debug()
@@ -153,8 +154,10 @@ irq_debug()
 void
 irq_init()
 {
-    for (int i = 0; i < IRQ_LINES; i++)
+    for (int i = 0; i < IRQ_LINES; i++) {
         handler[i] = 0;
+        params[i] = 0;
+    }
 
 #ifndef USE_GIC
     put32(GPU_INT_ROUTE, GPU_IRQ2CORE(0));
@@ -210,8 +213,7 @@ void
 irq_disable(int i)
 {
 #ifndef USE_GIC
-    // TODO: 実装する
-    panic("todo");
+    put32(DISABLE_IRQS_1 + 4 * (i / 32), 1 << (i % 32));
 #else
     put32(GICD_ICENABLER0 + 4 * (i / 32), 1 << (i % 32));
 #endif
@@ -223,9 +225,10 @@ irq_disable(int i)
  * TODO: 引数を追加
  */
 void
-irq_register(int i, void (*f)())
+irq_register(int i, void (*f)(void *), void *param)
 {
     handler[i] = f;
+    params[i] = param;
 }
 
 // 実際の割り込みハンドラの呼び出し
@@ -233,7 +236,7 @@ static int
 handle1(int i)
 {
     if (handler[i]) {
-        handler[i] ();
+        handler[i](params[i]);
         return 1;
     } else {
         debug("no handler for irq %d", i);

@@ -4,8 +4,8 @@
 #include "buf.h"
 #include "types.h"
 
-void dev_init();
-void dev_intr();
+void dev_init(void);
+void dev_intr(void *params);
 void devrw(struct buf *);
 
 /*

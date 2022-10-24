@@ -55,7 +55,11 @@ typedef int64_t         intptr_t;
 typedef unsigned        wint_t;
 typedef uint16_t        kdev_t;
 typedef uint16_t        wchar_t;        // muslでは4バイトだが、fatでは2バイト
+typedef uint64_t        handler_t;
 
+typedef int             boolean;
+#define true            1
+#define false           0
 
 /* Efficient min and max operations */
 #define MIN(_a, _b)                 \
@@ -112,5 +116,16 @@ typedef __builtin_va_list va_list;
 #define va_end(v)       __builtin_va_end(v)
 #define va_arg(v,l)     __builtin_va_arg(v,l)
 #define va_copy(d,s)    __builtin_va_copy(d,s)
+
+#define PACKED		__attribute__ ((packed))
+#define	GALIGN(n)	__attribute__ ((aligned (n)))
+#define NORETURN	__attribute__ ((noreturn))
+#define NOOPT		__attribute__ ((optimize (0)))
+#define STDOPT		__attribute__ ((optimize (2)))
+#define MAXOPT		__attribute__ ((optimize (3)))
+#define WEAK		__attribute__ ((weak))
+
+#define MAC_ADDRESS_SIZE    6
+#define IP_ADDRESS_SIZE     4
 
 #endif

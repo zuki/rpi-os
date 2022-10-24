@@ -62,6 +62,13 @@ dsb()
     asm volatile("dsb sy" ::: "memory");
 }
 
+/* Data memory barrier. */
+static inline void
+dmb()
+{
+    asm volatile("dmb" ::: "memory");
+}
+
 /* Brute-force data and instruction synchronization barrier. */
 static inline void
 disb()

@@ -165,18 +165,18 @@ console_intr1(int (*getc)())
 }
 
 void
-console_intr()
+console_intr(void *param)
 {
     console_intr1(uart_getchar);
 }
 
 void
-console_init()
+console_init(void)
 {
     uart_init();
 
     irq_enable(IRQ_AUX);
-    irq_register(IRQ_AUX, console_intr);
+    irq_register(IRQ_AUX, console_intr, 0);
 
     devsw[CONSOLE].read = console_read;
     devsw[CONSOLE].write = console_write;

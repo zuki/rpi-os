@@ -153,7 +153,7 @@ index 589f629..78bc40b 100644
 +#include "proc.h"
 
  /* Local timer */
- #define TIMER_ROUTE             (LOCAL_BASE + 0x24)
+ #define LOCAL_TIMER_ROUTE             (LOCAL_BASE + 0x24)
 @@ -92,6 +94,7 @@ void
  clock_intr()
  {
