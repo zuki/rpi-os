@@ -8,6 +8,8 @@ bin/
 back
 *.org
 kern/fat.tar.gz
+qemu.log
+qemu.trace
 
 boot/*
 memos/book/*
