@@ -9,10 +9,6 @@
 #include "spinlock.h"
 #include "rtc.h"
 
-/* Core Timer */
-#define CORE_TIMER_CTRL(i)      (LOCAL_BASE + 0x40 + 4*(i))
-#define CORE_TIMER_ENABLE       (1 << 1)    // CNTPNSIRQ: 非セキュアな物理カウンタ
-
 static uint64_t dt;
 //static uint64_t cnt;
 

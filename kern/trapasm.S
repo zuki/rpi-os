@@ -30,6 +30,7 @@ alltraps:
     stp     x11, x12, [sp, #-16]!
     stp     x9, x10, [sp, #-16]!
 
+    mov     x1, x0
     mov     x0, sp
 
     bl      trap

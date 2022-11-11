@@ -58,7 +58,7 @@ typedef struct dw2_xfer_stagedata {
     uint32_t        trstatus;           ///< トランザクション状態
     unsigned        err_cnt;            ///< エラー数
 
-    uint32_t        buffer GALIGN(4);   ///< DMA buffer
+    uint32_t        buffer[16] GALIGN(4);   ///< DMA buffer
     void           *buffp;              ///< バッファへのポインタ
 
     unsigned        start;              ///< スタート時(tickHZ)

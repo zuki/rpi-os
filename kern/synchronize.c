@@ -252,6 +252,9 @@ void clean_data_cache_range(uint64_t addr, uint64_t length)
     DataSyncBarrier ();
 }
 
+/// @brief データキャッシュaddr+lengthをクリアして無効化する
+/// @param addr 開始データアドレス
+/// @param length サイズ
 void clean_and_invalidate_data_cache_range(uint64_t addr, uint64_t length)
 {
     while (1) {

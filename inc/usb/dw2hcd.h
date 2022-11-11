@@ -39,12 +39,12 @@
 typedef struct dw2_hc {
     unsigned            channels;               ///< チャネル数
     volatile unsigned   allocch;                ///< 割り当て済みチャネル数: 1ビット1チャネル
-    struct spinlock     chanlock;                ///< スピンロック: チャネルを保護
-    struct spinlock     wblklock;               ///< スピンロック: wait blockを保護
-    struct spinlock     imasklock;              ///< スピンロック: 割り込みマスクを保護
-    dw2_xfer_stagedata_t stdata[DWHCI_MAX_CHANNELS]; ///< 転送ステートデータ
-    volatile boolean    waiting[DWHCI_WAIT_BLOCKS];         ///< 待機中
-    volatile unsigned   allocbits;              ///< 割り当て済みウェイトブロック: 1ビット1wait block
+    struct spinlock     chanlock;               ///< スピンロック: allocchを保護
+    struct spinlock     wblklock;               ///< スピンロック: allocwblkを保護
+    struct spinlock     imasklock;              ///< スピンロック: チャネル割り込みのマスク/アンマスク処理を保護
+    dw2_xfer_stagedata_t *stdata[DWHCI_MAX_CHANNELS]; ///< 転送ステートデータ（配列は各チャネルに対応）
+    volatile boolean    waiting[DWHCI_WAIT_BLOCKS];  ///< 待機中フラグ
+    volatile unsigned   allocwblk;              ///< 待機中フラグ配列の割り当て済みウェイトブロック: 1ビット1wait block
     dw2_rport_t         rport;                  ///< ルートポート
     volatile boolean    rpenabled;              ///< ルートポートが有効か
     volatile boolean    shutdown;               ///< USBドライバはshutdownするか
@@ -68,6 +68,8 @@ typedef struct port_status_event {
     struct list_head     list;
 } pst_ev_t;
 
+extern dw2_hc_t *dw2hc;
+
 // PUBLIC
 void dw2_hc(dw2_hc_t *self);
 void _dw2_hc(dw2_hc_t *self);
@@ -75,12 +77,13 @@ void _dw2_hc(dw2_hc_t *self);
 /// @brief DWHCデバイスの初期化
 /// @param scan 初期化の最後にデバイスを再スキャンするか
 /// @return 成功したらtrue, 失敗したらfalse
-boolean dw2_hc_init(dw2_hc_t *self, int scan);
+boolean dw2_hc_init(dw2_hc_t *self, boolean scan);
 
 /// @brief ルートポートが初期化されていなかったら初期化してUSBデバイスが接続されていないかスキャン
 void dw2_hc_rescan_dev(dw2_hc_t *self);
 
 /// @brief リクエストをブロッキングモードで発行する（アイソクロナス転送は未サポート）
+/// @param self USBホストコントローラ
 /// @param urb リクエスト
 /// @param timeout タイムアウト時間（デフォルトは0: なし）
 /// @return true, 失敗したらfalse
@@ -144,11 +147,11 @@ void dw2_hc_enable_common_intr(dw2_hc_t *self);
 /// @brief dwhcホスト割り込みの有効化
 void dw2_hc_enable_host_intr(dw2_hc_t *self);
 
-/// @brief チャネル割り込みの有効化
+/// @brief チャネルの割り込みの有効化
 /// @param channel 有効にするチャネル番号
 void dw2_hc_enable_channel_intr(dw2_hc_t *self, unsigned channel);
 
-/// @brief チャネル割り込みの無効化
+/// @brief チャネルの割り込みの無効化
 /// @param channel 無効にするチャネル番号
 void dw2_hc_disable_channel_intr(dw2_hc_t *self, unsigned channel);
 
@@ -159,7 +162,8 @@ void dw2_hc_flush_tx_fifo(dw2_hc_t *self, unsigned fifo);
 /// @brief 受信FIFOのフラッシュ
 void dw2_hc_flush_rx_fifo(dw2_hc_t *self);
 
-/// @brief リクエストの転送
+/// @brief リクエストの転送処理.\n
+///     実際の転送自体はdw2_hc_xfer_stage_async()で行う
 /// @param urb USBリクエストオブジェクト
 /// @param in INリクエストか
 /// @param stage  ステータスステージか
@@ -167,13 +171,14 @@ void dw2_hc_flush_rx_fifo(dw2_hc_t *self);
 /// @return
 boolean dw2_hc_xfer_stage(dw2_hc_t *self, usb_req_t *urb, boolean in, boolean stage, unsigned timeout);
 
-/// @brief 転送完了処理
+/// @brief 転送完了時のコールバック関数
 /// @param urb リクエスト
-/// @param param リクエストパラメタ
-/// @param ctx コンテキスト
+/// @param param リクエストパラメタ（waiting配列のインデックスを設定）
+/// @param ctx コンテキスト（USBホストコントローラオブジェクトを設定）
 void dw2_hc_comp_cb(usb_req_t *urb, void *param, void *ctx);
 
-// @brief リクエストの非同期転送
+/// @brief リクエストの非同期転送.\n
+///     実際の転送を非同期で行う
 /// @param urb USBリクエストオブジェクト
 /// @param in INリクエストか
 /// @param stage ステータスステージか
@@ -193,9 +198,11 @@ void dw2_hc_queue_delay_trans(dw2_hc_t *self, dw2_xfer_stagedata_t *data);
 /// @brief トランザクションを開始する
 /// @param data トランザクションステージデータ
 void dw2_hc_start_trans(dw2_hc_t *self, dw2_xfer_stagedata_t *stdata);
+
 /// @brief チャネルを開始する
 /// @param data トランザクションステージデータ
 void dw2_hc_start_channel(dw2_hc_t *self, dw2_xfer_stagedata_t *stdata);
+
 /// @brief チャネル割り込みハンドラ
 /// @param channel チャネル番号
 void dw2_hc_channel_intr_hdl(dw2_hc_t *self, unsigned channel);
@@ -213,15 +220,20 @@ void dw2_hc_intr_hdlstub(void *param);
     void dw2_hc_timer_hdl(dw2_hc_t *self, dw2_xfer_stagedata_t *stdata);
     void dw2_hc_timer_hdlstub(uint64_t data);
 #endif
-/// @brief チャネルを割り当てる
+
+/// @brief 転送用のチャネルを割り当てる
 /// @return チャネル番号
 unsigned dw2_hc_alloc_channel(dw2_hc_t *self);
-/// @brief チェネルを開放する
+
+/// @brief チャネルを開放する
 /// @param channel チャネル番号
 void dw2_hc_free_channel(dw2_hc_t *self, unsigned channel);
-/// @brief waitblockを割り当てる
-/// @return waitblock
+
+/// @brief waitblockを割り当てる. \n
+///    waitblockは配列でDWHCI_WAIT_BLOCKS個用意されている。そのうち、未使用の最初のwaitblockをシユすることにして、そのインデックスを返す
+/// @return waitblockのインデックス
 unsigned dw2_hc_alloc_wblock(dw2_hc_t *self);
+
 /// @brief waitblockを開放する
 /// @param wblock 待機ブロック
 void dw2_hc_free_wblock(dw2_hc_t *self, unsigned wblock);
@@ -229,7 +241,7 @@ void dw2_hc_free_wblock(dw2_hc_t *self, unsigned wblock);
 /// @brief 指定のビットが立つのを待つ
 /// @param register 対象レジスタ
 /// @param mask 対象ビット
-/// @param bit 待機ビット
+/// @param bit 待機するビット値（trueかfalseか）
 /// @param timeout タイムアウト
 /// @return ビットが立ったらTRUE, タイムアウトになったらFALSE
 boolean dw2_hc_wait_for_bit(dw2_hc_t *self, uint64_t reg, uint32_t mask, boolean bit, unsigned timeout);
@@ -258,22 +270,22 @@ int dw2_hc_get_desc(dw2_hc_t *self, usb_ep_t *ep,
                   void *buffer, unsigned buflen,
                   unsigned char reqtype, unsigned short idx);
 
-/// @brief デバイスアドレスをセット
+/// @brief デバイスにアドレスを付与する
 /// @param ep エンドポイント
-/// @param addr デバイスアドレス
+/// @param addr デバイスに付与するアドレス
 /// @return 成功したらTRUE, 失敗したらFALSE
 boolean dw2_hc_set_addr(dw2_hc_t *self, usb_ep_t *ep, uint8_t addr);
 
-///@brief コンフィグレーションをセット
+///@brief デバイスにコンフィグレーションをセットする
 /// @param ep エンドポイント
 /// @param cfgvalue コンフィグレーション値
 /// @return 成功したらTRUE, 失敗したらFALSE
 boolean dw2_hc_set_config(dw2_hc_t *self, usb_ep_t *ep, uint8_t cfgvalue);
 
-/// @brief メッセージを送信する
+/// @brief コントロール転送でメッセージを送信する
 /// @param ep エンドポイント
 /// @param reqtype リクエストタイプ
-/// @param req リクエスト
+/// @param req リクエストコマンド
 /// @param value 値
 /// @param index インデックス
 /// @param data データ
@@ -298,7 +310,21 @@ static inline boolean dw2_hc_is_pap(dw2_hc_t *self) {
 boolean dw2_hc_update_pap(dw2_hc_t *self);
 */
 
+/// @brief レジスタname(アドレスaddr)をダンプ出力する
+/// @param self USBホストコントローラ
+/// @param name レジスタ名
+/// @param addr レジスタアドレス
 void dw2_hc_dumreg(dw2_hc_t *self, const char *name, uint64_t addr);
+
+/// @brief チャネルchannel関連のすべてのレジスタをダンプ出力する
+/// @param self USBホストコントローラ
+/// @param channel チャネル
 void dw2_hc_dump_status(dw2_hc_t *self, unsigned channel);
+
+/// @brief USBホストコントローラを初期化する
+void usbhc_init(void);
+
+/// @brief usbホストをテストする
+void usb_test(void);
 
 #endif

@@ -76,16 +76,20 @@ void dw2_fsched_nsplit_wait_for_frame(dw2_fsched_t *base)
     dw2_fsched_nsplit_t *self = (dw2_fsched_nsplit_t *) base;
 
     uint32_t number;
-
+    // 1. 現在のフレーム番号を取得
     number = get32(DWHCI_HOST_FRM_NUM);
+    //uint32_t number_low = number & DWHCI_MAX_FRAME_NUMBER;
+    // 2. 次のフレーム番号を取得
     self->next = (DWHCI_HOST_FRM_NUM_NUMBER(number)+1) & DWHCI_MAX_FRAME_NUMBER;
-
+    // 3. 周期的でない場合, 次のフレームになるまで待つ
+    // FIXME: 現状、いきなり番号を2つ以上飛んでしまう、または次のフレームに移行しないので条件が成立しない）
     if (!self->periodic) {
         number = get32(DWHCI_HOST_FRM_NUM);
         while ((DWHCI_HOST_FRM_NUM_NUMBER(number) & DWHCI_MAX_FRAME_NUMBER) != self->next) {
             // do nothing
         }
     }
+
 }
 
 #else

@@ -9,6 +9,7 @@
 #include "timer.h"
 #include "clock.h"
 #include "console.h"
+#include "synchronize.h"
 
 // BCM2835割り込みレジスタ
 #define IRQ_BASIC_PENDING       (MMIO_BASE + 0xB200)
@@ -160,7 +161,14 @@ irq_init()
     }
 
 #ifndef USE_GIC
-    put32(GPU_INT_ROUTE, GPU_IRQ2CORE(0));
+    put32(GPU_INT_ROUTE, GPU_IRQ2CORE(0));      // GPU割り込みはCOre0に
+#if 1
+    put32(FIQ_CONTROL, 0);                      // FIQを無効に
+    put32(DISABLE_IRQS_1, (uint32_t)-1);        // GPU IRQ1をすべて無効
+    put32(DISABLE_IRQS_2, (uint32_t)-1);        // GPU IRQ2をすべて無効
+    put32(DISABLE_BASIC_IRQS, (uint32_t)-1);    // 基本IRQをすべて無効
+    EnableIRQs();                               // ARMの割り込みを有効
+#endif
 
 #else
     put32(GICD_CTLR, GICD_CTLR_DISABLE);
@@ -181,7 +189,8 @@ irq_init()
 
         put32(GICD_ITARGETSR0 + 4 * n, GICD_ITARGETSR_CORE0
               | GICD_ITARGETSR_CORE0 << 8
-              | GICD_ITARGETSR_CORE0 << 16 | GICD_ITARGETSR_CORE0 << 24);
+              | GICD_ITARGETSR_CORE0 << 16
+              | GICD_ITARGETSR_CORE0 << 24);
     }
 
     /* Set all interrupts to level triggered. */
@@ -254,6 +263,7 @@ irq_handler(int user_mode)
     int src = get32(IRQ_SRC_CORE(cpuid()));
     // 現在実装している割り込み以外はエラー
     assert(!(src & ~(IRQ_SRC_CNTPNSIRQ | IRQ_SRC_GPU | IRQ_SRC_TIMER)));
+    //if (src & IRQ_SRC_GPU) info("src=0x%x", src);
     // 1. 物理カウンター割り込み（コアタイマー割り込み: タイマーで使用）
     // FIXME: 実際はエンプションにしか使用していない
     if (src & IRQ_SRC_CNTPNSIRQ) {
@@ -273,8 +283,10 @@ irq_handler(int user_mode)
     // 3. GPU割り込み（割り込み保留ビットを取得）
     uint64_t irq =
         get32(PENDING_IRQS_1) | (((uint64_t) get32(PENDING_IRQS_2)) << 32);
+    //info("irq=0x%llx", irq);
 #endif
     // 保留されている登録済みの割り込みハンドラを降順に実行する
+    if (irq == 0) goto ret;
     for (int i = 0; i < IRQ_LINES && irq; i++) {
         if (irq & 1) {
             nack += handle1(i);
@@ -299,10 +311,11 @@ irq_handler(int user_mode)
     } else {
         assert(i >= 1020);
         trace("spurious interrupt %u, src 0x%x", i,
-              get32(IRQ_SRC_CORE(cpuid())));
+            get32(IRQ_SRC_CORE(cpuid())));
     }
 #endif /* USE_GIC */
     // ハンドラが呼び出された場合、nack > 0 になる
+ret:
     if (nack == 0) {
         trace("unexpected interrupt, maybe sdhost or EC_UNKNOWN");
     }

@@ -59,7 +59,7 @@ typedef enum usb_error {
     usb_err_unknown
 } usb_err_t;
 
-/// @brief セットアップデータ（リクエスト構造体の共通部分）を表す構造体
+/// @brief セットアップデータ（リクエスト構造体の共通部分: 8バイト）を表す構造体
 typedef struct setup_data {
     unsigned char       reqtype;
     unsigned char       req;

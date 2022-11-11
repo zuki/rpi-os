@@ -220,10 +220,11 @@ forkret()
         dev_init();
         iinit(ROOTDEV);
         initlog(ROOTDEV);
+        usbhc_init();
     } else {
         release(&ptable.lock);
     }
-    trace("proc '%s'(%d)", thisproc()->name, thisproc()->pid);
+    //info("proc '%s'(%d)", thisproc()->name, thisproc()->pid);
 }
 
 /* Give up CPU. */

@@ -53,7 +53,7 @@ boolean dw2_rport_init(dw2_rport_t *self)
     self->dev = (usb_dev_t *)kmalloc(sizeof(usb_dev_t));
     usb_device(self->dev, self->host, speed, false, 0, 1);
 
-    if (!usb_dev_init(self->dev)) {
+    if (!usb_dev_init(self->dev)) { // FIXME
         _usb_device(self->dev);
         kmfree(self->dev);
         self->dev = 0;

@@ -87,7 +87,11 @@ void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t 
     }
 
     assert(self->buffp != 0);
-    assert(((uintptr_t) self->buffp & 3) == 0);
+    trace("bp=0x%llx", self->buffp);
+    if (((uintptr_t) self->buffp & 3) != 0) {
+        warn("buffp not align: %p", self->buffp);
+    }
+    //assert(((uintptr_t) self->buffp & 3) == 0);
 
     if (self->split) {
         if (dw2_xfer_stagedata_is_periodic(self)) {
@@ -207,6 +211,9 @@ unsigned dw2_xfer_stagedata_get_sub_state(dw2_xfer_stagedata_t *self)
     return self->substate;
 }
 
+/// @brief スプリットサイクルを開始する
+/// @param self ステージデータ構造体へのポインタ
+/// @return 開始したか
 boolean dw2_xfer_stagedata_begin_split_cycle(dw2_xfer_stagedata_t *self)
 {
     return true;

@@ -54,6 +54,7 @@ clock_init(void)
         xtime.tv_nsec = 0L;
         xtime.tv_sec = 1655644975L;      // 2022/06/21/01:31 UTC
     }
+    info("clock init ok");
 }
 
 static void
@@ -97,7 +98,7 @@ clock_intr(void)
 {
     ++jiffies;
     //thisproc()->stime = jiffies * 1000000000 / HZ;
-    trace("c: %d", jiffies);
+    //info("c: %d", jiffies);
     update_times();             // 2. 時計更新
     run_timer_list();           // 3. カーネルタイマー実行
     clock_reset();              // 4. ローカルタイマーリセット

@@ -9,6 +9,10 @@
 
 #ifndef USE_GIC
 
+/* Core Timer */
+#define CORE_TIMER_CTRL(i)      (LOCAL_BASE + 0x40 + 4*(i))
+#define CORE_TIMER_ENABLE       (1 << 1)    // CNTPNSIRQ: 非セキュアな物理カウンタ/* Core Timer */
+
 // APMペリファラル割り込み番号（GPU IRQ 0-63）
 #define SYSTIMER_MATCH_1    1
 #define SYSTIMER_MATCH_3    3
