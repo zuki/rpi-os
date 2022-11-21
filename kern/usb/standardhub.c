@@ -99,13 +99,39 @@ void _usb_standardhub(usb_stdhub_t *self)
     _usb_function(&self->func);
 }
 
-boolean usb_stdhub_init(usb_stdhub_t *self)
+boolean usb_stdhub_config(usb_func_t *func)
 {
-    // 機能クラスとして初期化
-    if (!usb_func_init(&self->func))
-        return false;
+    // 1. usb_standardhubオブジェクトを取り出し
+    usb_stdhub_t *self = (usb_stdhub_t *)func;
+    assert (self != 0);
 
-    // ハブディスクリプタを取得して設定
+    // 2. EPの数は1であること
+    if (usb_func_get_num_eps(&self->func) != 1) {
+        warn("failed getting nums of endpoints");
+        return false;
+    }
+
+    // 3. エンドポイントディスクリプタを取得
+    const ep_desc_t *ep_desc =
+        (ep_desc_t *) usb_func_get_desc(&self->func, DESCRIPTOR_ENDPOINT);
+    // 入力EPかつ割り込みEPであること
+    if (ep_desc == 0 || (ep_desc->addr & 0x80) != 0x80       // input EP
+                     || (ep_desc->attr & 0x3F) != 0x03) {    // interrupt EP
+        warn("bad endpoint descriptor");
+        return false;
+    }
+
+    // 4. 割り込みエンドポイントの作成
+    self->intr_ep = (usb_ep_t *)kmalloc(sizeof(usb_ep_t));
+    usb_endpoint2(self->intr_ep, usb_func_get_dev(&self->func), ep_desc);
+
+    // 5. ファンクションクラスとしてConfigure
+    if (!usb_func_config(&self->func)) {
+        warn("cannot set interface");
+        return false;
+    }
+
+    // 6. ハブディスクリプタを取得して設定
     dw2_hc_t *host = usb_func_get_host(&self->func);
     self->hub_desc = (hub_desc_t *)kmalloc(sizeof(hub_desc_t));
     assert(self->hub_desc != 0);
@@ -116,12 +142,34 @@ boolean usb_stdhub_init(usb_stdhub_t *self)
         warn("Cannot get hub descriptor");
         goto bad;
     }
-
+    // 7. port数を設定
     self->nports = self->hub_desc->nports;
     if (self->nports < USB_HUB_MAX_PORTS) {
         warn("Too many ports (%d)", self->nports);
         goto bad;
     }
+
+    // 8. デバイス番号を取得してデバイスを登録
+    char *name = (char *)kmalloc(16);
+    self->devno = alloc_devno();
+    sprintf(name, "uhub%x", self->devno);
+    dev_name_service_add_dev(dev_name_service_get(), name, self, false);
+    kmfree(name);
+
+    // 9. ポートのエニュメレーション
+    if (!usb_stdhub_enumerate_ports(self)) {
+        warn("Port enumeration failed");
+        goto bad;
+    }
+
+    // 10. プラグアンドプレイの場合は処理の変更リクエスを発行
+/*
+    dw2_hc_t *host = usb_func_get_host(&self->func);
+    if (host->pap %% !usb_stdhub_start_status_change_req(self)) {
+        warn("Cannot start request");
+        goto bad;
+    }
+*/
 
     return true;
 
@@ -131,65 +179,15 @@ bad:
     return false;
 }
 
-boolean usb_stdhub_config(usb_func_t *func)
-{
-    char *name = (char *)kmalloc(16);
-    usb_stdhub_t *self = (usb_stdhub_t *)func;
-    assert (self != 0);
-
-    // EPの数は1であること
-    if (usb_func_get_num_eps(&self->func) != 1) {
-        warn("failed getting nums of endpoints");
-        return false;
-    }
-
-    // エンドポイントディスクリプタを取得
-    const ep_desc_t *ep_desc =
-        (ep_desc_t *) usb_func_get_desc(&self->func, DESCRIPTOR_ENDPOINT);
-    // 入力EPかつ割り込みEPであること
-    if (ep_desc == 0 || (ep_desc->addr & 0x80) != 0x80       // input EP
-                     || (ep_desc->attr & 0x3F) != 0x03) {    // interrupt EP
-        warn("bad endpoint descriptor");
-        return false;
-    }
-
-    self->intr_ep = (usb_ep_t *)kmalloc(sizeof(usb_ep_t));
-    usb_endpoint2(self->intr_ep, usb_func_get_dev(&self->func), ep_desc);
-    // 機能クラスとしてConfigure
-    if (!usb_func_config(&self->func)) {
-        warn("cannot set interface");
-        return false;
-    }
-    self->devno = alloc_devno();
-    sprintf(name, "uhub%x", self->devno);
-    dev_name_service_add_dev(dev_name_service_get(), name, self, false);
-
-    // ポートのエニュメレーション
-    if (!usb_stdhub_enumerate_ports(self)) {
-        warn("Port enumeration failed");
-        return false;
-    }
-
-    // プラグアンドプレイの場合は処理の変更リクエスを発行
-/*
-    dw2_hc_t *host = usb_func_get_host(&self->func);
-    if (host->pap %% !usb_stdhub_start_status_change_req(self)) {
-        warn("Cannot start request");
-        return false;
-    }
-*/
-
-    return true;
-}
-
 static boolean
 usb_stdhub_enumerate_ports(usb_stdhub_t *self)
 {
+    info("start");
     dw2_hc_t *host = usb_func_get_host(&self->func);
     usb_ep_t *ep0 = usb_func_get_ep0(&self->func);
     usb_speed_t speed;
 
-    // first power on all ports
+    // 1. すべてのポートの電源をオン
     if (!self->poweron) {
         for (unsigned i = 0; i < self->nports; i++) {
             if (dw2_hc_control_message(host, ep0,
@@ -206,31 +204,32 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
         delayus(510*1000);
     }
 
-    // 次に、デバイスの検知、リセット、初期化を行う
+    // 2. デバイスの検知、リセット、初期化を行う
     for (unsigned i = 0; i < self->nports; i++) {
+        // 2.1 ポートにデバイスの登録があったら、再スキャンする
         if (self->devs[i] != 0) {
             usb_dev_rescan_dev(self->devs[i]);
             continue;
         }
-
+        // 2.2 status[i]の領域を確保する
         if (self->status[i] == 0) {
             self->status[i] = kmalloc(sizeof(usb_port_status_t));
             assert (self->status[i] != 0);
         }
-        // ポートのステータスを取得する
+        // 2.3 ポートのステータスを取得する
         if (dw2_hc_control_message(host, ep0,
             REQUEST_IN | REQUEST_CLASS | REQUEST_TO_OTHER,
             GET_STATUS, 0, i+1, self->status[i], 4) != 4) {
             warn("Cannot get status of port %d", i+1);
             continue;
         }
-        // 電源が入っていること
+        // 2.4 電源が入っていること
         assert (self->status[i]->status & PORT_POWER__MASK);
-        // コネクトされていること
+        // 2.5 コネクトされていること
         if (!(self->status[i]->status & PORT_CONNECTION__MASK)) {
             continue;
         }
-        // ポートリセット
+        // 2.6 ポートリセット
         if (dw2_hc_control_message(host, ep0,
             REQUEST_OUT | REQUEST_CLASS | REQUEST_TO_OTHER,
             SET_FEATURE, PORT_RESET, i+1, 0, 0) < 0) {
@@ -238,7 +237,7 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
             continue;
         }
         delayus(100*1000);
-        // ポートステータスを取得する
+        // 2.7 ポートステータスを取得する
         if (dw2_hc_control_message(host, ep0,
             REQUEST_IN | REQUEST_CLASS | REQUEST_TO_OTHER,
             GET_STATUS, 0, i+1, self->status[i], 4) != 4) {
@@ -246,13 +245,13 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
         }
         debug("Port %d status is 0x%04x", i+1, (unsigned) self->status[i]->status);
 
-        // ポートが利用可能になっていること
+        // 2.8 ポートが利用可能になっていること
         if (!(self->status[i]->status & PORT_ENABLE__MASK)) {
             warn("Port %d is not enabled", i+1);
             continue;
         }
 
-        // 過電流になっている場合は電源をオフしてエニュメレーションを中止
+        // 2.9 過電流になっている場合は電源をオフしてエニュメレーションを中止
         if (self->status[i]->status & PORT_OVER_CURRENT__MASK) {
             dw2_hc_control_message(host, ep0,
                 REQUEST_OUT | REQUEST_CLASS | REQUEST_TO_OTHER,
@@ -261,7 +260,7 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
             return false;
         }
 
-        // スピードの判定
+        // 2.10 スピードの判定
         speed = usb_speed_unknown;
         if (self->status[i]->status & PORT_LOW_SPEED__MASK) {
             speed = usb_speed_low;
@@ -270,30 +269,12 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
         } else {
             speed = usb_speed_full;
         }
-        // ポートにデバイスを設定する
-        usb_dev_t *hub = usb_func_get_dev(&self->func);
-        assert (hub != 0);
-
-        boolean split   = usb_dev_is_split(hub);
-        uint8_t hubaddr = usb_dev_get_hubaddr(hub);
-        uint8_t hubport = usb_dev_get_hubport(hub);
-
-        // HSハブにHSでないデバイスが接続されるのはこれが初めであれば
-        if (!split
-            && usb_dev_get_speed(hub) == usb_speed_high
-            && speed < usb_speed_high) {
-            // このハブポートをトランスレータとしてsplit転送を有効にする
-            split   = true;
-            hubaddr = usb_dev_get_addr(hub);
-            hubport = i+1;
-        }
-
-        // まずデフォルトデバイスを作成する
+        // 2.11 ポートにデバイスを設定する
         assert (self->devs[i] == 0);
         self->devs[i] = kmalloc(sizeof(usb_dev_t));
         assert (self->devs[i] != 0);
-        usb_device(self->devs[i], host, speed, split, hubaddr, hubport);
-        // デバイスを初期化する
+        usb_device2(self->devs[i], host, speed, self, i);
+        // 2.12 デバイスを初期化する
         if (!usb_dev_init(self->devs[i])) {
             _usb_device(self->devs[i]);
             kmfree(self->devs[i]);
@@ -302,12 +283,12 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
         }
     }
 
-    // 次にデバイスのコンフィグレーションを行う
+    // 3. デバイスのコンフィグレーションを行う
     for (unsigned i = 0; i < self->nports; i++) {
         if (self->devs[i] == 0) continue;
         if (self->portconf[i]) continue;
-        self->portconf[i] = true;
 
+        self->portconf[i] = true;
         if (!usb_dev_config(self->devs[i])) {
             warn("Port %d: Cannot configure device", i+1);
             _usb_device(self->devs[i]);
@@ -319,10 +300,10 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
         info("Port %d: Device configured", i+1);
     }
 
-    // もう一度過電流がないかチェックする
+    // 4. もう一度過電流がないかチェックする
     hub_status_t *hubstatus = kmalloc(sizeof(hub_status_t));
     assert (hubstatus != 0);
-
+    // 4.1 ハブの過電流チェック
     if (dw2_hc_control_message(host, ep0,
             REQUEST_IN | REQUEST_CLASS,
             GET_STATUS, 0, 0, hubstatus, sizeof *hubstatus) != (int) sizeof *hubstatus) {
@@ -347,6 +328,7 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
 
     boolean result = true;
 
+    // 4.2 ポートの過電流チェック
     for (unsigned i = 0; i < self->nports; i++) {
         if (dw2_hc_control_message(host, ep0,
             REQUEST_IN | REQUEST_CLASS | REQUEST_TO_OTHER,

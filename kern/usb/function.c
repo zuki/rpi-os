@@ -43,7 +43,8 @@ boolean usb_func_init(usb_func_t *self)
 
 boolean usb_func_config(usb_func_t *self)
 {
-    if (self->if_desc != 0) {
+    assert(self->if_desc != 0);
+    if (self->if_desc->alt != 0) {
         if (dw2_hc_control_message(self->dev->host,
             self->dev->ep0, REQUEST_OUT | REQUEST_TO_INTERFACE, SET_INTERFACE,
             self->if_desc->alt, self->if_desc->num, 0, 0) < 0) {

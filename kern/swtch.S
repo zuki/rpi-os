@@ -2,7 +2,7 @@
  * Context switch
  *
  *   void swtch(struct context **old, struct context *new);
- * 
+ *
  * Save the current registers on the stack, creating
  * a struct context, and save its address in *old.
  * Switch stacks to new and pop previously-saved registers.
@@ -20,7 +20,8 @@ swtch:
     stp     x27, x26, [sp, #-16]!
     stp     x29, x28, [sp, #-16]!
     stp     x30, x30, [sp, #-16]!
-
+    /* 通常はreturnアドレス(x30）を2つ保存  */
+    /* initprocではx30=x15=forkretとx30=trapretを保存  */
     /* Switch stacks. */
     mov     x9, sp
     str     x9, [x0]
@@ -37,6 +38,8 @@ swtch:
 
     # ldr     q0, [sp], #16
 
-    /* Why not simply ret by x30? This is a hack for forkret. */
+    /* なぜ素直にx30でリターンしないのか? これはforkretのためのハックだ */
     dsb     sy; isb
+    /* x15にセットされたアドレスにリターンする。通常はx15=x30なので普通にリターン */
+    /* initprocの場合はx15=forkret()なのでforkret()が実行される */
     ret     x15

@@ -5,10 +5,11 @@
 #include "types.h"
 
 struct dw2_hc;
+struct usb_dev;
 
 typedef struct dw2_rport {
     struct dw2_hc   *host;
-    usb_dev_t       *dev;
+    struct usb_dev  *dev;
 } dw2_rport_t;
 
 void dw2_rport(dw2_rport_t *self, struct dw2_hc *host);

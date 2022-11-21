@@ -86,10 +86,10 @@ void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t 
         self->ppt = 1;
     }
 
-    assert(self->buffp != 0);
-    trace("bp=0x%llx", self->buffp);
-    if (((uintptr_t) self->buffp & 3) != 0) {
-        warn("buffp not align: %p", self->buffp);
+    //assert(self->buffp != 0);
+    //trace("bp=0x%llx", self->buffp);
+    if (self->buffp == 0 || ((uintptr_t) self->buffp & 3) != 0) {
+        error("buffp not align: %p", self->buffp);
     }
     //assert(((uintptr_t) self->buffp & 3) == 0);
 
@@ -255,7 +255,9 @@ uint8_t dw2_xfer_stagedata_get_ep_type(dw2_xfer_stagedata_t *self)
         break;
 
     default:
-        assert(0);
+        warn("bad ep_type: %d", usb_ep_get_type(self->ep));
+        //assert(0);
+        type = DWHCI_HOST_CHAN_CHARACTER_EP_TYPE_CONTROL;
         break;
     }
 
@@ -280,8 +282,8 @@ usb_speed_t dw2_xfer_stagedata_get_speed(dw2_xfer_stagedata_t *self)
 uint8_t dw2_xfer_stagedata_get_pid(dw2_xfer_stagedata_t *self)
 {
     uint8_t pid = 0;
-
-    switch(usb_ep_get_nextpid(self->ep, self->ststage))
+    usb_pid_t next = usb_ep_get_nextpid(self->ep, self->ststage);
+    switch(next)
     {
     case usb_pid_setup:
         pid = DWHCI_HOST_CHAN_XFER_SIZ_PID_SETUP;
@@ -296,6 +298,7 @@ uint8_t dw2_xfer_stagedata_get_pid(dw2_xfer_stagedata_t *self)
         break;
 
     default:
+        info("bad next: %d", next);
         assert(0);
         break;
     }

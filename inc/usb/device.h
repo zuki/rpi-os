@@ -25,6 +25,8 @@
 #include "usb/config_parser.h"
 #include "usb/function.h"
 #include "usb/string.h"
+#include "usb/dw2rootport.h"
+#include "usb/standardhub.h"
 
 #define USBDEV_MAX_FUNCTIONS    10
 
@@ -38,12 +40,18 @@ typedef enum { // 順序を変更しない
 } selector_t;
 
 struct dw2_hc;
+struct dw2_rport;
+struct standardhub;
 struct usb_ep;
 struct usb_dev;
+
 
 /// @brief USBデバイスを表すクラス
 typedef struct usb_dev {
     struct dw2_hc      *host;               ///< ホストコントローラ
+    struct dw2_rport   *rport;              ///< このデバイスが接続されているルートポート
+    struct standardhub *hub;           ///< このデバイスが接続されているハブ
+    unsigned            pindex;             ///< このハブの0ベースのインデックス
     uint8_t             addr;               ///< アドレス
     usb_speed_t         speed;              ///< スピード
     struct usb_ep      *ep0;                ///< エンドポイント 0
@@ -59,10 +67,12 @@ typedef struct usb_dev {
     usb_str_t          *manufact;           ///< 製造者文字列(uspi)
     usb_str_t          *product;            ///< 製品名文字列(uspi)
     usb_func_t         *usb_func[USBDEV_MAX_FUNCTIONS]; ///< デバイスクラス
-} PACKED usb_dev_t;
+} usb_dev_t;
 
 void usb_device(usb_dev_t *self, struct dw2_hc *host, usb_speed_t speed,
-		boolean split, uint8_t hubaddr, uint8_t hubport);
+		struct dw2_rport *rport);
+void usb_device2(usb_dev_t *self, struct dw2_hc *host, usb_speed_t speed,
+		struct standardhub *hub, unsigned pindex);
 void _usb_device(usb_dev_t *self);
 
 boolean usb_dev_init(usb_dev_t *self);      // onto address state(phase 1)

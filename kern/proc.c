@@ -20,6 +20,7 @@
 #include "linux/ppoll.h"
 #include "linux/resources.h"
 #include "linux/wait.h"
+#include "usb/dw2hcd.h"
 
 extern void trapret();
 extern void swtch(struct context **old, struct context *new);
@@ -213,18 +214,28 @@ static void
 forkret()
 {
     static int first = 1;
+    //struct context ctx;
+    //struct context *ctx_p;
     if (first && thisproc() != thiscpu()->idle) {
         first = 0;
         release(&ptable.lock);
+        //dump_struct_context("[1]", thisproc()->context);
+        //ctx_p = thisproc()->context;
+        //memmove(&ctx, thisproc()->context, sizeof(struct context));
 
         dev_init();
         iinit(ROOTDEV);
         initlog(ROOTDEV);
         usbhc_init();
+
+        //dump_struct_context("[2]", thisproc()->context);
+        //thisproc()->context = ctx_p;
+        //memmove(thisproc()->context, &ctx, sizeof(struct context));
+        //dump_struct_context("[3]", thisproc()->context);
     } else {
         release(&ptable.lock);
     }
-    //info("proc '%s'(%d)", thisproc()->name, thisproc()->pid);
+    trace("proc '%s'(%d)", thisproc()->name, thisproc()->pid);
 }
 
 /* Give up CPU. */
@@ -236,7 +247,9 @@ yield()
     if (p != thiscpu()->idle)
         list_push_back(&ptable.sched_que, &p->link);
     p->state = RUNNABLE;
+    trace("f %d", p->pid);
     swtch(&p->context, thiscpu()->scheduler);
+    trace("t %d", p->pid);
     p->state = RUNNING;
     release(&ptable.lock);
 }
@@ -1020,4 +1033,54 @@ get_procs(void)
     }
     release(&ptable.lock);
     return nump;
+}
+
+void dump_struct_context(char *title, struct context *p)
+{
+    cprintf("== Struct context %s\n", title);
+    cprintf("[0x%016llx]\n", (uint64_t)p);
+    cprintf("  lr0: 0x%016llx", p->lr0);
+    cprintf("  lr : 0x%016llx", p->lr);
+    cprintf("  fp : 0x%016llx\n", p->fp);
+    cprintf("  x28: 0x%016llx", p->x[0]);
+    cprintf("  x27: 0x%016llx", p->x[1]);
+    cprintf("  x26: 0x%016llx\n", p->x[2]);
+    cprintf("  x25: 0x%016llx", p->x[3]);
+    cprintf("  x24: 0x%016llx", p->x[4]);
+    cprintf("  x23: 0x%016llx\n", p->x[5]);
+    cprintf("  x22: 0x%016llx", p->x[6]);
+    cprintf("  x21: 0x%016llx", p->x[7]);
+    cprintf("  x20: 0x%016llx\n", p->x[8]);
+    cprintf("  x19: 0x%016llx\n", p->x[9]);
+}
+
+void dump_struct(char *title, void *p, uint64_t size)
+{
+    uint64_t pos = (uint64_t)p;
+    char *buf = (char *)p;
+    if ((pos & 0xff) != 0) {
+        pos = pos & 0xffffffffffffff00;
+        size += (pos & 0xff);
+    }
+
+    cprintf("\n== PRINT (%s) 0x%016llx (0x%016llx) - 0x%016llx ==\n\n", title, pos, (uint64_t)p, pos+size);
+
+    uint64_t i, j, idx;
+    for (i = 0; i < size / 16; i++) {
+        cprintf("%016llx: ", pos);
+        for (j = 0; j < 16; j += 2) {
+            idx = i * 16 + j;
+            cprintf("%02x%02x ", (unsigned char)buf[idx], (unsigned char)buf[idx+1]);
+        }
+        for (j = 0; j < 16; j++) {
+            unsigned char c = buf[i*16+j];
+            if (c >= 0x20 && c <= 0x7e)
+                cprintf("%c", c);
+            else
+                cprintf(".");
+        }
+        cprintf("\n");
+        pos += 16;
+    }
+
 }

@@ -60,7 +60,7 @@ $(KERN_IMG): $(KERN_ELF)
 -include mksd.mk
 
 #QEMU_CMD ?= $(QEMU) -M raspi3b -nographic -serial null -serial mon:stdio -drive file=$(SD_IMG),if=sd,format=raw
-QEMU_CMD ?= $(QEMU) -M raspi3b -nographic -serial null -serial mon:stdio -drive file=$(SD_IMG),if=sd,format=raw -device usb-kbd # -trace events=events
+QEMU_CMD ?= $(QEMU) -M raspi3b -nographic -serial null -serial mon:stdio -drive file=$(SD_IMG),if=sd,format=raw -netdev user,id=net0,hostfwd=tcp::8080-:80 -device usb-net,netdev=net0 # -device usb-kbd -trace events=events
 
 
 qemu: all

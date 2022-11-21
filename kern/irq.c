@@ -264,6 +264,7 @@ irq_handler(int user_mode)
     // 現在実装している割り込み以外はエラー
     assert(!(src & ~(IRQ_SRC_CNTPNSIRQ | IRQ_SRC_GPU | IRQ_SRC_TIMER)));
     //if (src & IRQ_SRC_GPU) info("src=0x%x", src);
+    //info("0x%x", src);
     // 1. 物理カウンター割り込み（コアタイマー割り込み: タイマーで使用）
     // FIXME: 実際はエンプションにしか使用していない
     if (src & IRQ_SRC_CNTPNSIRQ) {

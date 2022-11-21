@@ -20,10 +20,10 @@
 
 /* Stack must always be 16 bytes aligned. */
 struct context {
-    uint64_t lr0, lr, fp;
+    uint64_t lr0, lr, fp;       /* x15, x30, x29 */
     uint64_t x[10];             /* X28 ... X19 */
-    uint64_t padding;
-    // uint64_t q0[2];             /* V0 */
+    uint64_t padding;           /* xrz */
+    // uint64_t q0[2];          /* V0 */
 };
 
 enum procstate { UNUSED, EMBRYO, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
@@ -168,6 +168,9 @@ uint16_t get_procs();
 // sigret_syscall.S
 void execute_sigret_syscall_start(void);
 void execute_sigret_syscall_end(void);
+
+void dump_struct(char *title, void *p, uint64_t size);
+void dump_struct_context(char *title, struct context *p);
 
 static inline int capable(int cap)
 {

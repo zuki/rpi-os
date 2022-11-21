@@ -43,23 +43,24 @@ void _dw2_rport(dw2_rport_t *self)
 
 boolean dw2_rport_init(dw2_rport_t *self)
 {
+    // 1. speedをチェック
     usb_speed_t speed = dw2_hc_get_port_speed(self->host);
     if (speed == usb_speed_unknown) {
         error("cannot detect port speed");
         return false;
     }
 
-    // first create default device
+    // 2. デフォルトデバイスを作成
     self->dev = (usb_dev_t *)kmalloc(sizeof(usb_dev_t));
-    usb_device(self->dev, self->host, speed, false, 0, 1);
-
-    if (!usb_dev_init(self->dev)) { // FIXME
+    usb_device(self->dev, self->host, speed, self);
+    // 3. デフォルトデバイスの初期化
+    if (!usb_dev_init(self->dev)) {
         _usb_device(self->dev);
         kmfree(self->dev);
         self->dev = 0;
         return false;
     }
-
+    // 3. デフォルトデバイスのコンフィグレーション
     if (!usb_dev_config(self->dev)) {
         error("cannot configure device");
         _usb_device(self->dev);
@@ -68,9 +69,9 @@ boolean dw2_rport_init(dw2_rport_t *self)
         return false;
     }
 
-    debug("Device configured");
+    info("Device configured");
 
-    // check for over-current
+    // 4. 過電流を検知したらルートポートは無効としてFALSEを返す
     if (dw2_hc_overcurrent_detected(self->host)) {
         error("Over-current condition");
         dw2_hc_disable_rport(self->host, true);

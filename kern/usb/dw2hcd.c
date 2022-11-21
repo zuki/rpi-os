@@ -37,6 +37,7 @@
 #include "mbox.h"
 #include "synchronize.h"
 #include "linux/time.h"
+#include "proc.h"
 #include "rtc.h"
 
 #define DEVICE_ID_USB_HCD       3           // for SetpowerStateOn()
@@ -46,7 +47,7 @@
 #define POWER_STATE_NO_DEVICE   (1 << 1)    // in response
 
 // Dw2＿HCDドライバオブジェクト
-dw2_hc_t *dw2hc;
+static dw2_hc_t *dw2hc = 0;
 
 //
 // 構成
@@ -144,8 +145,8 @@ boolean dw2_hc_init(dw2_hc_t *self, boolean scan)
 {
     uint32_t vendor;
     // 1. ホストコントローラのバージョンチェック
-    // この値はDWC OTG HW Release version。実機は0x4f54280a、QEMUは
-    // 0x4f54294aとaminorバージョンが異なるのでmajorバージョンのみチェックする
+    // この値はDWC OTG HW Release version。実機は0x4f54280a、QEMUは0x4f54294a
+    // 両者のminorバージョンが異なるのでmajorバージョンのみチェックする
     if (((vendor = get32(DWHCI_CORE_VENDOR_ID)) & 0xfffff000) != 0x4f542000) {
         warn("Unknown vendor 0x%x", vendor);
         return false;
@@ -177,6 +178,7 @@ boolean dw2_hc_init(dw2_hc_t *self, boolean scan)
         warn("Cannot initialize host");
         return false;
     }
+/*
     // 以下の呼び出しはルートポートにデバイスが接続されていないと
     // 失敗する。システムはUSBデバイスなしでも実行できるのでこれは
     // エラーではない。
@@ -190,6 +192,7 @@ boolean dw2_hc_init(dw2_hc_t *self, boolean scan)
         warn("Cannot initialize root port");
         return true;
     }
+*/
 
     DataMemBarrier();
 
@@ -283,14 +286,14 @@ boolean dw2_hc_submit_async_request(dw2_hc_t *self, usb_req_t *urb, unsigned tim
     return result;
 }
 
-/*
+
 void dw2_hc_cancel_device_transaction(dw2_hc_t *self, usb_dev_t *dev)
 {
 #ifdef USE_USB_SOF_INTR
     // dw2_hc_flush_dev(self, dev);     // 未定義、未実装
 #endif
 }
-*/
+
 
 boolean dw2_hc_device_connected(dw2_hc_t *self)
 {
@@ -394,7 +397,7 @@ boolean dw2_hc_init_core(dw2_hc_t *self)
     ahbcfg = get32(DWHCI_CORE_AHB_CFG);
     ahbcfg |= DWHCI_CORE_AHB_CFG_DMAENABLE;     // [5]=1 : コア操作をDMAモードで行う
     // ahbcfg |= DWHCI_CORE_AHB_CFG_AHB_SINGLE; // if DMA single mode should be used
-    ahbcfg |= DWHCI_CORE_AHB_CFG_WAIT_AXI_WRITES;   // [2:1: = 0Burst type = Single
+    ahbcfg |= DWHCI_CORE_AHB_CFG_WAIT_AXI_WRITES;   // [2:1] = 0 : Burst type = Single
     ahbcfg &= ~DWHCI_CORE_AHB_CFG_MAX_AXI_BURST__MASK;
     // ahbcfg |= (0 << DWHCI_CORE_AHB_CFG_MAX_AXI_BURST__SHIFT) // max. AXI burst length 4
     put32(DWHCI_CORE_AHB_CFG, ahbcfg);
@@ -555,7 +558,7 @@ void dw2_hc_enable_common_intr(dw2_hc_t *self)
 
 void dw2_hc_enable_host_intr(dw2_hc_t *self)
 {
-    uint32_t intmask = 0;                   // すべての割り込みを無効に
+    uint32_t intmask = 0;                   // すべての割り込みを無効(0)に
     put32(DWHCI_CORE_INT_MASK, intmask);
 
     dw2_hc_enable_common_intr(self);
@@ -645,6 +648,7 @@ boolean dw2_hc_xfer_stage(dw2_hc_t *self, usb_req_t *urb, boolean in, boolean st
     //info("1");
     while (self->waiting[wblk]) {
         // dw2_hc_comp_cb()で待機中フラグが解除されるのを待つ
+        yield();
     }
     //info("2");
     dw2_hc_free_wblock(self, wblk);
@@ -687,7 +691,7 @@ boolean dw2_hc_xfer_stage_async(dw2_hc_t *self, usb_req_t *urb, boolean in, bool
     self->stdata[channel] = stdata;
     dw2_hc_enable_channel_intr(self, channel);
 #endif
-    // 5-1. split転送でない
+    // 5-1. split転送ではない
     if (!stdata->split) {
         stdata->state = stage_status_no_split;
     // 5-2. split転送である（途中にハブが介在する場合のみ）
@@ -961,7 +965,7 @@ void dw2_hc_channel_intr_hdl(dw2_hc_t *self, unsigned channel)
 #endif
             break;
          } else if (status & DWHCI_HOST_CHAN_INT_ERROR_MASK) {
-            warn("Transaction failed(status 0x%x)", status);
+            warn("Transaction failed 1 (status 0x%x)", status);
             urb->status = 0;
             urb->error = dw2_xter_dtagedata_get_usb_err(stdata);
         } else if ((status & (DWHCI_HOST_CHAN_INT_NAK | DWHCI_HOST_CHAN_INT_NYET))
@@ -1001,7 +1005,7 @@ void dw2_hc_channel_intr_hdl(dw2_hc_t *self, unsigned channel)
         if ((status & DWHCI_HOST_CHAN_INT_ERROR_MASK)
          || (status & DWHCI_HOST_CHAN_INT_NAK)
          || (status & DWHCI_HOST_CHAN_INT_NYET)) {
-            warn("Transaction failed(status 0x%x)", status);
+            warn("Transaction failed 2 (status 0x%x)", status);
             urb->status = 0;
             urb->error = dw2_xter_dtagedata_get_usb_err(stdata);
             dw2_hc_disable_channel_intr(self, channel);
@@ -1031,7 +1035,7 @@ void dw2_hc_channel_intr_hdl(dw2_hc_t *self, unsigned channel)
     case stage_status_complete_split:
         status = stdata->trstatus;
         if (status & DWHCI_HOST_CHAN_INT_ERROR_MASK) {
-            warn("Transaction failed(status 0x%x)", status);
+            warn("Transaction failed 3 (status 0x%x)", status);
             urb->status = 0;
             urb->error = dw2_xter_dtagedata_get_usb_err(stdata);
             dw2_hc_disable_channel_intr(self, channel);
@@ -1236,7 +1240,7 @@ void dw2_hc_timer_hdl(dw2_hc_t *self, dw2_xfer_stagedata_t *stdata)
 
         return;
     }
-
+    info("st=%d", stdata->state);
     assert(stdata->state == stage_status_periodic_delay);
 
     if (stdata->split) {
@@ -1266,7 +1270,7 @@ void dw2_hc_timer_hdlstub(uint64_t data)
     dw2_hc_timer_hdl(self, stdata);
 
     // FIXME: これはいる?
-    // kmfree(&data);
+    kmfree(&data);
 }
 
 #endif
@@ -1500,8 +1504,9 @@ boolean dw2_hc_update_pap(dw2_hc_t *self)
 
 void usbhc_init(void)
 {
-    //info("dw2_hc_t size=%d", sizeof(dw2_hc_t)); // 4144
-    //info("dw2_xfer_stagedata_t sieze=%d", sizeof(dw2_xfer_stagedata_t));    // 248
+    if (dw2hc != 0)
+        return;
+
     dw2hc = (dw2_hc_t *)kmalloc(sizeof(dw2_hc_t));
     dw2_hc(dw2hc);
     if (dw2_hc_init(dw2hc, true)) {
@@ -1509,6 +1514,7 @@ void usbhc_init(void)
     } else {
         panic("failed to initialize dw2_hc\n");
     }
+
 }
 
 void usb_test(void)

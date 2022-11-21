@@ -35,22 +35,22 @@ typedef enum {
 /// @brief USBエンドポイント構造体
 
 typedef struct usb_ep {
-    usb_dev_t      *dev;                ///< デバイス
+    struct usb_dev *dev;                ///< デバイス
     uint8_t         num;                ///< エンドポイント番号
     ep_type_t       type;               ///< 種別
     boolean         in;                 ///< 転送方向
     uint32_t        xsize;              ///< 最大パケットサイズ
     unsigned        interval;           ///< 間隔（ミリ秒）
     usb_pid_t       nextpid;            ///< 次のPID
-} PACKED usb_ep_t;
+} usb_ep_t;
 
-void usb_endpoint(usb_ep_t *self, usb_dev_t *dev);  // for ep0
-void usb_endpoint2(usb_ep_t *self, usb_dev_t *dev, const ep_desc_t *desc);
-void usb_endpoint_copy(usb_ep_t *self, usb_ep_t *ep, usb_dev_t *dev);
+void usb_endpoint(usb_ep_t *self, struct usb_dev *dev);  // for ep0
+void usb_endpoint2(usb_ep_t *self, struct usb_dev *dev, const ep_desc_t *desc);
+void usb_endpoint_copy(usb_ep_t *self, usb_ep_t *ep, struct usb_dev *dev);
 void _usb_endpoint(usb_ep_t *self);
 
 // getter
-usb_dev_t *usb_ep_get_device(usb_ep_t *self);
+struct usb_dev *usb_ep_get_device(usb_ep_t *self);
 uint8_t usb_ep_get_number(usb_ep_t *self);
 ep_type_t usb_ep_get_type(usb_ep_t *self);
 uint32_t usb_ep_get_max_packet_size(usb_ep_t *self);

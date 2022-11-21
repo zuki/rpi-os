@@ -116,7 +116,7 @@ boolean usb_string_get_from_desc(usb_str_t *self, uint8_t id, uint16_t langid)
 
     kmfree(self->str);
     self->str = (char *)kmalloc(length+1);
-    safestrcpy(self->str, buffer, length);
+    safestrcpy(self->str, buffer, length+1);
 
     return true;
 }

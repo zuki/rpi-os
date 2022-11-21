@@ -68,8 +68,6 @@ typedef struct port_status_event {
     struct list_head     list;
 } pst_ev_t;
 
-extern dw2_hc_t *dw2hc;
-
 // PUBLIC
 void dw2_hc(dw2_hc_t *self);
 void _dw2_hc(dw2_hc_t *self);
@@ -97,8 +95,7 @@ boolean dw2_hc_submit_async_request(dw2_hc_t *self, usb_req_t *urb, unsigned tim
 
 /// @brief 指定デバイスのトランザクションをキャンセルする
 /// @param device キャンセルするデバイス
-// USE_USB_SOF_INTRの場合のみ使用する関数で未実装
-//void dw2_hc_cancel_device_transaction(dw2_hc_t *self, usb_dev_t *dev);
+void dw2_hc_cancel_device_transaction(dw2_hc_t *self, usb_dev_t *dev);
 
 // static関数
 

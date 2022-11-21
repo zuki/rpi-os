@@ -67,7 +67,7 @@ void usb_endpoint2(usb_ep_t *self, usb_dev_t *dev, const ep_desc_t *desc)
         }
 
         // see USB 2.0 spec chapter 9.6.6
-        if(self->dev->speed != usb_speed_high) {    // LS/FS
+        if(self->dev->speed < usb_speed_high) {    // LS/FS
             self->interval = interval;
         } else {                                    // HS
             if (interval > 16) {
@@ -187,10 +187,12 @@ void usb_ep_skip_pid(usb_ep_t *self, unsigned packets, boolean ststage)
             break;
 
         default:
+            info("bad next pid: %d", self->nextpid);
             assert(0);
             break;
         }
     } else {
+        if (self->type != ep_type_control) info("type = %d", self->type);
         assert(self->type == ep_type_control);
         self->nextpid = usb_pid_setup;
     }

@@ -63,7 +63,6 @@ main()
     init_timervecs();
     trap_init();
     info("cpu %d init finished", cpuid());
-
     scheduler();
 
     panic("scheduler return.\n");

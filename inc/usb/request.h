@@ -28,7 +28,7 @@ struct usb_req;
 typedef void usb_comp_cb(struct usb_req *pURB, void *param, void *ctx);
 
 typedef struct usb_req {
-    usb_ep_t       *ep;                 ///< エンドポイント
+    struct usb_ep  *ep;                 ///< エンドポイント
     setup_data_t   *setup_data;         ///< セットアップデータ
     void           *buffer;             ///< バッファ
     uint32_t        buflen;             ///< バッファ長
@@ -41,10 +41,10 @@ typedef struct usb_req {
     usb_err_t       error;              ///< error
 } usb_req_t;
 
-void usb_request(usb_req_t *self, usb_ep_t *ep, void *buffer, uint32_t buflen, setup_data_t *setup_data);
+void usb_request(usb_req_t *self, struct usb_ep *ep, void *buffer, uint32_t buflen, setup_data_t *setup_data);
 void _usb_request(usb_req_t *self);
 
-usb_ep_t *usb_req_get_ep(usb_req_t *self);
+struct usb_ep *usb_req_get_ep(usb_req_t *self);
 
 void usb_req_set_status(usb_req_t *self, int status);
 void usb_req_set_resultlen(usb_req_t *self, uint32_t resultlen);

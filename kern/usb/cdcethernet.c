@@ -107,7 +107,7 @@ boolean cdcether_configure(usb_func_t *func)
         return false;
     }
 
-    debug("MAC address is %s". self->macaddr);
+    info("MAC address is %x:%x:%x:%x:%x:%x", self->macaddr[0], self->macaddr[1], self->macaddr[2], self->macaddr[3], self->macaddr[4], self->macaddr[5]);
 
     // エンドポイントを取得
     const ep_desc_t *ep_desc;

@@ -29,8 +29,9 @@
 #include "string.h"
 
 struct usb_ep;
+struct usb_dev;
 
-typedef struct usb_standardhub {
+typedef struct standardhub {
 	usb_func_t          func;       ///< usb functionオブジェクト
     struct usb_ep      *intr_ep;    ///< 割り込みエンドポイント
     hub_desc_t         *hub_desc;   ///< ハブディスクリプタ
@@ -38,14 +39,13 @@ typedef struct usb_standardhub {
     unsigned            nports;     ///< ポート数
     boolean             poweron;    ///< 電源オンか
     uint32_t            devno;      ///< デバイス番号("uhubXX"のXX部)
-    usb_dev_t     *devs[USB_HUB_MAX_PORTS];    ///< ポートデバイス配列
+    struct usb_dev     *devs[USB_HUB_MAX_PORTS];    ///< ポートデバイス配列
     usb_port_status_t  *status[USB_HUB_MAX_PORTS];  ///< ポートステータス配列
     boolean             portconf[USB_HUB_MAX_PORTS]; ///< ポート構成済み配列
 } usb_stdhub_t;
 
 void usb_standardhub(usb_stdhub_t *self, usb_func_t *func);
 void _usb_standardhub(usb_stdhub_t *self);
-boolean usb_stdhub_init(usb_stdhub_t *self);
 boolean usb_stdhub_config(usb_func_t *self);
 boolean usb_stdhub_rescan_dev(usb_stdhub_t *self);
 boolean usb_stdhub_remove_dev(usb_stdhub_t *self, uint32_t index);
@@ -53,8 +53,8 @@ boolean usb_stdhub_disable_port(usb_stdhub_t *self, uint32_t index);
 void usb_stdhub_handle_port_status_change(usb_stdhub_t *self);
 
 boolean usb_stdhub_start_status_change_req(usb_stdhub_t *self);
-void usb_stdhub_comp_cb(usb_stdhub_t *self, usb_req_t *urb);
-void usb_stdhub_comp_cbstub(usb_req_t *urb, void *param, void *ctx);
+void usb_stdhub_comp_cb(usb_stdhub_t *self, struct usb_req *urb);
+void usb_stdhub_comp_cbstub(struct usb_req *urb, void *param, void *ctx);
 
 void usb_stdhub_port_status_changed(usb_stdhub_t *self);
 
