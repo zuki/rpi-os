@@ -10,6 +10,7 @@ back
 kern/fat.tar.gz
 qemu.log
 qemu.trace
+kern/fat/*
 
 boot/*
 memos/book/*
