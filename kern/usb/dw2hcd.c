@@ -28,6 +28,7 @@
 #include "usb/dw2xferstagedata.h"
 #include "usb/dw2fscheduler.h"
 #include "usb/dw2rootport.h"
+#include "usb/devicenameservice.h"
 #include "types.h"
 #include "arm.h"
 #include "console.h"
@@ -108,9 +109,9 @@ void dw2_hc(dw2_hc_t *self)
     initlock(&self->wblklock, "waitblocklock");
     initlock(&self->imasklock, "itrmasklock");
     initlock(&self->hublock, "hublock");
-    list_init(self->hublist);
+    list_init(&self->hublist);
 #ifdef USE_USB_SOF_INTR
-    list_init(self->tqueue);
+    list_init(&self->tqueue);
 #endif
     //self->pap = false;
     dw2_rport(&self->rport, self);
@@ -645,12 +646,10 @@ boolean dw2_hc_xfer_stage(dw2_hc_t *self, usb_req_t *urb, boolean in, boolean st
         dw2_hc_free_wblock(self, wblk);
         return false;
     }
-    //info("1");
     while (self->waiting[wblk]) {
         // dw2_hc_comp_cb()で待機中フラグが解除されるのを待つ
         yield();
     }
-    //info("2");
     dw2_hc_free_wblock(self, wblk);
     return urb->status;
 }
@@ -1485,7 +1484,7 @@ boolean dw2_hc_update_pap(dw2_hc_t *self)
 
     acquire(&self->hublock);
     pst_ev_t *ev, *nev;
-    LIST_FOREACH_ENTRY_SAFE(ev, nev, hublist, list) {
+    LIST_FOREACH_ENTRY_SAFE(ev, nev, &self->hublist, list) {
         list_drop(ev);
         release(&self->hublock);
         if (ev->rport)
@@ -1507,6 +1506,8 @@ void usbhc_init(void)
     if (dw2hc != 0)
         return;
 
+    dev_ns_t *dev_ns = (dev_ns_t *)kmalloc(sizeof(dev_ns_t));
+    dev_name_service(dev_ns);
     dw2hc = (dw2_hc_t *)kmalloc(sizeof(dw2_hc_t));
     dw2_hc(dw2hc);
     if (dw2_hc_init(dw2hc, true)) {

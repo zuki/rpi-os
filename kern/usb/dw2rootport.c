@@ -125,7 +125,7 @@ void dw2_rport_port_status_changed(dw2_rport_t *self)
         list_init(&event->list);
 
         acquire(&self->host->hublock);
-        list_push_back(self->host->hublist, &event->list);
+        list_push_back(&self->host->hublist, &event->list);
         release(&self->host->hublock);
     }
 */

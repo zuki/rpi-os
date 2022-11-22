@@ -50,11 +50,11 @@ typedef struct dw2_hc {
     volatile boolean    shutdown;               ///< USBドライバはshutdownするか
 
 #ifdef USE_USB_SOF_INTR
-    struct list_head   *tqueue;                 ///< トランザクションキュー
+    struct list_head    tqueue;                 ///< トランザクションキュー
 #endif
 // 以下、usbhostcontrollerから
     struct spinlock     hublock;                ///< スピンロック: ハブリストを保護
-    struct list_head   *hublist;                ///< ハブリスト
+    struct list_head    hublist;                ///< ハブリスト
     /* boolean             pap; */              ///< プラグアンドプレイは有効か
 } dw2_hc_t;
 

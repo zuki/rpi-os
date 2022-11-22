@@ -125,7 +125,7 @@ proc_initx(char *name, char *code, size_t len)
 
     memmove(va, code, len);
     assert(len <= PGSIZE);
-
+    //if (p->pid == 1) info("pgdir=0x%p, va=0x%p", p->pgdir, va);
     // Flush dcache to memory so that icache can retrieve the correct one.
     dccivac(va, len);
 
@@ -214,24 +214,13 @@ static void
 forkret()
 {
     static int first = 1;
-    //struct context ctx;
-    //struct context *ctx_p;
     if (first && thisproc() != thiscpu()->idle) {
         first = 0;
         release(&ptable.lock);
-        //dump_struct_context("[1]", thisproc()->context);
-        //ctx_p = thisproc()->context;
-        //memmove(&ctx, thisproc()->context, sizeof(struct context));
-
         dev_init();
         iinit(ROOTDEV);
         initlog(ROOTDEV);
         usbhc_init();
-
-        //dump_struct_context("[2]", thisproc()->context);
-        //thisproc()->context = ctx_p;
-        //memmove(thisproc()->context, &ctx, sizeof(struct context));
-        //dump_struct_context("[3]", thisproc()->context);
     } else {
         release(&ptable.lock);
     }

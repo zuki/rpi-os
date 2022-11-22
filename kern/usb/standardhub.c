@@ -137,8 +137,8 @@ boolean usb_stdhub_config(usb_func_t *func)
     assert(self->hub_desc != 0);
     if (dw2_hc_get_desc(host, usb_func_get_ep0(&self->func),
                     DESCRIPTOR_HUB, DESCRIPTOR_INDEX_DEFAULT,
-                    self->hub_desc, sizeof *self->hub_desc,
-                    REQUEST_IN | REQUEST_CLASS, 0) != (int) sizeof(*self->hub_desc)) {
+                    self->hub_desc, sizeof(hub_desc_t),
+                    REQUEST_IN | REQUEST_CLASS, 0) != (int) sizeof(hub_desc_t)) {
         warn("Cannot get hub descriptor");
         goto bad;
     }
@@ -182,7 +182,6 @@ bad:
 static boolean
 usb_stdhub_enumerate_ports(usb_stdhub_t *self)
 {
-    info("start");
     dw2_hc_t *host = usb_func_get_host(&self->func);
     usb_ep_t *ep0 = usb_func_get_ep0(&self->func);
     usb_speed_t speed;
@@ -493,7 +492,7 @@ void usb_stdhub_port_status_changed(usb_stdhub_t *self)
         list_init(&event->list);
 
         acquire(&host->hublock);
-        list_push_back(host->hublist, &event->list);
+        list_push_back(&host->hublist, &event->list);
         release(&host->hublock);
     }
 */

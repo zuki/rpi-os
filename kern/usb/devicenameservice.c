@@ -48,7 +48,7 @@ void dev_name_service_add_dev(dev_ns_t *self, const char *name, void *dev, boole
 {
     dev_info_t *info = (dev_info_t *) kmalloc(sizeof(dev_info_t));
     info->name = (char *) kmalloc(strlen(name)+1);
-    safestrcpy(info->name, name, strlen(name));
+    safestrcpy(info->name, name, strlen(name)+1);
     info->dev = dev;
     info->blkdev = blkdev;
     info->next = self->list;
