@@ -161,8 +161,8 @@ irq_init()
     }
 
 #ifndef USE_GIC
-    put32(GPU_INT_ROUTE, GPU_IRQ2CORE(0));      // GPU割り込みはCOre0に
-#if 1
+    put32(GPU_INT_ROUTE, GPU_IRQ2CORE(0));      // GPU割り込みはCore0に
+#if 0
     put32(FIQ_CONTROL, 0);                      // FIQを無効に
     put32(DISABLE_IRQS_1, (uint32_t)-1);        // GPU IRQ1をすべて無効
     put32(DISABLE_IRQS_2, (uint32_t)-1);        // GPU IRQ2をすべて無効

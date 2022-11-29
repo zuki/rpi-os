@@ -229,19 +229,23 @@ mbox_get_macaddr(char *address)
     __attribute__((aligned(16)))
     volatile uint32_t buf[] =
         { 0, 0, MBOX_TAG_GET_MAC_ADDRESS, 8, MBOX_TAG_REQUEST, 0, 0,
-        MBOX_TAG_END
-    };
+        MBOX_TAG_END};
     buf[0] = sizeof(buf);
     asserts((V2P(buf) & 0xF) == 0, "Buffer should align to 16 bytes. ");
 
     if (mbox_send(buf, sizeof(buf)) < 0)
         return false;
 
-    if ((buf[4] >> 31) == 0) {
+    if ((buf[4] >> 31) == 0) {              // 成功の場合はbit31=1
         debug("unexpected tag resp %d", buf[4]);
         return false;
     }
-    assert((buf[4] & 0x3FFFFFFF) == 8);
+/*
+    for (int i=0; i < 8; i++) {
+        info("buf: %08x", buf[i]);
+    };
+*/
+    assert((buf[4] & 0x7FFFFFFF) == 6);     // MACアドレスは6バイト
     memmove(address, ((char *)buf)+20, 6);
     return true;
 }

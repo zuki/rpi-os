@@ -59,8 +59,8 @@ unsigned usb_ep_get_interval(usb_ep_t *self);		// Milliseconds
 void usb_ep_set_max_packet_size(usb_ep_t *self, uint32_t xsize);
 // その他
 boolean usb_ep_is_direction_in(usb_ep_t *self);
-usb_pid_t usb_ep_get_nextpid(usb_ep_t *self, boolean ststage);
-void usb_ep_skip_pid(usb_ep_t *self, unsigned packets, boolean ststage);
+usb_pid_t usb_ep_get_nextpid(usb_ep_t *self, boolean ststatus);
+void usb_ep_skip_pid(usb_ep_t *self, unsigned packets, boolean ststatus);
 void usb_ep_reset_pid(usb_ep_t *self);
 
 #endif

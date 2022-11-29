@@ -48,4 +48,79 @@ debug_reg()
     cprintf("FAR_EL1: 0x%llx\n", far);
 }
 
+static inline void
+debug_struct(char *title, void *p, uint64_t size)
+{
+    uint64_t pos = (uint64_t)p;
+    uint64_t skip = 0;
+    char *buf = (char *)p;
+    if ((pos & 0xf) != 0) {
+        skip = (pos & 0xf);
+        pos = pos & 0xfffffffffffffff0;
+    }
+
+    cprintf("\n== %s: 0x%016llx (0x%016llx) - 0x%016llx: size=0x%llx ==\n\n", title, pos, (uint64_t)p, pos+skip+size, size);
+
+    uint64_t i, j, k, idx, l = 1 + ((size - 1) / 16);;
+    for (i = 0; i < l; i++) {
+        cprintf("%016llx: ", pos);
+        if (skip != 0 && i == 0) {
+            for (k = 0; k < skip; k++) {
+                cprintf("  ");
+                if (k & 1) cprintf(" ");
+            };
+            for (j = 0; j < 16 - skip; j += 2) {
+                if (j < size)
+                    cprintf("%02x", (unsigned char)buf[j]);
+                else
+                    cprintf("  ");
+                if (j + 1 < size)
+                    cprintf("%02x ", (unsigned char)buf[j+1]);
+                else
+                    cprintf("   ");
+            }
+            for (k = 0; k < skip; k++) {
+                cprintf(" ");
+            };
+            for (j = 0; j < 16 - skip; j++) {
+                unsigned char c = buf[j];
+                if (c >= 0x20 && c <= 0x7e)
+                    cprintf("%c", c);
+                else
+                    cprintf(".");
+            }
+            cprintf("\n");
+            pos += 16;
+            continue;
+        }
+        for (j = 0; j < 16; j += 2) {
+            idx = i * 16 + j - skip;
+            if (idx < size)
+                cprintf("%02x", (unsigned char)buf[idx]);
+            else
+                cprintf("  ");
+            if (idx + 1 < size)
+                cprintf("%02x ", (unsigned char)buf[idx+1]);
+            else
+                cprintf("   ");
+        }
+        for (j = 0; j < 16; j++) {
+            idx = i * 16 + j - skip;
+            if (idx + 1 <= size) {
+                unsigned char c = buf[idx];
+                if (c >= 0x20 && c <= 0x7e)
+                    cprintf("%c", c);
+                else
+                    cprintf(".");
+            } else {
+                cprintf(" ");
+            }
+        }
+        cprintf("\n");
+        pos += 16;
+    }
+    cprintf("\n");
+
+}
+
 #endif

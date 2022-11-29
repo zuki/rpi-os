@@ -24,6 +24,7 @@
 #include "types.h"
 #include "console.h"
 #include "kmalloc.h"
+#include "mm.h"
 #include "string.h"
 
 #define USBSTR_MIN_LENGTH       4
@@ -41,7 +42,8 @@ void usb_string_copy(usb_str_t *self, usb_str_t *parent)
     self->dev = parent->dev;
     self->str = 0;
     if (parent->str_desc != 0) {
-        self->str_desc = (str_desc_t *)kmalloc(parent->str_desc->len);
+        //self->str_desc = (str_desc_t *)kmalloc(parent->str_desc->len);
+        self->str_desc = (str_desc_t *)kalloc();
         memmove(self->str_desc, parent->str_desc, parent->str_desc->len);
     }
     self->str = (char *)kmalloc(strlen(parent->str) + 1);
@@ -54,7 +56,8 @@ void _usb_string(usb_str_t *self)
     self->str = 0;
 
     if (self->str_desc != 0) {
-        kmfree(self->str_desc);
+        //kmfree(self->str_desc);
+        kfree(self->str_desc);
         self->str_desc = 0;
     }
 
@@ -64,10 +67,13 @@ void _usb_string(usb_str_t *self)
 boolean usb_string_get_from_desc(usb_str_t *self, uint8_t id, uint16_t langid)
 {
     if (self->str_desc != 0) {
-        kmfree (self->str_desc);
+        //kmfree (self->str_desc);
+        kfree (self->str_desc);
     }
 
-    self->str_desc = (str_desc_t *)kmalloc(USBSTR_MIN_LENGTH);
+    // FIXME
+    //self->str_desc = (str_desc_t *)kmalloc(USBSTR_MIN_LENGTH);
+    self->str_desc = (str_desc_t *)kalloc();
     if (dw2_hc_control_message(self->dev->host, self->dev->ep0,
             REQUEST_IN, GET_DESCRIPTOR,
             (DESCRIPTOR_STRING << 8) | id, langid,
@@ -83,8 +89,9 @@ boolean usb_string_get_from_desc(usb_str_t *self, uint8_t id, uint16_t langid)
     }
 
     if (len > USBSTR_MIN_LENGTH) {
-        kmfree(self->str_desc);
-        self->str_desc = (str_desc_t *)kmalloc(len);
+        //kmfree(self->str_desc);
+        memset(self->str_desc, 0, len);
+        //self->str_desc = (str_desc_t *)kmalloc(len);
         if (dw2_hc_control_message(self->dev->host, self->dev->ep0,
             REQUEST_IN, GET_DESCRIPTOR,
             (DESCRIPTOR_STRING << 8) | id, langid,

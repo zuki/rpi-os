@@ -333,7 +333,9 @@ static boolean lan7800_init_macaddr(lan7800_t *self)
         return false;
     }
 
-    info("MAC address is %s", self->macaddr);
+    info("MAC address is %02x:%02x:%02x:%02x:%02x:%02x",
+        self->macaddr[0], self->macaddr[1], self->macaddr[2],
+        self->macaddr[3], self->macaddr[4], self->macaddr[5]);
 
     return true;
 }

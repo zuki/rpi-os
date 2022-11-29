@@ -36,7 +36,7 @@ typedef struct dw2_xfer_stagedata {
     unsigned        channel;            ///< チャネル
     usb_req_t      *urb;                ///< リクエスト
     boolean         in;                 ///< 方向（INか）
-    boolean         ststage;            ///< ステージステータス
+    boolean         ststatus;           ///< ステージステータス
 
     boolean         split;              ///< 分割トランザクションか
     boolean         split_comp;         ///< 分割完了か
@@ -72,7 +72,7 @@ typedef struct dw2_xfer_stagedata {
     } fsched;                           ///< フレームスケジューラ
 } dw2_xfer_stagedata_t;
 
-void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t *urb, boolean in, boolean ststage, unsigned timeout);
+void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t *urb, boolean in, boolean ststatus, unsigned timeout);
 
 void _dw2_xfer_stagedata(dw2_xfer_stagedata_t *self);
 
@@ -100,7 +100,7 @@ uint8_t dw2_xfer_stagedata_get_pid(dw2_xfer_stagedata_t *self);
 boolean dw2_xfer_stagedata_is_in(dw2_xfer_stagedata_t *self);
 boolean dw2_xfer_stagedata_is_ststage(dw2_xfer_stagedata_t *self);
 
-uint32_t dw2_xfer_stagedata_get_dmaaddr(dw2_xfer_stagedata_t *self);
+uint64_t dw2_xfer_stagedata_get_dmaaddr(dw2_xfer_stagedata_t *self);
 uint32_t dw2_xfer_stagedata_get_byte2xfer(dw2_xfer_stagedata_t *self);
 uint32_t dw2_xfer_stagedata_get_packet2xfer(dw2_xfer_stagedata_t *self);
 
@@ -125,5 +125,7 @@ boolean dw2_xfer_stagedata_is_retry_ok(dw2_xfer_stagedata_t *self);
 usb_err_t dw2_xter_dtagedata_get_usb_err(dw2_xfer_stagedata_t *self);
 
 boolean dw2_xfer_stagedata_is_timeout(dw2_xfer_stagedata_t *self);
+
+void debug_stdata(dw2_xfer_stagedata_t *self);
 
 #endif

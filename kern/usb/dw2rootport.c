@@ -53,6 +53,7 @@ boolean dw2_rport_init(dw2_rport_t *self)
     // 2. デフォルトデバイスを作成
     self->dev = (usb_dev_t *)kmalloc(sizeof(usb_dev_t));
     usb_device(self->dev, self->host, speed, self);
+
     // 3. デフォルトデバイスの初期化
     if (!usb_dev_init(self->dev)) {
         _usb_device(self->dev);
@@ -60,7 +61,8 @@ boolean dw2_rport_init(dw2_rport_t *self)
         self->dev = 0;
         return false;
     }
-    // 3. デフォルトデバイスのコンフィグレーション
+    trace("3");
+    // 4. デフォルトデバイスのコンフィグレーション
     if (!usb_dev_config(self->dev)) {
         error("cannot configure device");
         _usb_device(self->dev);
@@ -68,10 +70,8 @@ boolean dw2_rport_init(dw2_rport_t *self)
         self->dev = 0;
         return false;
     }
-
-    info("Device configured");
-
-    // 4. 過電流を検知したらルートポートは無効としてFALSEを返す
+    trace("4");
+    // 5. 過電流を検知したらルートポートは無効としてFALSEを返す
     if (dw2_hc_overcurrent_detected(self->host)) {
         error("Over-current condition");
         dw2_hc_disable_rport(self->host, true);
@@ -80,7 +80,7 @@ boolean dw2_rport_init(dw2_rport_t *self)
         self->dev = 0;
         return false;
     }
-
+    info("Device configured");
     return true;
 }
 

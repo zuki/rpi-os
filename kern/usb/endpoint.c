@@ -158,9 +158,9 @@ unsigned usb_ep_get_interval(usb_ep_t *self)
     return self->interval;
 }
 
-usb_pid_t usb_ep_get_nextpid(usb_ep_t *self, boolean ststage)
+usb_pid_t usb_ep_get_nextpid(usb_ep_t *self, boolean ststatus)
 {
-    if (ststage) {
+    if (ststatus) {
         assert(self->type == ep_type_control);
         return usb_pid_data1;
     }
@@ -168,9 +168,9 @@ usb_pid_t usb_ep_get_nextpid(usb_ep_t *self, boolean ststage)
     return self->nextpid;
 }
 
-void usb_ep_skip_pid(usb_ep_t *self, unsigned packets, boolean ststage)
+void usb_ep_skip_pid(usb_ep_t *self, unsigned packets, boolean ststatus)
 {
-    if (!ststage) {
+    if (!ststatus) {
         switch(self->nextpid) {
         case usb_pid_setup:
             self->nextpid = usb_pid_data1;
@@ -192,8 +192,8 @@ void usb_ep_skip_pid(usb_ep_t *self, unsigned packets, boolean ststage)
             break;
         }
     } else {
-        if (self->type != ep_type_control) info("type = %d", self->type);
-        assert(self->type == ep_type_control);
+        if (self->type != ep_type_control) warn("type = %d", self->type);
+        //assert(self->type == ep_type_control);
         self->nextpid = usb_pid_setup;
     }
 }

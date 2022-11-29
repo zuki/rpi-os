@@ -257,15 +257,16 @@ void clean_data_cache_range(uint64_t addr, uint64_t length)
 /// @param length サイズ
 void clean_and_invalidate_data_cache_range(uint64_t addr, uint64_t length)
 {
+    trace("1: addr=0x%016llx, length=0x%llx", addr, length);
     while (1) {
         asm volatile ("dc civac, %0" : : "r" (addr) : "memory");
 
         if (length <= DATA_CACHE_LINE_LENGTH_MIN) {
             break;
         }
-
         addr += DATA_CACHE_LINE_LENGTH_MIN;
         length  -= DATA_CACHE_LINE_LENGTH_MIN;
+        trace("1-1: addr=0x%016llx, length=0x%016llx", addr, length);
     }
 
     DataSyncBarrier ();

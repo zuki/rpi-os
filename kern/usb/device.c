@@ -25,6 +25,8 @@
 #include "console.h"
 #include "kmalloc.h"
 #include "string.h"
+#include "debug.h"
+#include "mm.h"
 
 
 #define MAX_CONFIG_DESC_SIZE    512        // best guess
@@ -135,7 +137,8 @@ void _usb_device(usb_dev_t *self)
     }
 
     if (self->cfg_desc != 0) {
-        kmfree(self->cfg_desc);
+        //kmfree(self->cfg_desc);
+        kfree(self->cfg_desc);
         self->cfg_desc = 0;
     }
 
@@ -167,8 +170,11 @@ void _usb_device(usb_dev_t *self)
 
 boolean usb_dev_init(usb_dev_t *self)
 {
+    trace("usb_dev_init start");
     assert (self->dev_desc == 0);
-    self->dev_desc = (dev_desc_t *) kmalloc(sizeof (dev_desc_t));
+    // FIXME: 64 byte alignのメモリアロケータを作成する
+    //self->dev_desc = (dev_desc_t *) kmalloc(sizeof (dev_desc_t));
+    self->dev_desc = (dev_desc_t *) kalloc();
     assert(sizeof *self->dev_desc >= USB_DEFAULT_MAX_PACKET_SIZE);
     // 1.  8バイトデバイスディスクリプタを取得
     if (dw2_hc_get_desc(self->host, self->ep0,
@@ -176,7 +182,8 @@ boolean usb_dev_init(usb_dev_t *self)
                     self->dev_desc, USB_DEFAULT_MAX_PACKET_SIZE, REQUEST_IN, 0)
         != USB_DEFAULT_MAX_PACKET_SIZE) {
         error("Cannot get device descriptor (short)");
-        kmfree(self->dev_desc);
+        //kmfree(self->dev_desc);
+        kfree(self->dev_desc);
         self->dev_desc = 0;
         return false;
     }
@@ -184,13 +191,16 @@ boolean usb_dev_init(usb_dev_t *self)
     if (self->dev_desc->length != sizeof *self->dev_desc
      || self->dev_desc->type   != DESCRIPTOR_DEVICE) {
         error("Invalid device descriptor");
-        kmfree(self->dev_desc);
+        //kmfree(self->dev_desc);
+        kfree(self->dev_desc);
         self->dev_desc = 0;
         return false;
     }
+    DataMemBarrier();
+    //debug_struct("dev_desc(8)", self->dev_desc, 8);
 
     // 2. 詳細なデバイスディスクリプタを取得
-    usb_ep_set_max_packet_size(self->ep0, self->dev_desc->xsize0);
+    self->ep0->xsize = self->dev_desc->xsize0;
 
     if (dw2_hc_get_desc(self->host, self->ep0,
                     DESCRIPTOR_DEVICE, DESCRIPTOR_INDEX_DEFAULT,
@@ -202,7 +212,8 @@ boolean usb_dev_init(usb_dev_t *self)
         return false;
     }
 
-    // DebugHexdump (self->dev_desc, sizeof *self->dev_desc, "usbdevice");
+    DataMemBarrier();
+    debug_struct("dev_desc", self->dev_desc, sizeof *self->dev_desc);
 
     // 3. アドレスを採番
     uint8_t addr = next_addr++;
@@ -210,19 +221,21 @@ boolean usb_dev_init(usb_dev_t *self)
         error("Too many devices");
         return false;
     }
-
+    trace("3: addr=%d", addr);
     // 4. デバイスにアドレスをセット
     if (!dw2_hc_set_addr(self->host, self->ep0, addr)) {
         error("Cannot set address %d", addr);
         return false;
     }
     self->addr = addr;
-
-    // 5. コンフィグレーションディスクリプタ（8バイト短縮版）を仮設定
+    trace("4");
+    // 5. コンフィグレーションディスクリプタ（先頭のconfig_descのみ）を仮設定
     assert (self->cfg_desc == 0);
-    self->cfg_desc = (cfg_desc_t *)kmalloc(sizeof (cfg_desc_t));
+    // FIXME
+    //self->cfg_desc = (cfg_desc_t *)kmalloc(sizeof (cfg_desc_t));
+    self->cfg_desc = (cfg_desc_t *)kalloc();
     assert (self->cfg_desc != 0);
-
+    trace("cfg_desc[1]=0x%p", self->cfg_desc);
     // 5.1 コンフィグレーションインデックスの設定
     uint8_t cindex = DESCRIPTOR_INDEX_DEFAULT;
     // 5.2 QEMUのEthernetデバイスの場合は、特別なサポート
@@ -230,56 +243,69 @@ boolean usb_dev_init(usb_dev_t *self)
      || self->dev_desc->productid == 0xA4A2) {  // Ethernet/RNDIS Gadget
         cindex++;
     }
+    trace("5.2: cindex=%d", cindex);
     // 5.3 コンフィグレーションディスクリプタを取得
     if (dw2_hc_get_desc(self->host, self->ep0,
                     DESCRIPTOR_CONFIGURATION, cindex,
                     self->cfg_desc, sizeof *self->cfg_desc, REQUEST_IN, 0)
         != (int) sizeof *self->cfg_desc) {
         error("Cannot get configuration descriptor (short)");
-        kmfree(self->cfg_desc);
+        //kmfree(self->cfg_desc);
+        kfree(self->cfg_desc);
         self->cfg_desc = 0;
         return false;
     }
+    trace("5.3");;
     // 5.4 コンフィグレーションディスクリプタが不正
     if (self->cfg_desc->length != sizeof *self->cfg_desc
      || self->cfg_desc->type   != DESCRIPTOR_CONFIGURATION
      || self->cfg_desc->total  >  MAX_CONFIG_DESC_SIZE) {
         error("Invalid configuration descriptor");
-        kmfree(self->cfg_desc);
+        //kmfree(self->cfg_desc);
+        kfree(self->cfg_desc);
         self->cfg_desc = 0;
         return false;
     }
+    DataMemBarrier();
+    //debug_struct("config_desc(8)", self->cfg_desc, sizeof(cfg_desc_t));
 
+    trace("5.4");;
     // 6. 正式版のコンフィグレーションディスクリプタを取得
     unsigned total = self->cfg_desc->total;
     // 6.1 8バイト版コンフィグレーションディスクリプタを削除
-    kmfree(self->cfg_desc);
+    //kmfree(self->cfg_desc);
+    memset(self->cfg_desc, 0, total);
+    DataMemBarrier();
+
     // 6.2 正式なコンフィグレーションディスクリプタ用のスペースを確保
-    self->cfg_desc = (cfg_desc_t *)kmalloc(total);
+    //self->cfg_desc = (cfg_desc_t *)kmalloc(total);
     assert (self->cfg_desc != 0);
+    trace("cfg_desc[2]=0x%p", self->cfg_desc);
     // 6.3 正式なコンフィグレーションディスクリプタを取得
     if (dw2_hc_get_desc(self->host, self->ep0,
                     DESCRIPTOR_CONFIGURATION, cindex,
                     self->cfg_desc, total, REQUEST_IN, 0)
         != (int) total) {
         error("Cannot get configuration descriptor");
-        kmfree(self->cfg_desc);
+        //kmfree(self->cfg_desc);
+        kfree(self->cfg_desc);
         self->cfg_desc = 0;
         return false;
     }
-
-    // DebugHexdump (self->cfg_desc, total, FromDevice);
+    trace("6");
+    //DataMemBarrier();
+    debug_struct("config_desc", self->cfg_desc, (uint64_t)total);
 
     // 7. コンフィグレーションパーサを作成
     assert (self->cfg_parser == 0);
     self->cfg_parser = (cfg_parser_t *)kmalloc (sizeof (cfg_parser_t));
     assert (self->cfg_parser != 0);
     cfg_parser(self->cfg_parser, self->cfg_desc, total);
-    if (!cfg_parser_is_valid(self->cfg_parser)) {
+    if (!self->cfg_parser->valid) {
         cfg_parser_error(self->cfg_parser, "usbdevice");
         return false;
     }
-
+    trace("7");
     // 8. デバイス名を表示
     char *names = (char *)kmalloc(128);
     names = usb_dev_get_names(self);
@@ -306,7 +332,7 @@ boolean usb_dev_init(usb_dev_t *self)
         info("Product: %s %s", self->manufact != 0 ? self->manufact->str : "",
                                self->product != 0 ? self->product->str : "");
     }
-
+    trace("8");
     // 9. コンフィグレーションディスクリプタからインタフェースを取得する
     unsigned i = 0;
     uint8_t num = 0;
@@ -369,7 +395,7 @@ boolean usb_dev_init(usb_dev_t *self)
         warn("Device has no supported function");
         return false;
     }
-
+    trace("9");
     return true;
 }
 
@@ -395,7 +421,7 @@ boolean usb_dev_config(usb_dev_t *self)
                 kmfree(self->usb_func[i]);
                 self->usb_func[i] = 0;
             } else {
-                info("%d is ok", i);
+                trace("%d is ok", i);
                 result = true;
             }
         }

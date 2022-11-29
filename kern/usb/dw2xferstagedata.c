@@ -24,11 +24,26 @@
 #include "usb/dw2hc.h"
 #include "types.h"
 #include "console.h"
+#include "debug.h"
 #include "linux/time.h"
 
 #define MAX_BULK_TRIES      8
 
-void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t *urb, boolean in, boolean ststage, unsigned timeout)
+#define BTF(x) ((x) ? "true" : "false")
+
+void
+debug_stdata(dw2_xfer_stagedata_t *self)
+{
+    cprintf("\nstagedata: stagedata: 0x%p\n", self);
+    cprintf("    : channel: %d, in: %s, stage: %s, fsused: %s, split: %s\n",
+        self->channel, BTF(self->in), BTF(self->ststatus), BTF(self->fsused), BTF(self->split));
+    cprintf("    : state: %d, substate: %d, trstatus: %d\n",
+        self->state, self->substate, self->trstatus);
+    cprintf("    : buffp: 0x%p, bpt: %d, ppt: %d, packets: %d\n\n",
+        self->buffp, self->bpt, self->ppt, self->packets);
+}
+
+void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t *urb, boolean in, boolean ststatus, unsigned timeout)
 {
     assert(self != 0);
 
@@ -36,7 +51,7 @@ void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t 
     self->urb = urb;
     self->in = in;
     self->timeout = USB_TIMEOUT_NONE;
-    self->ststage = ststage;
+    self->ststatus = ststatus;
     self->split_comp = false;
     self->xfered = 0;
     self->state = 0;
@@ -51,15 +66,14 @@ void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t 
     self->speed = usb_dev_get_speed(self->dev);
     self->xpsize = usb_ep_get_max_packet_size(self->ep);
 
-    self->split = usb_dev_get_hubaddr(self->dev) != 0
-               && self->speed != usb_speed_high;
+    self->split = self->dev->hubaddr != 0 && self->speed != usb_speed_high;
 
-    if (!ststage) {
-        if (usb_ep_get_nextpid(self->ep, ststage) == usb_pid_setup) {
-            self->buffp = usb_req_get_setup_data(urb);
+    if (!ststatus) {
+        if (usb_ep_get_nextpid(self->ep, ststatus) == usb_pid_setup) {
+            self->buffp = urb->setup_data;
             self->xfersize = sizeof(setup_data_t);
         } else {
-            self->buffp = usb_req_get_buffer(urb);
+            self->buffp = urb->buffer;
             self->xfersize = usb_req_get_buflen(urb);
         }
 
@@ -86,18 +100,20 @@ void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t 
         self->ppt = 1;
     }
 
-    //assert(self->buffp != 0);
+    assert(self->buffp != 0);
     //trace("bp=0x%llx", self->buffp);
-    if (self->buffp == 0 || ((uintptr_t) self->buffp & 3) != 0) {
-        error("buffp not align: %p", self->buffp);
-    }
-    //assert(((uintptr_t) self->buffp & 3) == 0);
+    //if (self->buffp == 0 || ((uintptr_t) self->buffp & 3) != 0) {
+    //    error("buffp not align: %p", self->buffp);
+    //}
+    assert(((uintptr_t) self->buffp & 3) == 0);
 
     if (self->split) {
         if (dw2_xfer_stagedata_is_periodic(self)) {
             dw2_fsched_per(&self->fsched.periodic);
+            trace("periodic: 0x%p", &self->fsched.periodic);
         } else {
             dw2_fsched_nper(&self->fsched.nonperiodic);
+            trace("nonperiodic: 0x%p", &self->fsched.nonperiodic);
         }
         self->fsused = true;
     } else {
@@ -105,7 +121,10 @@ void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t 
         {
             dw2_fsched_nsplit(&self->fsched.nosplit,
                             dw2_xfer_stagedata_is_periodic(self));
+            trace("nosplit: 0x%p", &self->fsched.nosplit);
             self->fsused = true;
+        } else {
+            trace("no use fsched");
         }
     }
 
@@ -115,6 +134,7 @@ void dw2_xfer_stagedata(dw2_xfer_stagedata_t *self, unsigned channel, usb_req_t 
         self->timeout = timeout * HZ / 1000;
         self->start = jiffies;
     }
+    //debug_stdata(self);
 }
 
 void _dw2_xfer_stagedata(dw2_xfer_stagedata_t *self)
@@ -162,7 +182,7 @@ void dw2_xfer_stagedata_trans_complete(dw2_xfer_stagedata_t *self, uint32_t stat
     self->buffp = (uint8_t *)self->buffp + bytexfered;
 
     if (!self->split || self->split_comp) {
-        usb_ep_skip_pid(self->ep, packetxfered, self->ststage);
+        usb_ep_skip_pid(self->ep, packetxfered, self->ststatus);
     }
 
     // これはないはずだが、何らかのデバイスで生じるようだ
@@ -282,7 +302,7 @@ usb_speed_t dw2_xfer_stagedata_get_speed(dw2_xfer_stagedata_t *self)
 uint8_t dw2_xfer_stagedata_get_pid(dw2_xfer_stagedata_t *self)
 {
     uint8_t pid = 0;
-    usb_pid_t next = usb_ep_get_nextpid(self->ep, self->ststage);
+    usb_pid_t next = usb_ep_get_nextpid(self->ep, self->ststatus);
     switch(next)
     {
     case usb_pid_setup:
@@ -298,7 +318,7 @@ uint8_t dw2_xfer_stagedata_get_pid(dw2_xfer_stagedata_t *self)
         break;
 
     default:
-        info("bad next: %d", next);
+        warn("bad next: %d", next);
         assert(0);
         break;
     }
@@ -313,12 +333,12 @@ boolean dw2_xfer_stagedata_is_in(dw2_xfer_stagedata_t *self)
 
 boolean dw2_xfer_stagedata_is_ststage(dw2_xfer_stagedata_t *self)
 {
-    return self->ststage;
+    return self->ststatus;
 }
 
-uint32_t dw2_xfer_stagedata_get_dmaaddr(dw2_xfer_stagedata_t *self)
+uint64_t dw2_xfer_stagedata_get_dmaaddr(dw2_xfer_stagedata_t *self)
 {
-    return (uint32_t)(uintptr_t)self->buffp;
+    return (uint64_t)self->buffp;
 }
 
 uint32_t dw2_xfer_stagedata_get_bpt(dw2_xfer_stagedata_t *self)

@@ -112,7 +112,7 @@ typedef struct // device_descriptor
 {
     unsigned char   length;
     unsigned char   type;
-    unsigned short  usb;
+    unsigned short  version;
     unsigned char   class;
     unsigned char   subclass;
     unsigned char   proto;

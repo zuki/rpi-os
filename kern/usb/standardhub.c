@@ -28,6 +28,7 @@
 #include "types.h"
 #include "console.h"
 #include "kmalloc.h"
+#include "mm.h"
 #include "string.h"
 
 static uint32_t DEVNOS = 0;
@@ -69,7 +70,8 @@ void _usb_standardhub(usb_stdhub_t *self)
 {
     for (unsigned i = 0; i < self->nports; i++) {
         if (self->status[i] != 0) {
-            kmfree(self->status[i]);
+            //kmfree(self->status[i]);
+            kfree(self->status[i]);
             self->status[i] = 0;
         }
 
@@ -92,7 +94,8 @@ void _usb_standardhub(usb_stdhub_t *self)
     }
 
     if (self->hub_desc != 0) {
-        kmfree(self->hub_desc);
+        //kmfree(self->hub_desc);
+        kfree(self->hub_desc);
         self->hub_desc = 0;
     }
 
@@ -133,7 +136,9 @@ boolean usb_stdhub_config(usb_func_t *func)
 
     // 6. ハブディスクリプタを取得して設定
     dw2_hc_t *host = usb_func_get_host(&self->func);
-    self->hub_desc = (hub_desc_t *)kmalloc(sizeof(hub_desc_t));
+    // FIXME
+    //self->hub_desc = (hub_desc_t *)kmalloc(sizeof(hub_desc_t));
+    self->hub_desc = (hub_desc_t *)kalloc();
     assert(self->hub_desc != 0);
     if (dw2_hc_get_desc(host, usb_func_get_ep0(&self->func),
                     DESCRIPTOR_HUB, DESCRIPTOR_INDEX_DEFAULT,
@@ -144,7 +149,7 @@ boolean usb_stdhub_config(usb_func_t *func)
     }
     // 7. port数を設定
     self->nports = self->hub_desc->nports;
-    if (self->nports < USB_HUB_MAX_PORTS) {
+    if (self->nports > USB_HUB_MAX_PORTS) {
         warn("Too many ports (%d)", self->nports);
         goto bad;
     }
@@ -174,7 +179,8 @@ boolean usb_stdhub_config(usb_func_t *func)
     return true;
 
 bad:
-    kmfree(self->hub_desc);
+    //kmfree(self->hub_desc);
+    kfree(self->hub_desc);
     self->hub_desc = 0;
     return false;
 }
@@ -212,7 +218,8 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
         }
         // 2.2 status[i]の領域を確保する
         if (self->status[i] == 0) {
-            self->status[i] = kmalloc(sizeof(usb_port_status_t));
+            //self->status[i] = (usb_port_status_t *)kmalloc(sizeof(usb_port_status_t));
+            self->status[i] = (usb_port_status_t *)kalloc();
             assert (self->status[i] != 0);
         }
         // 2.3 ポートのステータスを取得する
@@ -300,14 +307,16 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
     }
 
     // 4. もう一度過電流がないかチェックする
-    hub_status_t *hubstatus = kmalloc(sizeof(hub_status_t));
+    //hub_status_t *hubstatus = kmalloc(sizeof(hub_status_t));
+    hub_status_t *hubstatus = kalloc();
     assert (hubstatus != 0);
     // 4.1 ハブの過電流チェック
     if (dw2_hc_control_message(host, ep0,
             REQUEST_IN | REQUEST_CLASS,
             GET_STATUS, 0, 0, hubstatus, sizeof *hubstatus) != (int) sizeof *hubstatus) {
         warn("Cannot get hub status");
-        kmfree(hubstatus);
+        //kmfree(hubstatus);
+        kfree(hubstatus);
         return false;
     }
 
@@ -318,11 +327,13 @@ usb_stdhub_enumerate_ports(usb_stdhub_t *self)
                 CLEAR_FEATURE, PORT_POWER, i+1, 0, 0);
         }
         warn("Hub over-current condition");
-        kmfree (hubstatus);
+        //kmfree (hubstatus);
+        kfree (hubstatus);
         return false;
     }
 
-    kmfree(hubstatus);
+    //kmfree(hubstatus);
+    kfree(hubstatus);
     hubstatus = 0;
 
     boolean result = true;
